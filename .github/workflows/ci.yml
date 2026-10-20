@@ -31,6 +31,10 @@ jobs:
           packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          # Self-hosted runners keep ~/.gradle in a persisted volume; uploading it to GitHub's cache
+          # after every job only adds minutes (seen 8+ min on a 2-core runner).
+          cache-disabled: ${{ runner.environment == 'self-hosted' }}
 
       - name: Release key
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
