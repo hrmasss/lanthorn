@@ -1,0 +1,18 @@
+Player
+Copyright (C) 2026 the Player contributors.
+Licensed under the GNU General Public License v3.0 or later. See LICENSE.
+
+This app bundles or links the following third-party software:
+
+- libmpv-android (dev.jdtech.mpv:libmpv), MIT licence.
+  https://github.com/jarnedemeulemeester/libmpv-android
+  Ships native builds of:
+  - mpv (https://mpv.io), GPL-2.0-or-later as built.
+  - FFmpeg (https://ffmpeg.org), built with --enable-gpl --enable-version3, so GPL-3.0-or-later.
+  - libass, FreeType, HarfBuzz, FriBidi, fontconfig, libxml2, libunibreak, dav1d, libplacebo,
+    mbedTLS, Lua. Each under its own licence, all GPL-3.0 compatible.
+  Corresponding source: the libmpv-android repository at tag v1.0.0, whose buildscripts pin
+  every upstream version.
+
+- AndroidX and Jetpack Compose, Apache-2.0.
+- Kotlin and kotlinx.coroutines, Apache-2.0.
