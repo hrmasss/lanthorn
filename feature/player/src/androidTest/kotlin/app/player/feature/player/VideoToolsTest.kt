@@ -52,7 +52,8 @@ class VideoToolsTest {
         log("fit margins (top, bottom, left, right): $margins")
         assertTrue("fit leaves bars", margins.getValue(FitMode.Fit).sum() > 0)
         assertEquals("stretch fills", 0, margins.getValue(FitMode.Stretch).sum())
-        assertEquals("crop fills", 0, margins.getValue(FitMode.Crop).sum())
+        // Crop overflows the screen: margins go negative (the picture is larger than the view).
+        assertTrue("crop fills", margins.getValue(FitMode.Crop).all { it <= 0 })
         assertTrue("100% is smaller than fit", margins.getValue(FitMode.Original).sum() > margins.getValue(FitMode.Fit).sum())
     }
 
@@ -136,9 +137,11 @@ class VideoToolsTest {
         val adjusted = grab("adjust-on")
         tools.setPicture(PictureAdjust())
         val reset = grab("adjust-reset")
-        assertTrue("adjust changed the frame", !plain.sameAs(adjusted))
-        assertTrue("zeros give back the frame", plain.sameAs(reset))
-        log("picture adjust: changed, reset identical")
+        val changed = maxDiff(plain, adjusted)
+        val back = maxDiff(plain, reset)
+        log("picture adjust: max channel difference with adjust $changed, after reset to zeros $back")
+        assertTrue("adjust changed the frame", changed > 10)
+        assertEquals("zeros give back the frame", 0, back)
     }
 
     @Test fun deinterlaceModes_US38() = runBlocking<Unit> {
@@ -183,6 +186,17 @@ class VideoToolsTest {
         else -> null
     }
 
+    /** Largest per-channel difference over every pixel. */
+    private fun maxDiff(a: Bitmap, b: Bitmap): Int {
+        var worst = 0
+        for (y in 0 until minOf(a.height, b.height)) for (x in 0 until minOf(a.width, b.width)) {
+            val p = a.getPixel(x, y)
+            val q = b.getPixel(x, y)
+            worst = maxOf(worst, abs(Color.red(p) - Color.red(q)), abs(Color.green(p) - Color.green(q)), abs(Color.blue(p) - Color.blue(q)))
+        }
+        return worst
+    }
+
     private fun sampleError(a: Bitmap, b: Bitmap, map: (Int, Int) -> Pair<Int, Int>): Int {
         var worst = 0
         for (i in 1..9) for (j in 1..9) {
@@ -221,11 +235,10 @@ class VideoToolsTest {
     }
 
     private fun copy(asset: String): Uri {
+        // Always fresh: a run that crashed mid-copy once left a truncated file here.
         val file = File(context.cacheDir, asset)
-        if (!file.exists()) {
-            InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
-                file.outputStream().use { input.copyTo(it) }
-            }
+        InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
+            file.outputStream().use { input.copyTo(it) }
         }
         return Uri.fromFile(file)
     }
