@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Overlay controls: content descriptions (US-69.1) -->
+    <string name="player_back">Back</string>
+    <string name="player_more">More options</string>
+    <string name="player_lock">Lock controls</string>
+    <string name="player_previous">Previous video</string>
+    <string name="player_next">Next video</string>
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_rotate">Rotate screen</string>
+    <string name="player_fit">Fit mode</string>
+    <string name="player_seek_bar">Playback position</string>
+    <string name="player_elapsed">Elapsed %1$s</string>
+    <string name="player_total">Total %1$s. Tap for remaining time</string>
+    <string name="player_remaining">Remaining %1$s. Tap for total time</string>
+    <string name="player_decoder_badge">Decoder %1$s. Tap to change</string>
+    <string name="player_speed_badge">Speed %1$s</string>
+    <string name="player_battery">Battery %1$d%%</string>
+    <string name="player_close_panel">Close</string>
+    <string name="player_back_again">Press back again to leave</string>
+
+    <!-- Decoder picker (US-35.2) -->
+    <string name="decoder_title">Decoder</string>
+    <string name="decoder_auto">Auto</string>
+    <string name="decoder_auto_summary">Hardware first, software if it fails</string>
+    <string name="decoder_hw">HW</string>
+    <string name="decoder_hw_summary">Hardware, fastest</string>
+    <string name="decoder_hw_plus">HW+</string>
+    <string name="decoder_hw_plus_summary">Hardware with filters and deinterlace</string>
+    <string name="decoder_sw">SW</string>
+    <string name="decoder_sw_summary">Software, plays anything, more battery</string>
+
+    <!-- TalkBack actions instead of gestures (US-69.2) -->
+    <string name="a11y_seek_forward">Forward 10 seconds</string>
+    <string name="a11y_seek_back">Back 10 seconds</string>
+    <string name="a11y_volume_up">Volume up</string>
+    <string name="a11y_volume_down">Volume down</string>
+    <string name="a11y_brightness_up">Brightness up</string>
+    <string name="a11y_brightness_down">Brightness down</string>
+    <string name="a11y_hide_controls">Hide controls</string>
+    <string name="a11y_show_controls">Show controls</string>
+    <string name="a11y_video">Video</string>
+
+    <!-- Menu -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_group_video">Video</string>
+    <string name="menu_group_audio">Audio</string>
+    <string name="menu_group_subtitle">Subtitle</string>
+    <string name="menu_group_tools">Tools</string>
+    <string name="menu_player_settings">Player settings</string>
+
+    <!-- Player settings group -->
+    <string name="settings_player">Player</string>
+    <string name="settings_auto_hide">Hide controls automatically</string>
+    <string name="settings_auto_hide_summary">While playing, after the last touch</string>
+    <string name="settings_auto_hide_delay">Hide after</string>
+    <string name="settings_seconds">%1$s s</string>
+    <string name="settings_show_remaining">Show remaining time</string>
+    <string name="settings_screen_on_paused">Keep screen on when paused</string>
+    <string name="settings_status_top_bar">Battery and clock in top bar</string>
+    <string name="settings_keep_status">Keep status visible</string>
+    <string name="settings_keep_status_summary">Elapsed time, battery and clock stay in the corners when controls hide</string>
+    <string name="settings_back_twice">Press back twice to leave</string>
+</resources>
