@@ -30,6 +30,12 @@ class VideoToolsTest {
         )
     }
 
+    @Test fun `US-57_3 each control runs -100 to +100 in steps of 1`() {
+        assertEquals(-100L, VideoTools.clampAdjust(-250))
+        assertEquals(100L, VideoTools.clampAdjust(101))
+        (-100..100).forEach { assertEquals(it.toLong(), VideoTools.clampAdjust(it)) }
+    }
+
     @Test fun `US-57_3 picture adjust defaults to zero`() {
         assertEquals(PictureAdjust(0, 0, 0, 0), PictureAdjust())
     }
