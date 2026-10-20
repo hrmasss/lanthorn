@@ -128,4 +128,30 @@
     <string name="g_touch_pause">Play or pause</string>
     <string name="g_touch_show_then_pause">Show controls, then play or pause</string>
     <string name="g_touch_show_and_pause">Show controls and pause</string>
+
+    <!-- Video menu and shortcuts (P1.16) -->
+    <string name="video_aspect">Aspect ratio</string>
+    <string name="video_aspect_default">As the file says</string>
+    <string name="video_aspect_custom">Custom</string>
+    <string name="video_picture">Picture</string>
+    <string name="video_night_summary">Darker, less blue picture. Controls and subtitles stay as they are.</string>
+    <string name="video_brightness">Brightness</string>
+    <string name="video_contrast">Contrast</string>
+    <string name="video_saturation">Saturation</string>
+    <string name="video_gamma">Gamma</string>
+    <string name="video_reset">Reset picture</string>
+    <string name="video_fit_aspect">Fit and aspect ratio</string>
+    <string name="sc_title">Shortcuts</string>
+    <string name="sc_rotation_lock">Rotation lock</string>
+    <string name="sc_background">Background play</string>
+    <string name="sc_loop">Loop</string>
+    <string name="sc_mute">Mute</string>
+    <string name="sc_shuffle">Shuffle</string>
+    <string name="sc_equalizer">Equalizer</string>
+    <string name="sc_night">Night mode</string>
+    <string name="sc_mirror">Mirror</string>
+    <string name="sc_vflip">Vertical flip</string>
+    <string name="sc_on">On</string>
+    <string name="sc_off">Off</string>
+    <string name="sc_move_up">Move %1$s up</string>
 </resources>

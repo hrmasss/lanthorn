@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import app.player.feature.player.R
+import app.player.feature.player.overlay.Shortcut
+import app.player.feature.player.overlay.ShortcutsSettings
 import app.player.feature.player.tools.PlaybackTools
 import kotlin.math.roundToInt
 
@@ -78,6 +80,8 @@ fun PlayerSettingsContent(prefs: PlayerPrefs, update: ((PlayerPrefs) -> PlayerPr
             modifier = Modifier.testTag("set-back-twice"),
         )
         GestureSettings(prefs.gestures) { change -> update { it.copy(gestures = change(it.gestures)) } }
+        SectionHeader(stringResource(R.string.sc_title))
+        ShortcutsSettings(Shortcut.parse(prefs.shortcuts)) { list -> update { it.copy(shortcuts = Shortcut.format(list)) } }
     }
 }
 
