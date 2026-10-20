@@ -79,6 +79,9 @@ android {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.uiautomator)
     implementation(project(":core:designsystem"))
     implementation(project(":core:engine"))
     implementation(project(":core:data"))

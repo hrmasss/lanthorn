@@ -73,16 +73,17 @@ fun RadioRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     summary: String? = null,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .selectable(selected, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null)
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
         RowText(title, summary, Modifier.weight(1f).padding(start = 16.dp))
     }
 }
