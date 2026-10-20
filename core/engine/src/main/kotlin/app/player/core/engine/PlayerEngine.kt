@@ -198,6 +198,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         scrubTarget = positionMs
         scrubSentAt = SystemClock.elapsedRealtime()
         mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
+        if (preview) Log.i(TAG, "preview seek to $positionMs ms")
     }
 
     private fun scrubLanded() = post {
@@ -453,6 +454,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
+                    if (preview) Log.i(TAG, "preview frame at ${_state.value.positionMs} ms")
                     scrubLanded()
                     _state.update {
                         if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)

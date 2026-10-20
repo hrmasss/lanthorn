@@ -150,10 +150,12 @@ class BenchActivity : ComponentActivity() {
         engine.pause()
         val p = SeekPreviewState(PlayerEngine.preview(this))
         preview = p
-        p.engine.open(uri)
-        withTimeoutOrNull(10_000) { p.engine.state.first { it.loaded } }
+        // Surface first, then the file, as on the real seek bar once it has been touched.
         previewTarget = engine.state.value.durationMs / 10
-        delay(1500)
+        delay(500)
+        p.engine.open(uri)
+        withTimeoutOrNull(10_000) { p.engine.state.first { it.firstFrameMs != null } }
+        delay(1000)
         drag(p.engine, out, seconds) { previewTarget = it }
         previewTarget = null
         preview = null
