@@ -55,7 +55,9 @@ class AudioSettingsOnDeviceTest {
         store.setLanguage("it")
         engine.await("alang", PropertyType.Text) { it == "it,ita" }
         open("tracks.mkv")
-        val picked = engine.get("current-tracks/audio/lang", PropertyType.Text)
+        // The previous file's track values linger until the new file has loaded: wait for the pick, bounded.
+        val picked = runCatching { engine.await("current-tracks/audio/lang", PropertyType.Text, 5_000) { it == "ita" } }
+            .map { "ita" }.getOrElse { engine.get("current-tracks/audio/lang", PropertyType.Text) }
         assertEquals("ita", picked)
         evidence("US-47.2 no preference: '$first' (the default track); preferred Italian: '$picked' picked at open (alang it,ita)")
     }
