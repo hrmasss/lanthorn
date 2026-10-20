@@ -20,4 +20,13 @@
     <string name="audio_stereo">Stereo</string>
     <string name="audio_mono">Mono</string>
     <string name="audio_reverse">Reverse</string>
+    <string name="audio_settings_title">Audio</string>
+    <string name="audio_setting_language">Preferred audio language</string>
+    <string name="audio_setting_language_none">None (use the file\'s default track)</string>
+    <string name="audio_setting_default_delay">Default audio delay</string>
+    <string name="audio_setting_default_delay_summary">Applied to every new video</string>
+    <string name="audio_setting_bluetooth_delay">Bluetooth audio delay</string>
+    <string name="audio_setting_bluetooth_delay_summary">Added while sound goes to a Bluetooth device</string>
+    <string name="audio_setting_delay_note">Positive values play sound later, negative earlier.</string>
+    <string name="audio_delay_value">%1$+.2f s</string>
 </resources>
