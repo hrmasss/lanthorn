@@ -33,6 +33,7 @@ class StreamInfoTest {
         val clip = File(context.cacheDir, "clip.mp4")
         InstrumentationRegistry.getInstrumentation().context.assets.open("clip.mp4").use { i -> clip.outputStream().use { i.copyTo(it) } }
         val srt = File(context.cacheDir, "clip.fr.srt").apply { writeText("1\n00:00:00,000 --> 00:00:04,000\nSous-titre externe\n\n") }
+        engine.set("sub-auto", "no") // mpv would also load clip.fr.srt by itself and list it twice
         engine.open(Uri.fromFile(clip))
         withTimeout(10_000) { engine.state.first { it.loaded } }
         engine.command("sub-add", srt.path, "select", "external", "fr")
