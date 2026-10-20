@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.player.core.designsystem.theme.PlayerColors
 import app.player.core.designsystem.theme.tabular
@@ -86,6 +87,19 @@ fun OverlayChip(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         )
     }
+}
+
+/** Video title in the overlay's top bar. One line, ellipsis at the end. */
+@Composable
+fun OverlayTitle(title: String, modifier: Modifier = Modifier) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        color = PlayerColors.Content,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
 }
 
 /** Centred readout for a gesture in progress: seek target and delta, volume, brightness. */

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -43,9 +43,16 @@ fun AppSheet(
     }
 }
 
-/** Buffering in the player. The shape-morphing indicator, white, never a spinner. */
+/**
+ * Buffering in the player. The shape-morphing indicator, never a spinner. White on a scrim
+ * disc so it stays visible over a white frame.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BufferingIndicator(modifier: Modifier = Modifier) {
-    LoadingIndicator(modifier = modifier, color = PlayerColors.Content)
+    ContainedLoadingIndicator(
+        modifier = modifier,
+        containerColor = PlayerColors.Scrim,
+        indicatorColor = PlayerColors.Content,
+    )
 }

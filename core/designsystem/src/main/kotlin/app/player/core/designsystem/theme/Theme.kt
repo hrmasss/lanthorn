@@ -38,6 +38,7 @@ fun LanthornTheme(
         else -> FallbackLight
     }
     if (dark && pureBlack) scheme = scheme.pureBlack()
+    SystemBarIcons(darkContentBehind = dark)
     MaterialExpressiveTheme(
         colorScheme = scheme,
         motionScheme = MotionScheme.expressive(),
@@ -59,6 +60,7 @@ fun LanthornPlayerTheme(dynamicColor: Boolean = true, content: @Composable () ->
     } else {
         FallbackDark
     }
+    SystemBarIcons(darkContentBehind = true)
     MaterialExpressiveTheme(
         colorScheme = scheme,
         motionScheme = MotionScheme.standard(),

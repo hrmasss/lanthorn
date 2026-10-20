@@ -7,3 +7,7 @@ plugins {
 android {
     namespace = "app.player.core.designsystem"
 }
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+}

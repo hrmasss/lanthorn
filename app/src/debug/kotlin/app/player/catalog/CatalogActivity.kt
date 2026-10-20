@@ -36,6 +36,7 @@ import app.player.core.designsystem.component.BufferingIndicator
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.component.OverlayChip
 import app.player.core.designsystem.component.OverlayIconButton
+import app.player.core.designsystem.component.OverlayTitle
 import app.player.core.designsystem.component.PlayPauseButton
 import app.player.core.designsystem.component.ReadoutPill
 import app.player.core.designsystem.component.ScrimEdge
@@ -86,13 +87,7 @@ private fun OverlayCatalog(frame: String) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OverlayIconButton(LanthornIcons.Back, "Back", {})
-                Text(
-                    "Holiday in the mountains.mkv",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = PlayerColors.Content,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
+                OverlayTitle("Holiday in the mountains.mkv", Modifier.weight(1f))
                 OverlayIconButton(LanthornIcons.Subtitles, "Subtitles", {})
                 OverlayIconButton(LanthornIcons.Audio, "Audio track", {})
                 OverlayIconButton(LanthornIcons.More, "More", {})
