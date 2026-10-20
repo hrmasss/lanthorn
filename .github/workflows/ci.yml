@@ -10,7 +10,8 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Self-hosted pool on charulata when the repo variable RUNNER is set (hm-runner); GitHub-hosted otherwise.
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -19,6 +20,15 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
+      # GitHub's image ships an Android SDK; the self-hosted runner does not. Installed once into
+      # the runner's persisted home, then reused.
+      - uses: android-actions/setup-android@v3
+        if: runner.environment == 'self-hosted'
+        with:
+          # The default list still names 'tools', which Google no longer ships. Gradle fetches the
+          # platform and build-tools it needs on its own once the licences are accepted.
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v6
 
