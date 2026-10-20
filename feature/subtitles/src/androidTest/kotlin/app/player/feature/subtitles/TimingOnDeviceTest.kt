@@ -65,7 +65,15 @@ class TimingOnDeviceTest {
         near(0.3)
         engine.open(tracks)
         near(1.25)
+        // "Remember choices" off: the file gets the default again.
+        val remember = app.player.core.data.choice.RememberPerFile(OnDevice.context)
+        remember.set(false)
+        engine.open(Uri.fromFile(OnDevice.asset("wide.mkv")))
+        near(0.3)
+        engine.open(tracks)
+        near(0.3)
+        remember.set(true)
         app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(tracks.toString())
-        evidence("US-41.4 set 1.25 s on one file; another file got the 300 ms default; reopening the first restored 1.25 s")
+        evidence("US-41.4 set 1.25 s on one file; another file got the 300 ms default; reopening the first restored 1.25 s; with remember choices off it got 300 ms")
     }
 }
