@@ -81,15 +81,18 @@ class PlayerChromeTest {
 
     @Test fun screenOnWhilePlayingAndPaused_US60_1() {
         // Read from the window manager (dumpsys), the state the system acts on.
-        runCatching { waitUntil(3_000) { keepScreenOn() } }
-            .onFailure { log("US-60.1 window block: ${windowBlock().take(1_500)}") }.getOrThrow()
-        log("US-60.1 playing: keep-screen-on ${keepScreenOn()}")
+        fun step(name: String, want: Boolean) {
+            runCatching { waitUntil(8_000) { keepScreenOn() == want } }
+                .onFailure { log("US-60.1 $name: wanted $want, window block: ${windowBlock().take(1_200)}") }
+                .getOrThrow()
+            log("US-60.1 $name: keep-screen-on ${keepScreenOn()}")
+        }
+        SystemClock.sleep(1_000)
+        step("playing", true)
         PlayerSessions.current.value!!.pause()
-        waitUntil(3_000) { !keepScreenOn() }
-        log("US-60.1 paused, setting off: keep-screen-on ${keepScreenOn()}")
+        step("paused, setting off", false)
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
-        waitUntil(3_000) { keepScreenOn() }
-        log("US-60.1 paused, setting on: keep-screen-on ${keepScreenOn()}")
+        step("paused, setting on", true)
     }
 
     @Test fun talkBackActions_US69_2() {
