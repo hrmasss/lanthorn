@@ -64,6 +64,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private var scrubInFlight = false
     private var scrubNext: Long? = null
     private var scrubSentAt = 0L
+    private var scrubTarget: Long? = null
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -187,21 +188,35 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     /** The finger lifted: exact seek to where it stopped (US-17.2). */
     fun endScrub(positionMs: Long) = post {
         scrubNext = null
+        scrubTarget = null
         scrubInFlight = false
         mpvCommand("seek", "${positionMs / 1000.0}", "absolute+exact")
     }
 
     private fun sendScrub(positionMs: Long) {
         scrubInFlight = true
+        scrubTarget = positionMs
         scrubSentAt = SystemClock.elapsedRealtime()
         mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
     }
 
     private fun scrubLanded() = post {
         scrubInFlight = false
-        scrubNext?.let {
+        val next = scrubNext
+        if (next != null) {
             scrubNext = null
-            sendScrub(it)
+            sendScrub(next)
+            return@post
+        }
+        // Nothing newer waiting: if the keyframe is far from the target (long GOPs), refine with
+        // an exact seek, so a slowing finger sees the frame it points at (US-30.1: within 2 s).
+        val target = scrubTarget ?: return@post
+        val landed = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() } ?: return@post
+        if (kotlin.math.abs(landed - target) > SCRUB_REFINE_MS) {
+            scrubTarget = null
+            scrubInFlight = true
+            scrubSentAt = SystemClock.elapsedRealtime()
+            mpvCommand("seek", "${target / 1000.0}", "absolute+exact")
         }
     }
 
@@ -468,6 +483,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val SURFACE_TIMEOUT_MS = 2000L
         private const val SURFACE_WAIT_MS = 1000L
         private const val SCRUB_STALL_MS = 250L
+        private const val SCRUB_REFINE_MS = 1500L
 
         /**
          * A second, video-only engine for seek preview frames (US-30.1). Not shared: the caller
