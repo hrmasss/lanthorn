@@ -3,6 +3,7 @@ package app.player.feature.playback
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import app.player.core.data.library.LibraryIndex
 import app.player.core.data.library.LibraryVideo
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,7 @@ internal object FolderQueue {
         val folder = videos.filter { it.folder == opened.folder && it.available }.sortedWith(byName)
         val index = folder.indexOfFirst { it.id == opened.id }
         // The opened uri stays as given, so its resume row keeps the key it was saved under.
-        folder.map { if (it.id == opened.id) uri else Uri.parse(it.uri) } to index
+        folder.map { if (it.id == opened.id) uri else it.uri.toUri() } to index
     }
 
     /** A file manager's document uri points at the same MediaStore row the library indexed. */

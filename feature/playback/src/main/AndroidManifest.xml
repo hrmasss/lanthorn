@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
     <application>
         <!--
+            Lint checks this module alone and cannot see feature/player, hence MissingClass ignores.
             US-13.4: the player runs in its own task, so back from a player another app opened
             returns to that app, not to the library. Merged into feature/player's declaration;
             singleTask stays for PiP. autoRemoveFromRecents keeps a closed player out of recents.
@@ -11,6 +12,7 @@
             android:name="app.player.feature.player.PlayerActivity"
             android:autoRemoveFromRecents="true"
             android:taskAffinity=""
+            tools:ignore="MissingClass"
             tools:node="merge" />
 
         <!--
@@ -20,7 +22,8 @@
         <activity-alias
             android:name="app.player.feature.playback.OpenFile"
             android:exported="true"
-            android:targetActivity="app.player.feature.player.PlayerActivity">
+            android:targetActivity="app.player.feature.player.PlayerActivity"
+            tools:ignore="MissingClass">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -30,7 +33,7 @@
                 <data android:mimeType="application/ogg" />
                 <data android:mimeType="application/x-matroska" />
                 <data android:mimeType="application/vnd.apple.mpegurl" />
-                <data android:mimeType="application/x-mpegURL" />
+                <data android:mimeType="application/x-mpegurl" />
                 <data android:mimeType="application/dash+xml" />
             </intent-filter>
         </activity-alias>
@@ -43,8 +46,9 @@
             android:name="app.player.feature.playback.OpenLink"
             android:enabled="true"
             android:exported="true"
-            android:targetActivity="app.player.feature.player.PlayerActivity">
-            <intent-filter>
+            android:targetActivity="app.player.feature.player.PlayerActivity"
+            tools:ignore="MissingClass">
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -76,7 +80,7 @@
                 <data android:pathPattern=".*\\.m3u8" />
                 <data android:pathPattern=".*\\.mpd" />
             </intent-filter>
-            <intent-filter>
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -85,7 +89,7 @@
                 <data android:mimeType="video/*" />
                 <data android:mimeType="audio/*" />
                 <data android:mimeType="application/vnd.apple.mpegurl" />
-                <data android:mimeType="application/x-mpegURL" />
+                <data android:mimeType="application/x-mpegurl" />
                 <data android:mimeType="application/dash+xml" />
             </intent-filter>
         </activity-alias>
