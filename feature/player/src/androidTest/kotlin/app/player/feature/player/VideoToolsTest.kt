@@ -42,7 +42,7 @@ class VideoToolsTest {
 
     @After fun close() = scenario.close()
 
-    @Test fun fitModes_US53_1() = runBlocking {
+    @Test fun fitModes_US53_1() = runBlocking<Unit> {
         open("clip.mp4")
         val margins = FitMode.entries.associateWith { mode ->
             tools.setFit(mode)
@@ -56,7 +56,7 @@ class VideoToolsTest {
         assertTrue("100% is smaller than fit", margins.getValue(FitMode.Original).sum() > margins.getValue(FitMode.Fit).sum())
     }
 
-    @Test fun aspectOverride_US54_1() = runBlocking {
+    @Test fun aspectOverride_US54_1() = runBlocking<Unit> {
         open("clip.mp4")
         val before = engine.get("video-out-params/aspect", PropertyType.Real)!!
         val t0 = SystemClock.elapsedRealtime()
@@ -68,7 +68,7 @@ class VideoToolsTest {
         waitUntil(1_000) { runBlocking { engine.get("video-out-params/aspect", PropertyType.Real) }?.let { abs(it - before) < 0.01 } == true }
     }
 
-    @Test fun zoomAndPan_US55() = runBlocking {
+    @Test fun zoomAndPan_US55() = runBlocking<Unit> {
         open("clip.mp4")
         tools.setZoom(4.0)
         SystemClock.sleep(300)
@@ -88,7 +88,7 @@ class VideoToolsTest {
         assertEquals(-0.1, py, 1e-6)
     }
 
-    @Test fun rotationMetadata_US56_4() = runBlocking {
+    @Test fun rotationMetadata_US56_4() = runBlocking<Unit> {
         open("rotated.mp4")
         waitUntil(3_000) { tools.rotation.value != null }
         val w = engine.get("video-out-params/dw", PropertyType.Int64)
@@ -98,7 +98,7 @@ class VideoToolsTest {
         assertTrue("portrait after rotation: ${w}x$h", (h ?: 0) > (w ?: 0))
     }
 
-    @Test fun mirrorFlipNight_US57() = runBlocking {
+    @Test fun mirrorFlipNight_US57() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
         SystemClock.sleep(500)
@@ -127,7 +127,7 @@ class VideoToolsTest {
         assertTrue("off restores the frame", plain.sameAs(back))
     }
 
-    @Test fun pictureAdjustZeroIsIdentical_US57_3() = runBlocking {
+    @Test fun pictureAdjustZeroIsIdentical_US57_3() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
         SystemClock.sleep(500)
@@ -141,7 +141,7 @@ class VideoToolsTest {
         log("picture adjust: changed, reset identical")
     }
 
-    @Test fun deinterlaceModes_US38() = runBlocking {
+    @Test fun deinterlaceModes_US38() = runBlocking<Unit> {
         open("interlaced.mp4")
         val modes = Deinterlace.entries.associateWith { mode ->
             tools.setDeinterlace(mode)
@@ -153,13 +153,34 @@ class VideoToolsTest {
         assertEquals("no", modes[Deinterlace.Off])
     }
 
-    /** mpv's own render of the current frame, through shaders, then decoded. */
+    /**
+     * The video area of the screen as composited (the libmpv build cannot write image files, so
+     * mpv's own screenshots are not available). The picture rectangle comes from mpv's
+     * `osd-dimensions` margins, offset by where the video surface sits on screen.
+     */
     private suspend fun grab(name: String): Bitmap {
-        SystemClock.sleep(300)
+        SystemClock.sleep(500)
+        val ml = engine.get("osd-dimensions/ml", PropertyType.Int64)!!.toInt()
+        val mt = engine.get("osd-dimensions/mt", PropertyType.Int64)!!.toInt()
+        val mr = engine.get("osd-dimensions/mr", PropertyType.Int64)!!.toInt()
+        val mb = engine.get("osd-dimensions/mb", PropertyType.Int64)!!.toInt()
+        val w = engine.get("osd-dimensions/w", PropertyType.Int64)!!.toInt()
+        val h = engine.get("osd-dimensions/h", PropertyType.Int64)!!.toInt()
+        val at = IntArray(2)
+        scenario.onActivity { a -> findSurface(a.window.decorView)?.getLocationOnScreen(at) }
+        val screen = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            .copy(Bitmap.Config.ARGB_8888, false)
+        // Keep 2 px off each edge so scaling seams do not count.
+        val crop = Bitmap.createBitmap(screen, at[0] + ml + 2, at[1] + mt + 2, w - ml - mr - 4, h - mt - mb - 4)
         val file = File(File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }, "p15-$name.png")
-        engine.command("screenshot-to-file", file.path, "window")
-        engine.get("pause", PropertyType.Flag)
-        return BitmapFactory.decodeFile(file.path)
+        file.outputStream().use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return crop
+    }
+
+    private fun findSurface(v: android.view.View): android.view.View? = when {
+        v is android.view.SurfaceView -> v
+        v is android.view.ViewGroup -> (0 until v.childCount).firstNotNullOfOrNull { findSurface(v.getChildAt(it)) }
+        else -> null
     }
 
     private fun sampleError(a: Bitmap, b: Bitmap, map: (Int, Int) -> Pair<Int, Int>): Int {
