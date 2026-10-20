@@ -1,7 +1,6 @@
 package app.player.core.engine
 
 import android.net.Uri
-import android.os.SystemClock
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -11,16 +10,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 /**
  * P1.1 against the real libmpv: the one-line notice when the chosen decoder cannot play the file
- * (US-35.3), and NF-5 when the hardware decoder fails in the middle of playback.
- * Emulator MediaCodec refuses H.264 4:4:4, which stands in for a phone's hardware refusing a stream.
+ * (US-35.3). Emulator MediaCodec refuses H.264 4:4:4, which stands in for a phone's hardware
+ * refusing a stream. A hardware failure in the middle of playback cannot be produced on the
+ * emulator; it is a phone check (work/evidence/P1.1).
  */
 @RunWith(AndroidJUnit4::class)
 class DecoderFallbackTest {
@@ -49,27 +47,5 @@ class DecoderFallbackTest {
         withTimeout(10_000) { engine.state.first { it.video != null } }
         delay(500)
         assertEquals(null, engine.state.value.decoderNotice)
-    }
-
-    /** First half 4:2:0 (hardware plays it), second half 4:4:4 (hardware cannot). */
-    @Test fun hardwareFailsMidStreamSoftwareContinues_NF5(): Unit = runBlocking {
-        engine.open(asset("midswitch.ts"), decoder = DecoderMode.AUTO)
-        withTimeout(10_000) { engine.state.first { it.firstFrameMs != null } }
-        val startedOn = engine.state.value.activeDecoder
-        // Watch the switch point at 3 s: when does SW take over, and does the clock keep moving?
-        val swAt = withTimeout(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.SW } }
-        val switchedWall = SystemClock.elapsedRealtime()
-        val posAtSwitch = swAt.positionMs
-        withTimeout(5_000) { engine.state.first { it.positionMs > posAtSwitch + 1000 || it.ended } }
-        val after = engine.state.value
-        Log.i(
-            "P1.1",
-            "mid-stream: started on ${startedOn.label}, SW at ${posAtSwitch} ms, later ${after.positionMs} ms, " +
-                "ended ${after.ended}, error ${after.error}, ${SystemClock.elapsedRealtime() - switchedWall} ms after the switch",
-        )
-        assertTrue("never left SW-free start: started on $startedOn", startedOn != ActiveDecoder.SW)
-        assertEquals(null, after.error)
-        assertTrue("playback did not continue after the switch", after.positionMs > posAtSwitch || after.ended)
-        assertNotNull(after.video)
     }
 }
