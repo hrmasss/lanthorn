@@ -14,6 +14,7 @@ import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.playerExtensions
+import app.player.feature.player.settings.PlayerSettings
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
 class PlayerActivity : ComponentActivity() {
@@ -32,7 +33,7 @@ class PlayerActivity : ComponentActivity() {
         }
         if (savedInstanceState == null) intent.data?.let { engine.open(it) }
         setContent {
-            LanthornPlayerTheme { PlayerScreen(engine, extensions = extensions) }
+            LanthornPlayerTheme { PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this)) }
         }
     }
 
