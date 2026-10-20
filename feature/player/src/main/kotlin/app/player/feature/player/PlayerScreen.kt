@@ -98,7 +98,8 @@ fun PlayerScreen(
     engine: PlayerEngine,
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
-    controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
+    /** Hidden on open, as MX users expect (recon/ux-map.md, defaults). */
+    controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
     settings: PlayerSettings? = null,
 ) {
@@ -137,7 +138,7 @@ fun PlayerScreen(
         }
     }
     SystemBarsEffect(activity, controls)
-    KeepScreenOnEffect(on = !state.paused || prefs.keepScreenOnPaused)
+    KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
     LaunchedEffect(note) {
         note?.let { delay(NOTE_MS); note = null }
     }

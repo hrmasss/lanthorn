@@ -57,8 +57,11 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
         .map { it.toPrefs() }
         .stateIn(scope, SharingStarted.Eagerly, PlayerPrefs())
 
+    // One writer at a time, in call order: two quick updates must not land swapped.
+    private val writer = Dispatchers.IO.limitedParallelism(1)
+
     fun update(change: (PlayerPrefs) -> PlayerPrefs) {
-        scope.launch {
+        scope.launch(writer) {
             store.edit { p ->
                 val next = change(p.toPrefs())
                 p[AUTO_HIDE] = next.autoHide

@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import app.player.feature.player.overlay.StatusUi
@@ -35,11 +34,12 @@ internal fun SystemBarsEffect(activity: Activity?, visible: Boolean) {
 
 /** Screen stays on while playing, and while paused if the viewer asked (US-60.1). */
 @Composable
-internal fun KeepScreenOnEffect(on: Boolean) {
-    val view = LocalView.current
-    DisposableEffect(view, on) {
-        view.keepScreenOn = on
-        onDispose { view.keepScreenOn = false }
+internal fun KeepScreenOnEffect(activity: Activity?, on: Boolean) {
+    DisposableEffect(activity, on) {
+        val window = activity?.window
+        if (on) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 }
 

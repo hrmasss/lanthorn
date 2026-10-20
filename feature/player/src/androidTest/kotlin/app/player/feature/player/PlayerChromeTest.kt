@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
-import android.view.View
-import android.view.ViewGroup
 import android.view.WindowInsets
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -95,6 +93,7 @@ class PlayerChromeTest {
         compose.onNodeWithTag("decoder-badge").performClick()
         compose.waitUntil(2_000) { shown("decoder-picker") }
         shot("04-decoder-picker")
+        log("decoder before switch: ${engine.state.value.activeDecoder} (${engine.state.value.decoderMode})")
         val before = engine.state.value.positionMs
         val t0 = SystemClock.elapsedRealtime()
         compose.onNodeWithTag("decoder-SW").performClick()
@@ -112,7 +111,8 @@ class PlayerChromeTest {
     @Test fun backTwiceToLeave_US78_1() {
         PlayerSettings.get(context).update { it.copy(backTwice = true) }
         waitUntil(2_000) { PlayerSettings.get(context).prefs.value.backTwice }
-        SystemClock.sleep(300)
+        compose.waitForIdle()
+        SystemClock.sleep(500)
         back()
         SystemClock.sleep(300)
         var finishing = true
@@ -169,12 +169,9 @@ class PlayerChromeTest {
 
     private fun screenOn(): Boolean {
         var on = false
-        scenario.onActivity { a -> on = anyKeepsScreenOn(a.window.decorView) }
+        scenario.onActivity { a -> on = a.window.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0 }
         return on
     }
-
-    private fun anyKeepsScreenOn(v: View): Boolean =
-        v.keepScreenOn || (v is ViewGroup && (0 until v.childCount).any { anyKeepsScreenOn(v.getChildAt(it)) })
 
     private fun waitUntil(ms: Long, check: () -> Boolean) {
         val end = SystemClock.elapsedRealtime() + ms
