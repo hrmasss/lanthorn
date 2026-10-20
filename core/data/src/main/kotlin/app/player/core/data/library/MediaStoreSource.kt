@@ -6,9 +6,12 @@ import android.provider.MediaStore
 import android.provider.MediaStore.Video.Media
 
 /** Where a scan reads videos from. MediaStore on a device, a fake in tests. */
-fun interface VideoSource {
+interface VideoSource {
     /** Runs on a background thread. Returns every video the app may see. */
     fun scan(): List<LibraryVideo>
+
+    /** Volumes mounted now. Videos on any other volume are unavailable, not deleted. */
+    fun mountedVolumes(): Set<String> = emptySet()
 }
 
 /**
@@ -17,7 +20,10 @@ fun interface VideoSource {
  * With partial media access it returns only the videos the viewer picked.
  */
 class MediaStoreSource(context: Context) : VideoSource {
-    private val resolver = context.applicationContext.contentResolver
+    private val app = context.applicationContext
+    private val resolver = app.contentResolver
+
+    override fun mountedVolumes(): Set<String> = MediaStore.getExternalVolumeNames(app)
 
     override fun scan(): List<LibraryVideo> {
         val projection = arrayOf(

@@ -5,6 +5,8 @@ import app.player.core.data.library.IndexDiff
 import app.player.core.data.library.LibraryDao
 import app.player.core.data.library.LibraryIndex
 import app.player.core.data.library.LibraryVideo
+import app.player.core.data.library.VideoExtra
+import app.player.core.data.library.VideoSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +36,13 @@ private class MemoryDao : LibraryDao {
     override suspend fun upsert(videos: List<LibraryVideo>) { rows.value = rows.value + videos.associateBy { it.id } }
     override suspend fun delete(ids: List<Long>) { rows.value = rows.value - ids.toSet() }
     override suspend fun apply(diff: IndexDiff) = super.apply(diff)
+    override suspend fun extra(id: Long): VideoExtra? = null
+    override suspend fun putExtra(extra: VideoExtra) = Unit
+}
+
+private fun source(list: () -> List<LibraryVideo>) = object : VideoSource {
+    override fun scan() = list()
+    override fun mountedVolumes() = setOf("external_primary")
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -46,8 +55,9 @@ class LibraryViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.vm() = LibraryViewModel(
-        LibraryIndex(dao, { onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
-        { listOf("Internal shared storage", "SD card") },
+        LibraryIndex(dao, source { onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
+        null,
+        { listOf(Volume("external_primary", "Internal shared storage"), Volume("1234-abcd", "SD card")) },
         StandardTestDispatcher(testScheduler),
     )
 
@@ -105,7 +115,9 @@ class LibraryViewModelTest {
         val s = vm.state.value as LibraryUiState.Content
         assertTrue(s.folders.isEmpty())
         assertTrue(s.scanned)
-        assertEquals(listOf("Internal shared storage", "SD card"), s.volumes)
+        assertEquals(listOf("Internal shared storage", "SD card"), s.volumes.map { it.label })
+        assertEquals(null, s.volumeLabel("external_primary"))
+        assertEquals("SD card", s.volumeLabel("1234-abcd"))
     }
 
     @Test fun `partial access is flagged`() = runTest(main) {
@@ -118,7 +130,8 @@ class LibraryViewModelTest {
     @Test fun `media changes are batched into one scan`() = runTest(main) {
         var scans = 0
         val vm = LibraryViewModel(
-            LibraryIndex(dao, { scans++; onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
+            LibraryIndex(dao, source { scans++; onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
+            null,
             { emptyList() },
             StandardTestDispatcher(testScheduler),
         )

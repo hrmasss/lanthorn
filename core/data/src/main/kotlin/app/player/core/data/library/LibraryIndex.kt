@@ -33,6 +33,11 @@ class LibraryIndex(
 
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
+    /** Details learned by opening a file (frame rate), if probed before. */
+    suspend fun extra(id: Long): VideoExtra? = withContext(io) { dao.extra(id) }
+
+    suspend fun putExtra(extra: VideoExtra) = withContext(io) { dao.putExtra(extra) }
+
     /** Scans the source and applies the difference. Calls made while a scan runs wait for it, then scan again. */
     suspend fun refresh(): ScanResult = mutex.withLock {
         withContext(io) {
@@ -40,7 +45,7 @@ class LibraryIndex(
             try {
                 val start = clock()
                 val scanned = source.scan()
-                val diff = IndexDiff.between(dao.all(), scanned)
+                val diff = IndexDiff.between(dao.all(), scanned, source.mountedVolumes())
                 if (!diff.isEmpty) dao.apply(diff)
                 ScanResult(scanned.size, diff.changed.size, diff.removed.size, clock() - start)
             } finally {
