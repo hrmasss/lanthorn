@@ -25,6 +25,9 @@ interface PlayerExtension {
      */
     fun onEngineCreated(context: Context, engine: PlayerEngine) {}
 
+    /** Resume, queue, lock and PiP. Only playback's extension sets it; the player uses the first one. */
+    val playback: PlaybackControls? get() = null
+
     /**
      * Drawn over the video, under the controls and panels, full size, always present while the
      * player shows. For state the feature owns, such as network buffering and an error card.

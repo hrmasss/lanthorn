@@ -55,6 +55,7 @@ import app.player.core.designsystem.component.BufferingIndicator
 import app.player.core.designsystem.theme.PlayerColors
 import app.player.core.designsystem.theme.PlayerMotion
 import app.player.core.designsystem.theme.tabular
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PropertyType
 import app.player.core.engine.VideoSurfaceView
@@ -102,6 +103,8 @@ fun PlayerScreen(
     controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
     settings: PlayerSettings? = null,
+    /** The viewer picked a decoder by hand (US-36.3: remembered for the file). */
+    onDecoderPicked: (DecoderMode) -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -159,6 +162,8 @@ fun PlayerScreen(
             override fun notify(message: String) = show(message)
         }
     }
+    // US-35.3: one line when the chosen decoder could not play the stream.
+    LaunchedEffect(state.decoderNotice) { state.decoderNotice?.let(::show) }
     val currentState by rememberUpdatedState(state)
     val actions = remember(engine, activity) {
         ControlsActions(
@@ -301,6 +306,7 @@ fun PlayerScreen(
                 OwnPanel.MENU -> MenuContent(items)
                 OwnPanel.DECODER -> DecoderContent(state.decoderMode, state.activeDecoder.label) {
                     engine.setDecoder(it)
+                    onDecoderPicked(it)
                     openPanel = null
                 }
                 OwnPanel.SETTINGS -> PlayerSettingsContent(prefs, { change -> settings?.update(change) })

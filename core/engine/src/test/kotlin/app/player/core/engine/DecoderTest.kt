@@ -21,6 +21,7 @@ class DecoderTest {
         // mpv falls back to software after the last listed hwdec, so each list stays hwdec-only.
         DecoderMode.entries.forEach { assert(!it.hwdec.contains("auto")) { it } }
         assertEquals("mediacodec,mediacodec-copy", DecoderMode.AUTO.hwdec)
+        assertEquals(DecoderMode.AUTO.hwdec, DecoderMode.HW.hwdec)
         assertEquals("no", DecoderMode.SW.hwdec)
     }
 }
