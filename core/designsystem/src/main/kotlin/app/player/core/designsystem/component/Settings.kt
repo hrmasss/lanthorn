@@ -13,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -131,6 +132,51 @@ fun <T> SettingsChoice(
             dismissButton = {
                 TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) }
             },
+        )
+    }
+}
+
+/**
+ * A text value. The row shows the value (or [placeholder] when empty); tapping opens a dialog to
+ * edit it. Saving an empty field clears the value.
+ */
+@Composable
+fun SettingsText(
+    title: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    highlighted: Boolean = false,
+) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    SettingsAction(
+        title = title,
+        summary = value.ifEmpty { placeholder },
+        onClick = { open = true },
+        modifier = modifier,
+        highlighted = highlighted,
+    )
+    if (open) {
+        var draft by rememberSaveable { mutableStateOf(value) }
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(title) },
+            text = {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    placeholder = placeholder?.let { { Text(it) } },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onValueChange(draft)
+                    open = false
+                }) { Text(stringResource(android.R.string.ok)) }
+            },
+            dismissButton = { TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) } },
         )
     }
 }
