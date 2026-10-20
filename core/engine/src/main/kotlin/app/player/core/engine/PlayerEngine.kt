@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -31,13 +31,18 @@ import java.util.concurrent.TimeUnit
  */
 class PlayerEngine(context: Context) {
     private val appContext = context.applicationContext
-    private val thread: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "engine") }
+    private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine") }
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
     private var mpv: MPVLib? = null
     @Volatile private var openedAt = 0L
     @Volatile private var starting = false
+
+    // Engine thread only. A load waits for the surface: MediaCodec's zero-copy path needs the
+    // video output's surface at decoder init, so loading first would cost HW for the whole file.
+    private var hasSurface = false
+    private var pendingLoad: (() -> Unit)? = null
     private var released = false
     private var openFd: android.os.ParcelFileDescriptor? = null
 
@@ -61,7 +66,9 @@ class PlayerEngine(context: Context) {
         lib.setOptionString("idle", "yes")
         lib.setOptionString("keep-open", "yes")
         lib.setOptionString("force-window", "no")
-        lib.setOptionString("vo", "gpu-next,gpu")
+        // No video output until a surface attaches: a vo that starts without a surface fails and
+        // mpv drops the video track for the whole file. attachSurface switches to the GPU output.
+        lib.setOptionString("vo", "null")
         lib.setOptionString("gpu-context", "android")
         lib.setOptionString("opengl-es", "yes")
         lib.setOptionString("ao", "audiotrack,opensles")
@@ -87,8 +94,28 @@ class PlayerEngine(context: Context) {
         post {
             val path = resolve(uri)
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
-            mpvCommand("loadfile", path, "replace", "-1", opts)
-            setProperty("pause", "no")
+            val load: () -> Unit = {
+                mpvCommand("loadfile", path, "replace", "-1", opts)
+                setProperty("pause", "no")
+            }
+            if (hasSurface) {
+                load()
+            } else {
+                // No surface yet: load when it attaches, or after a short wait (audio-only, background).
+                pendingLoad = load
+                thread.schedule({ runPendingLoad() }, SURFACE_WAIT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+    }
+
+    private fun runPendingLoad() {
+        val load = pendingLoad ?: return
+        pendingLoad = null
+        try {
+            load()
+        } catch (e: Exception) {
+            Log.e(TAG, "load failed", e)
+            _state.update { it.copy(error = e.message) }
         }
     }
 
@@ -162,6 +189,8 @@ class PlayerEngine(context: Context) {
         mpv?.attachSurface(surface)
         mpv?.setOptionString("force-window", "yes")
         setProperty("vo", "gpu-next,gpu")
+        hasSurface = true
+        runPendingLoad()
     }
 
     fun setSurfaceSize(width: Int, height: Int) = post {
@@ -173,6 +202,7 @@ class PlayerEngine(context: Context) {
         setProperty("vo", "null")
         mpv?.setOptionString("force-window", "no")
         mpv?.detachSurface()
+        hasSurface = false
     }
 
     fun release() {
@@ -318,6 +348,7 @@ class PlayerEngine(context: Context) {
     companion object {
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
+        private const val SURFACE_WAIT_MS = 1000L
         private val OBSERVED = listOf(
             "time-pos" to MpvFormat.MPV_FORMAT_DOUBLE,
             "duration" to MpvFormat.MPV_FORMAT_DOUBLE,
