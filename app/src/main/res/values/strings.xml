@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Player</string>
     <string name="library_empty">No videos yet</string>
+    <string name="open_file">Open a video</string>
 </resources>
