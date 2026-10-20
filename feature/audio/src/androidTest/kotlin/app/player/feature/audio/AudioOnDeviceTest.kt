@@ -117,6 +117,51 @@ class AudioOnDeviceTest {
         assertTrue("took $took ms", took < 100)
     }
 
+    /**
+     * US-49.2 output peak, read with Android's Visualizer on our session. Three cases on a -3 dBFS
+     * tone: no boost (shows the Visualizer hears us), boost 200% with the limiter off (shows it
+     * hears after the effect), boost 200% with the limiter on (the claim).
+     */
+    @Test fun limiterKeepsPeakUnder0dBFS_US49_2() = runBlocking {
+        OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.RECORD_AUDIO)
+        engine.set("loop-file", "inf")
+        engine.open(Uri.fromFile(OnDevice.asset("loud.flac")))
+        engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }
+        val session = engine.get("audiotrack-session-id", PropertyType.Int64)!!.toInt()
+        val effects = OnDevice.main { AudioExtension.effects(engine)!! }
+        val visualizer = OnDevice.main {
+            android.media.audiofx.Visualizer(session).apply {
+                measurementMode = android.media.audiofx.Visualizer.MEASUREMENT_MODE_PEAK_RMS
+                enabled = true
+            }
+        }
+        suspend fun peakDb(): Double {
+            delay(800) // settle after a change
+            var peak = Int.MIN_VALUE
+            val m = android.media.audiofx.Visualizer.MeasurementPeakRms()
+            repeat(40) {
+                OnDevice.main { visualizer.getMeasurementPeakRms(m) }
+                peak = maxOf(peak, m.mPeak)
+                delay(50)
+            }
+            return peak / 100.0 // millibels to dB
+        }
+        val plain = peakDb()
+        OnDevice.main { effects.setBoost(2f) }
+        val dp = (effects.sink as PlatformEffects).effect!!
+        OnDevice.main { dp.setLimiterAllChannelsTo(android.media.audiofx.DynamicsProcessing.Limiter(true, false, 0, 1f, 60f, 1f, 0f, 0f)) }
+        val unlimited = peakDb()
+        OnDevice.main { effects.setBoost(1.99f); effects.setBoost(2f) } // re-applies our limiter
+        val limited = peakDb()
+        OnDevice.main { visualizer.release() }
+        evidence("US-49.2 Visualizer peak on our session, -3 dBFS tone: no boost %.1f dB, boost 200%% limiter off %.1f dB, limiter on %.1f dB".format(plain, unlimited, limited))
+        if (unlimited <= plain + 1.0) {
+            evidence("US-49.2 Visualizer reads before the effect on this device (boost did not raise its peak): output peak not measurable here")
+        } else {
+            assertTrue("limited peak $limited dB", limited < 0.0)
+        }
+    }
+
     @Test fun monoWithin200ms_US51_1() = runBlocking {
         openTracks()
         val effects = OnDevice.main { AudioExtension.effects(engine)!! }

@@ -62,7 +62,7 @@ class SubtitleControllerTest {
         controller.setOverrideStyles(false)
         controller.setOverrideStyles(true)
         controller.setIgnoreEmbeddedFonts(true)
-        assertEquals(listOf("set sub-ass-override=scale", "set sub-ass-override=force", "set embeddedfonts=no"), mpv.calls)
+        assertEquals(listOf("set sub-ass-override=scale", "set sub-ass-override=strip", "set embeddedfonts=no"), mpv.calls)
     }
 
     @Test fun `external file is added and selected, reload by id (US-44_2)`() {

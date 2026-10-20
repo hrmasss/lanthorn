@@ -39,7 +39,7 @@ internal class SubtitleController(private val mpv: Mpv) {
     /** Current delay in ms, null until a file is loaded. */
     val delayMs: Flow<Long?> = mpv.observe("sub-delay", PropertyType.Real).map { it?.let { s -> (s * 1000).roundToLong() } }
     val speed: Flow<Double?> = mpv.observe("sub-speed", PropertyType.Real)
-    val overrideStyles: Flow<Boolean> = mpv.observe("sub-ass-override", PropertyType.Text).map { it == "force" }
+    val overrideStyles: Flow<Boolean> = mpv.observe("sub-ass-override", PropertyType.Text).map { it == "strip" }
     val ignoreEmbeddedFonts: Flow<Boolean> = mpv.observe("embeddedfonts", PropertyType.Flag).map { it == false }
 
     fun select(selection: SubSelection) {
@@ -68,10 +68,11 @@ internal class SubtitleController(private val mpv: Mpv) {
     }
 
     /**
-     * US-42.4: keep the file's ASS styling ("scale" only applies our size scale), or force ours.
+     * US-42.4: keep the file's ASS styling ("scale" only applies our size scale), or drop it and
+     * draw the text in our style. mpv's "force" keeps inline tags (rotation, italics), so "strip".
      */
     fun setOverrideStyles(override: Boolean) {
-        mpv.set("sub-ass-override", if (override) "force" else "scale")
+        mpv.set("sub-ass-override", if (override) "strip" else "scale")
     }
 
     /** US-42.4: ignore fonts embedded in the file. mpv reads this when it next loads the file. */
