@@ -10,6 +10,10 @@ import kotlinx.coroutines.withContext
 class ResumePoints(context: Context) {
     private val dao = PlayerDatabase.get(context).playbackPositions()
 
+    suspend fun get(uri: String): PlaybackPosition? = withContext(Dispatchers.IO) { dao.get(uri) }
+
+    suspend fun put(position: PlaybackPosition) = withContext(Dispatchers.IO) { dao.put(position) }
+
     suspend fun all(): List<PlaybackPosition> = withContext(Dispatchers.IO) { dao.all() }
 
     suspend fun putAll(positions: List<PlaybackPosition>) = withContext(Dispatchers.IO) { dao.putAll(positions) }
