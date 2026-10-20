@@ -1,6 +1,7 @@
 package app.player.feature.library
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -10,6 +11,7 @@ import androidx.core.content.ContextCompat
 enum class MediaAccess { Full, Partial, None }
 
 /** The permissions one request asks for. On Android 14+ the system prompt offers "select videos" as well. */
+@SuppressLint("InlinedApi") // Plain strings, chosen by sdk.
 fun mediaPermissions(sdk: Int = Build.VERSION.SDK_INT): Array<String> = when {
     sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
         arrayOf(Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
