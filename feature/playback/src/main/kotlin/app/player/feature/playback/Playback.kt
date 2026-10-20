@@ -261,6 +261,9 @@ object Playback : PlaybackControls {
             combine(engine.state, pause) { st, p -> if (p == null) st else st.copy(paused = p) }.collect { s ->
                 val prev = last
                 val now = SystemClock.elapsedRealtime()
+                if (prev != null && (prev.paused != s.paused || prev.loaded != s.loaded || prev.error != s.error)) {
+                    Log.d(TAG, "state: paused ${s.paused}, loaded ${s.loaded}, error ${s.error}, ended ${s.ended}, at ${s.positionMs}")
+                }
                 when {
                     prev != null && prev.uri != s.uri -> save(prev, "next file")
                     s.loaded && s.paused && prev?.paused == false -> save(s, "paused")
@@ -342,7 +345,10 @@ object Playback : PlaybackControls {
     private fun <T> PlayQueue<T>.currentOrNull(): T? = if (size == 0) null else current
 
     private suspend fun write(s: PlaybackState, why: String) {
-        val row = Resume.toSave(s, System.currentTimeMillis()) ?: return
+        val row = Resume.toSave(s, System.currentTimeMillis()) ?: run {
+            Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, uri ${s.uri}")
+            return
+        }
         if (history.isPaused()) return
         resumePoints.put(row)
         Log.i(TAG, "saved ${row.uri} at ${row.positionMs} of ${row.durationMs} ($why)")
