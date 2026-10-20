@@ -140,12 +140,14 @@ private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier)
             )
         }
         val decoderDesc = stringResource(R.string.player_decoder_badge, ui.decoder)
-        OverlayChip(
+        // No badge until a decoder runs ("-"), so the chip never shows an empty circle.
+        if (ui.decoder != "-") OverlayChip(
             ui.decoder,
             selected = false,
             onClick = actions.openDecoder,
             modifier = Modifier
                 .minimumInteractiveComponentSize()
+                .widthIn(min = 64.dp)
                 .semantics { contentDescription = decoderDesc }
                 .testTag("decoder-badge"),
         )

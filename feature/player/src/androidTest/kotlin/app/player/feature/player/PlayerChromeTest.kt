@@ -79,12 +79,89 @@ class PlayerChromeTest {
         assertFalse("bars hidden without controls", barsVisible())
     }
 
-    @Test fun screenOnWhilePlaying_US60_1() {
-        assertTrue(screenOn())
+    @Test fun screenOnWhilePlayingAndPaused_US60_1() {
+        // Read from the window manager (dumpsys), the state the system acts on.
+        waitUntil(3_000) { keepScreenOn() }
+        log("US-60.1 playing: keep-screen-on ${keepScreenOn()}")
         PlayerSessions.current.value!!.pause()
-        waitUntil(2_000) { !screenOn() }
+        waitUntil(3_000) { !keepScreenOn() }
+        log("US-60.1 paused, setting off: keep-screen-on ${keepScreenOn()}")
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
-        waitUntil(2_000) { screenOn() }
+        waitUntil(3_000) { keepScreenOn() }
+        log("US-60.1 paused, setting on: keep-screen-on ${keepScreenOn()}")
+    }
+
+    @Test fun talkBackActions_US69_2() {
+        val engine = PlayerSessions.current.value!!
+        val audio = context.getSystemService(android.media.AudioManager::class.java)
+        val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, max / 2, 0)
+        fun run(label: String) {
+            val actions = compose.onNodeWithTag("video").fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
+            compose.runOnUiThread { actions.first { it.label == label }.action() }
+            SystemClock.sleep(700)
+        }
+        val labels = compose.onNodeWithTag("video").fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.CustomActions]
+        log("US-69.2 actions on the video: ${labels.map { it.label }}")
+        assertEquals(6, labels.size)
+
+        val p0 = engine.state.value.positionMs
+        run("Forward 10 seconds")
+        val p1 = engine.state.value.positionMs
+        run("Back 10 seconds")
+        val p2 = engine.state.value.positionMs
+        log("US-69.2 seek: $p0 -> forward $p1 -> back $p2 ms")
+        assertTrue(p1 - p0 in 9_000..11_500)
+        assertTrue(p1 - p2 in 8_500..11_500)
+
+        val v0 = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        run("Volume up")
+        val v1 = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        run("Volume down")
+        val v2 = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+        log("US-69.2 volume steps: $v0 -> up $v1 -> down $v2 of $max")
+        assertEquals(v0 + 1, v1)
+        assertEquals(v0, v2)
+
+        fun brightness(): Float { var b = 0f; scenario.onActivity { b = it.window.attributes.screenBrightness }; return b }
+        run("Brightness up")
+        val b1 = brightness()
+        run("Brightness down")
+        val b2 = brightness()
+        log("US-69.2 window brightness: up $b1 -> down $b2")
+        assertTrue(b1 in 0f..1f && b2 in 0f..1f && b1 - b2 > 0.05f)
+    }
+
+    @Test fun remainingTimeSurvivesReopen_US16_4() {
+        compose.onNodeWithTag("video").performClick()
+        compose.waitUntil(2_000) { shown("end-time") }
+        compose.onNodeWithTag("end-time").performClick()
+        waitUntil(2_000) { PlayerSettings.get(context).prefs.value.showRemaining }
+        scenario.close()
+        scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip()))
+        waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
+        compose.onNodeWithTag("video").performClick()
+        compose.waitUntil(2_000) { shown("end-time") }
+        val desc = compose.onNodeWithTag("end-time").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
+        log("US-16.4 after reopen the end time reads: $desc")
+        assertTrue(desc.startsWith("Remaining"))
+        shot("09-remaining-after-reopen")
+    }
+
+    @Test fun backCallbackOnlyWithTheSetting_US78_2() {
+        var enabled = true
+        scenario.onActivity { enabled = it.onBackPressedDispatcher.hasEnabledCallbacks() }
+        log("US-78.2 setting off: back callback enabled = $enabled")
+        assertFalse(enabled)
+        PlayerSettings.get(context).update { it.copy(backTwice = true) }
+        waitUntil(2_000) { PlayerSettings.get(context).prefs.value.backTwice }
+        compose.waitForIdle()
+        SystemClock.sleep(300)
+        scenario.onActivity { enabled = it.onBackPressedDispatcher.hasEnabledCallbacks() }
+        log("US-78.2 setting on: back callback enabled = $enabled (so the system draws no back preview on the first press)")
+        assertTrue(enabled)
     }
 
     @Test fun decoderSwitchKeepsPosition_US35_2() {
@@ -141,6 +218,7 @@ class PlayerChromeTest {
         // Controls are hidden on open.
         PlayerSettings.get(context).update { it.copy(keepStatusVisible = true) }
         compose.waitUntil(3_000) { shown("kept-status") }
+        SystemClock.sleep(1_500)
         shot("06-kept-status")
     }
 
@@ -167,10 +245,13 @@ class PlayerChromeTest {
         return visible
     }
 
-    private fun screenOn(): Boolean {
-        var on = false
-        scenario.onActivity { a -> on = a.window.attributes.flags and android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0 }
-        return on
+    /** KEEP_SCREEN_ON on the player's window, as the window manager reports it. */
+    private fun keepScreenOn(): Boolean {
+        val out = InstrumentationRegistry.getInstrumentation().uiAutomation
+            .executeShellCommand("dumpsys window windows")
+            .let { pfd -> android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().readText() }
+        val block = out.substringAfter("PlayerActivity", "").take(4_000)
+        return Regex("fl=[^ ]*KEEP_SCREEN_ON").containsMatchIn(block)
     }
 
     private fun waitUntil(ms: Long, check: () -> Boolean) {
@@ -183,10 +264,8 @@ class PlayerChromeTest {
 
     private fun clip(): Uri {
         val file = File(context.cacheDir, "clip.mp4")
-        if (!file.exists()) {
-            InstrumentationRegistry.getInstrumentation().context.assets.open("clip.mp4").use { input ->
-                file.outputStream().use { input.copyTo(it) }
-            }
+        InstrumentationRegistry.getInstrumentation().context.assets.open("clip.mp4").use { input ->
+            file.outputStream().use { input.copyTo(it) }
         }
         return Uri.fromFile(file)
     }

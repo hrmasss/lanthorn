@@ -1,5 +1,6 @@
 package app.player.feature.player.settings
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 // Settings rows. Built here until the design system has shared ones (proposed to brand); the
@@ -61,7 +69,30 @@ fun SliderRow(
             Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             Text(valueText, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps, enabled = enabled)
+        // M3's slider is 44 dp tall; a 48 dp box that merges it is the target US-69.1 counts.
+        // The slider's own semantics are replaced by the box's, so TalkBack and the touch target
+        // both see one 48 dp control with the row's title.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .semantics {
+                    contentDescription = title
+                    stateDescription = valueText
+                    progressBarRangeInfo = ProgressBarRangeInfo(value, range, steps)
+                    if (enabled) setProgress { v -> onChange(v.coerceIn(range)); true }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                valueRange = range,
+                steps = steps,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+        }
     }
 }
 

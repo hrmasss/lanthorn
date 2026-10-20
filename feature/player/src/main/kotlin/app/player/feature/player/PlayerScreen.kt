@@ -231,7 +231,16 @@ fun PlayerScreen(
         extensions.forEach { it.Overlay(host) }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
-            Text(it, color = PlayerColors.Content, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
+            Text(
+                it.replaceFirstChar(Char::uppercaseChar),
+                color = PlayerColors.Content,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(PlayerColors.Scrim, CircleShape)
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .testTag("player-error"),
+            )
         }
 
         val status = rememberStatus(active = (controls && prefs.statusInTopBar) || (!controls && prefs.keepStatusVisible))
@@ -243,7 +252,7 @@ fun PlayerScreen(
             Controls(
                 ControlsUi(
                     title = title,
-                    playing = !state.paused,
+                    playing = !state.paused && state.error == null,
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
                     decoder = state.activeDecoder.label,
@@ -271,9 +280,8 @@ fun PlayerScreen(
                 color = PlayerColors.Content,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.displayCutout)
-                    .padding(top = 72.dp)
+                    .align(Alignment.Center)
+                    .padding(bottom = 160.dp)
                     .background(PlayerColors.Scrim, CircleShape)
                     .padding(horizontal = 20.dp, vertical = 10.dp)
                     .testTag("note"),
