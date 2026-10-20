@@ -89,7 +89,10 @@ class PlayerChromeTest {
         }
         SystemClock.sleep(1_000)
         step("playing", true)
-        PlayerSessions.current.value!!.pause()
+        // Pause the way a viewer does: the play/pause button.
+        compose.onNodeWithTag("video").performClick()
+        compose.waitUntil(2_000) { shown("play-pause") }
+        compose.onNodeWithTag("play-pause").performClick()
         step("paused, setting off", false)
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
         step("paused, setting on", true)
