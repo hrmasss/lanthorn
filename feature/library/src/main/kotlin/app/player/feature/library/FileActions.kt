@@ -2,6 +2,7 @@ package app.player.feature.library
 
 import android.app.Activity
 import android.app.RecoverableSecurityException
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ContentValues
 import android.content.Context
@@ -53,6 +54,21 @@ class FileActions internal constructor(
             Intent.createChooser(send, context.getString(R.string.action_share))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
+    }
+
+    /**
+     * US-10.4: the info panel of US-37 for one file, shown by feature/info's own screen
+     * (action [SHOW_INFO], file as data), so the library needs no dependency on it.
+     */
+    fun properties(video: LibraryVideo) {
+        val intent = Intent(SHOW_INFO, video.uri.toUri())
+            .setPackage(context.packageName)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            failed(R.string.properties_unavailable)
+        }
     }
 
     /**
@@ -127,6 +143,11 @@ class FileActions internal constructor(
     private fun done(message: Int) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         onChanged()
+    }
+
+    companion object {
+        /** Agreed with engine (work/questions.md): feature/info's info screen. */
+        const val SHOW_INFO = "app.player.action.SHOW_INFO"
     }
 
     // US-10.5: never fail silently.

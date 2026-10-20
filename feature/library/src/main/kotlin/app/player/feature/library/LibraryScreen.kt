@@ -298,7 +298,7 @@ private fun LibraryHome(
                                     folders = shownFolders,
                                     videos = shownVideos,
                                     layout = state.prefs.layout,
-                                    ctx = rowContext(state, vm, loaders, onFolder, shownVideos, onPlayQueue, selection) { k ->
+                                    ctx = rowContext(state, vm, loaders, onFolder, shownVideos, onPlayQueue, selection, actions = actions) { k ->
                                         selection = if (k in selection) selection - k else selection + k
                                     },
                                     listState = listState,
@@ -369,7 +369,7 @@ private fun FolderScreen(
                         folders = subfolders,
                         videos = videos,
                         layout = content.prefs.layout,
-                        ctx = rowContext(content, vm, loaders, onFolder, videos, onPlayQueue, selection) { k ->
+                        ctx = rowContext(content, vm, loaders, onFolder, videos, onPlayQueue, selection, actions = actions) { k ->
                             selection = if (k in selection) selection - k else selection + k
                         },
                         listState = listState,
@@ -392,8 +392,10 @@ internal fun rowContext(
     queue: List<LibraryVideo>,
     onPlayQueue: (List<Uri>, Int) -> Unit,
     selection: Set<String> = emptySet(),
+    /** Share and properties in each video's row menu (US-74.1, US-10.4). */
+    actions: FileActions? = null,
     onSelect: ((String) -> Unit)? = null,
-) = remember(state.prefs.fields, state.volumes, loaders, queue, selection) {
+) = remember(state.prefs.fields, state.volumes, loaders, queue, selection, actions) {
     RowContext(
         loader = loaders.first,
         fps = loaders.second::fps,
@@ -408,7 +410,9 @@ internal fun rowContext(
             RowAction(R.string.action_hide) { f -> vm.setHidden(f.key, true) },
             RowAction(R.string.action_exclude) { f -> vm.setExcluded(f.key, true) },
         ),
-        videoActions = listOf(
+        videoActions = listOfNotNull(
+            actions?.let { a -> RowAction(R.string.action_share) { v: LibraryVideo -> a.share(listOf(v)) } },
+            actions?.let { a -> RowAction(R.string.action_properties) { v: LibraryVideo -> a.properties(v) } },
             RowAction(R.string.action_hide) { v -> vm.setHidden(v.uri, true) },
         ),
         selection = selection,

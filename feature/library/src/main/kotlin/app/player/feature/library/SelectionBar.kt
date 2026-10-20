@@ -85,6 +85,11 @@ internal fun SelectionBar(
                             onClick = { menu = false; renaming = videos.first() },
                             modifier = Modifier.testTag("selection-rename"),
                         )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_properties)) },
+                            onClick = { menu = false; actions.properties(videos.first()); onClear() },
+                            modifier = Modifier.testTag("selection-properties"),
+                        )
                     }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.selection_all)) },
