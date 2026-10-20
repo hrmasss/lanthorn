@@ -19,8 +19,8 @@ androidx-test-junit = "1.3.0"
 androidx-test-runner = "1.7.0"
 androidx-test-core = "1.7.0"
 junit = "4.13.2"
+json = "20250517"
 libmpv = "1.0.0"
-org-json = "20250517"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
@@ -44,8 +44,8 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 libmpv = { module = "dev.jdtech.mpv:libmpv", version.ref = "libmpv" }
 junit = { module = "junit:junit", version.ref = "junit" }
-# Real org.json for JVM unit tests; Android ships it, the unit-test android.jar stubs it.
-org-json = { module = "org.json:json", version.ref = "org-json" }
+# Real org.json for JVM unit tests; Android's copy is a stub there.
+json = { module = "org.json:json", version.ref = "json" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
