@@ -3,6 +3,17 @@
     <application>
         <activity android:name="app.player.feature.subtitles.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
-        <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" />
+        <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <activity android:name="app.player.feature.subtitles.PanelTestActivity" android:exported="false" android:screenOrientation="landscape" />
+        <provider
+            android:name="app.player.feature.subtitles.TestFontsProvider"
+            android:authorities="app.player.feature.subtitles.test.fonts"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
     </application>
 </manifest>
