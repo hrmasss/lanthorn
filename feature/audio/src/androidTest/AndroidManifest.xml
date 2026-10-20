@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Test only: the Visualizer that measures the limiter (US-49.2) needs it. Not in the app. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- The real-settings test starts the app (package visibility, Android 11+). -->
+    <queries>
+        <package android:name="app.player" />
+    </queries>
     <application>
         <activity android:name="app.player.feature.audio.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />

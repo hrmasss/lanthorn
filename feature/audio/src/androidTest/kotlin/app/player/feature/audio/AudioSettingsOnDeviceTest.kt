@@ -6,6 +6,7 @@ import androidx.test.core.app.ActivityScenario
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PropertyType
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -93,6 +94,47 @@ class AudioSettingsOnDeviceTest {
         app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(Uri.fromFile(OnDevice.asset("tracks.mkv")).toString())
         assertEquals("eng", whenOff)
         evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored; with remember choices off it opened on 'eng'")
+    }
+
+    @Test fun defaultFlaggedTrackWithoutPreference_US47_2() = runBlocking {
+        engine.open(Uri.fromFile(OnDevice.asset("default-second.mkv")))
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 3 }
+        engine.await("current-tracks/audio/lang", PropertyType.Text, 10_000) { it != null }
+        val tracks = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "audio" }
+        assertEquals(listOf("eng" to false, "ita" to true), tracks.map { it.lang to it.default })
+        assertEquals("ita", engine.get("current-tracks/audio/lang", PropertyType.Text))
+        evidence("US-47.2 no preference, default flag on the second track (ita), first is eng: opened on 'ita'")
+    }
+
+    @Test fun groupResetExportImport() = runBlocking {
+        store.setLanguage("it")
+        store.setDefaultDelay(120)
+        store.setBluetoothDelay(200)
+        val exported = AudioSettings.export(OnDevice.context)
+        AudioSettings.reset(OnDevice.context)
+        assertEquals(AudioPrefs(), store.prefs.first())
+        AudioSettings.import(OnDevice.context, org.json.JSONObject(exported.toString()))
+        assertEquals(AudioPrefs("it", 120, 200), store.prefs.first())
+        evidence("Audio group: export $exported; reset gave the defaults; import brought back it/120/200")
+    }
+
+    @Test fun groupInRealSettings() {
+        val device = androidx.test.uiautomator.UiDevice.getInstance(OnDevice.instrumentation)
+        val launch = OnDevice.context.packageManager.getLaunchIntentForPackage("app.player")
+            ?: throw AssertionError("app.player not installed")
+        runBlocking { store.setDefaultDelay(120); store.setBluetoothDelay(200) }
+        OnDevice.context.startActivity(launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        fun tap(sel: androidx.test.uiautomator.BySelector) {
+            device.wait(androidx.test.uiautomator.Until.findObject(sel), 15_000)?.click() ?: throw AssertionError("not found: $sel")
+        }
+        tap(androidx.test.uiautomator.By.desc("More options"))
+        tap(androidx.test.uiautomator.By.text("Settings"))
+        tap(androidx.test.uiautomator.By.text("Audio"))
+        device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Default audio delay")), 5_000)
+        Thread.sleep(1500)
+        shot("audio-settings-real-screen")
+        device.pressBack(); device.pressBack(); device.pressBack()
+        evidence("Audio group opened from the app's real Settings screen; screenshot")
     }
 
     @Test fun settingsPage_P1_31() = runBlocking {
