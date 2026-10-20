@@ -79,7 +79,23 @@ class LibmpvBuildTest {
         assertEquals("PNG signature", listOf(0x89, 0x50, 0x4E, 0x47), magic.take(4).map { it.toInt() and 0xFF })
     }
 
+    /** Separates iconv from detection: with the codepage named, only iconv is involved. */
+    @Test fun subtitleCharsetConvertedWithIconv_US44_2() = runBlocking {
+        val text = "Привет, мир. Это проверка кодировки субтитров."
+        val srt = File(context.cacheDir, "cp1251-named.srt")
+        srt.writeBytes("1\n00:00:00,000 --> 00:00:04,000\n$text\n\n".toByteArray(Charset.forName("windows-1251")))
+        engine.set("msg-level", "all=warn,sub=v,charset=v")
+        engine.set("sub-codepage", "cp1251")
+        engine.command("sub-add", srt.path, "select")
+        engine.seekTo(1000)
+        delay(1500)
+        val shown = engine.get("sub-text", PropertyType.Text)
+        Log.i("P1.33", "named cp1251 sub-text = $shown")
+        assertEquals(text, shown)
+    }
+
     @Test fun subtitleCharsetDetectedWithUchardet_US44_1() = runBlocking {
+        engine.set("msg-level", "all=warn,sub=v,charset=v")
         val text = "Привет, мир. Это проверка кодировки субтитров."
         val srt = File(context.cacheDir, "cp1251.srt")
         srt.writeBytes("1\n00:00:00,000 --> 00:00:04,000\n$text\n\n".toByteArray(Charset.forName("windows-1251")))

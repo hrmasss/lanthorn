@@ -9,9 +9,10 @@ This app bundles or links the following third-party software:
   Ships native builds of:
   - mpv (https://mpv.io), GPL-2.0-or-later as built.
   - FFmpeg (https://ffmpeg.org), built with --enable-gpl --enable-version3, so GPL-3.0-or-later.
+  - GNU libiconv, LGPL-2.1-or-later, linked statically.
   - libass, FreeType, HarfBuzz, FriBidi, fontconfig, libxml2, libunibreak, uchardet, dav1d,
     libplacebo, mbedTLS, Lua. Each under its own licence, all GPL-3.0 compatible.
-  Corresponding source: the fork at tag v1.0.0-player.2, whose buildscripts pin every upstream
+  Corresponding source: the fork at tag v1.0.0-player.3, whose buildscripts pin every upstream
   version.
 
 - AndroidX and Jetpack Compose, Apache-2.0.

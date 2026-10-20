@@ -15,9 +15,9 @@
       </trusted-artifacts>
    </configuration>
    <components>
-      <component group="hrmasss" name="libmpv" version="v1.0.0-player.2">
-         <artifact name="libmpv-v1.0.0-player.2.aar">
-            <sha256 value="cbaa30c69f8d995fc02366447f5145dbafc10e9f034df1c25318ed8b26a9b410" origin="hrmasss/libmpv-android release v1.0.0-player.2"/>
+      <component group="hrmasss" name="libmpv" version="v1.0.0-player.3">
+         <artifact name="libmpv-v1.0.0-player.3.aar">
+            <sha256 value="b0d5bd8181bd824cb86f013c65e53b594ee170b87fab47676452a2ce4c722381" origin="hrmasss/libmpv-android release v1.0.0-player.3"/>
          </artifact>
       </component>
    </components>
