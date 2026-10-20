@@ -56,6 +56,8 @@ class PlayerEngine(context: Context) {
     // video output's surface at decoder init, so loading first would cost HW for the whole file.
     private var hasSurface = false
     private var pendingLoad: (() -> Unit)? = null
+    private var videoBeforeDetach: String? = null
+    private var reattachedAt = 0L
     @Volatile private var released = false
     private var openFd: android.os.ParcelFileDescriptor? = null
 
@@ -211,6 +213,14 @@ class PlayerEngine(context: Context) {
         mpv?.setOptionString("force-window", "yes")
         setProperty("vo", "gpu-next,gpu")
         hasSurface = true
+        // Back from background play (US-59.3): turn the video track on again. mpv reinitialises the
+        // decoder and shows the frame at the current audio position.
+        videoBeforeDetach?.let {
+            reattachedAt = SystemClock.elapsedRealtime()
+            setProperty("vid", it)
+            videoBeforeDetach = null
+            Log.i(TAG, "video back on at ${_state.value.positionMs} ms")
+        }
         runPendingLoad()
     }
 
@@ -219,6 +229,12 @@ class PlayerEngine(context: Context) {
     }
 
     fun detachSurface() = runAndWait {
+        // No surface means nobody sees video: stop decoding it while audio plays on (background
+        // play, US-59.1), and bring it back on the next attach.
+        if (_state.value.loaded && _state.value.video != null) {
+            videoBeforeDetach = mpv?.getPropertyString("vid")?.takeIf { it != "no" }
+            if (videoBeforeDetach != null) setProperty("vid", "no")
+        }
         // Setting vo=null returns once the video output has released the surface.
         setProperty("vo", "null")
         mpv?.setOptionString("force-window", "no")
@@ -315,6 +331,10 @@ class PlayerEngine(context: Context) {
 
     private fun refreshVideo() {
         val lib = mpv ?: return
+        if (reattachedAt > 0) {
+            Log.i(TAG, "video shown again ${SystemClock.elapsedRealtime() - reattachedAt} ms after the surface came back, at ${_state.value.positionMs} ms")
+            reattachedAt = 0
+        }
         val codec = lib.getPropertyString("video-format") ?: return
         val info = VideoInfo(
             codec = codec,
