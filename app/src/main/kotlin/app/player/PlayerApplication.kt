@@ -10,6 +10,7 @@ import app.player.feature.library.settings.GeneralSettings
 import app.player.feature.library.settings.LibrarySettings
 import app.player.feature.library.settings.ResumePointsBackup
 import app.player.feature.audio.AudioExtension
+import app.player.feature.audio.AudioSettings
 import app.player.feature.subtitles.SubtitlesExtension
 
 class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
@@ -22,6 +23,7 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
 
     /** Every feature's settings group (core/settings-api). Owners add theirs; order comes from each group. */
     override val settingsGroups: List<SettingsGroup> = listOf(
+        AudioSettings,
         LibrarySettings,
         GeneralSettings,
     )
