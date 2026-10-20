@@ -5,7 +5,8 @@ logs every request's path and User-Agent, so US-61.5 can be checked from the log
     perf/stream-server.py <dir> <log> [http_port=8000] [https_port=8443]
 
 From the emulator the host is 10.0.2.2. HTTPS uses a throwaway self-signed certificate made in <dir>
-(mpv does not verify TLS by default). /slow/<file> waits 30 s before answering, for timeout checks.
+(mpv does not verify TLS by default). /slow/<file> waits 10 s before answering; /throttle/<file>
+sends at 40 kB/s, below the test clip's bitrate, so playback stalls and buffers.
 """
 import http.server
 import os
@@ -19,6 +20,7 @@ root, log_path = sys.argv[1], sys.argv[2]
 http_port = int(sys.argv[3]) if len(sys.argv) > 3 else 8000
 https_port = int(sys.argv[4]) if len(sys.argv) > 4 else 8443
 log = open(log_path, "a", buffering=1)
+THROTTLE_BPS = 40_000
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -34,9 +36,33 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self._note()
         if self.path.startswith("/slow/"):
-            time.sleep(30)
+            time.sleep(10)
             self.path = self.path[len("/slow"):]
+        if self.path.startswith("/throttle/"):
+            return self._throttled(self.path[len("/throttle"):])
         super().do_GET()
+
+    def _throttled(self, path):
+        """Sends the file at THROTTLE_BPS, below the clip's bitrate, so playback stalls and buffers."""
+        file = os.path.join(root, path.lstrip("/"))
+        if not os.path.isfile(file):
+            return self.send_error(404)
+        size = os.path.getsize(file)
+        self.send_response(200)
+        self.send_header("Content-Type", "video/mp4")
+        self.send_header("Content-Length", str(size))
+        self.end_headers()
+        chunk = 4096
+        with open(file, "rb") as f:
+            while True:
+                data = f.read(chunk)
+                if not data:
+                    break
+                try:
+                    self.wfile.write(data)
+                except (BrokenPipeError, ConnectionResetError):
+                    return
+                time.sleep(chunk / THROTTLE_BPS)
 
     def do_HEAD(self):
         self._note()

@@ -42,7 +42,12 @@ object NetworkExtension : PlayerExtension {
         // the agent must be set now, not after an async read. One small file read, bounded.
         val agent = runBlocking { withTimeoutOrNull(300) { NetworkPrefs(context).userAgent.first() } }
         if (!agent.isNullOrBlank()) engine.set("user-agent", agent)
+        // mpv waits 60 s for a silent server. 20 s is long enough for slow links and short
+        // enough that the viewer gets a reason and a retry (US-61.4) before giving up on us.
+        engine.set("network-timeout", NETWORK_TIMEOUT_S)
     }
+
+    private const val NETWORK_TIMEOUT_S = 20L
 
     @Composable
     override fun Overlay(host: PanelHost) = NetworkOverlay(host.engine)
