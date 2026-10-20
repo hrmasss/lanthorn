@@ -62,4 +62,10 @@
     <string name="settings_keep_status">Keep status visible</string>
     <string name="settings_keep_status_summary">Elapsed time, battery and clock stay in the corners when controls hide</string>
     <string name="settings_back_twice">Press back twice to leave</string>
+
+    <!-- Fit modes (US-53.1) -->
+    <string name="fit_fit">Fit</string>
+    <string name="fit_stretch">Stretch</string>
+    <string name="fit_crop">Crop</string>
+    <string name="fit_original">100%</string>
 </resources>
