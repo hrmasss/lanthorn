@@ -45,6 +45,12 @@ import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import app.player.core.engine.PlayerSessions
 import java.nio.charset.Charset
 
 /** Subtitle tracks, external files, sync and ASS options inside the player (P1.3). */
@@ -86,7 +92,21 @@ object SubtitlesExtension : PlayerExtension {
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
+        // US-41.3: every new file starts at the default delay.
+        val controller = SubtitleController(engine.asMpv())
+        val store = SubtitleStyleStore(context)
+        val job = scope.launch {
+            engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect {
+                controller.setDelayMs(store.defaultDelayMs.first())
+            }
+        }
+        scope.launch {
+            PlayerSessions.current.first { it !== engine }
+            job.cancel()
+        }
     }
+
+    private val scope = MainScope()
 }
 
 private object TracksPanel : PlayerPanel {
