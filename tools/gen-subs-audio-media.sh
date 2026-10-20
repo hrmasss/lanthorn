@@ -82,3 +82,9 @@ ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=10 
 
 # Loud tone for the limiter check (US-49.2): 1 kHz at -3 dBFS, lossless so the peak is exact.
 ffmpeg -loglevel error -y -f lavfi -i "aevalsrc=0.7079*sin(2*PI*1000*t):s=48000:d=10" -c:a flac "$AUD/loud.flac"
+
+# Two audio tracks where the default-flagged one is second (US-47.2, "else the default-flagged track").
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=25:duration=10 \
+  -f lavfi -i sine=frequency=440:duration=10:sample_rate=48000 -f lavfi -i sine=frequency=880:duration=10:sample_rate=48000 \
+  -map 0:v -map 1:a -map 2:a -c:v libx264 -preset veryfast -crf 35 -pix_fmt yuv420p -c:a aac -b:a 48k \
+  -metadata:s:a:0 language=eng -metadata:s:a:1 language=ita -disposition:a:0 0 -disposition:a:1 default "$AUD/default-second.mkv"
