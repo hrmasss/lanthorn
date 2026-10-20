@@ -1,0 +1,48 @@
+package app.player.feature.playback
+
+import app.player.core.data.PlaybackPosition
+import app.player.core.engine.PlaybackState
+
+/** "Resume" setting (US-22.2, US-22.3). */
+enum class ResumeMode { Yes, Ask, No }
+
+/** Where a file starts. */
+sealed interface StartAt {
+    data object Beginning : StartAt
+
+    /** Start at [positionMs] and offer "start over" for 5 s (US-22.2). */
+    data class Resume(val positionMs: Long) : StartAt
+
+    /** Ask resume or start over before the first frame (US-22.3). */
+    data class Ask(val positionMs: Long) : StartAt
+}
+
+/**
+ * The resume rules, without Android. The library reads the same rows for its marks (US-07): a
+ * finished file keeps its row with position equal to duration, so finished and never played differ.
+ */
+object Resume {
+    /** The last 5% counts as the end (US-22.1, US-07.3). */
+    const val FINISHED_SHARE = 0.95
+
+    /** How often a playing file's position is written, so a killed process loses at most this (US-22.5: 10 s). */
+    const val SAVE_EVERY_MS = 5_000L
+
+    /** The row to write for [state], or null when there is nothing worth saving. */
+    fun toSave(state: PlaybackState, now: Long): PlaybackPosition? {
+        val uri = state.uri ?: return null
+        if (!state.loaded || state.error != null || state.durationMs <= 0) return null
+        val finished = state.ended || state.positionMs >= state.durationMs * FINISHED_SHARE
+        val position = if (finished) state.durationMs else state.positionMs / 1000 * 1000
+        return PlaybackPosition(uri, position.coerceAtLeast(0), state.durationMs, now)
+    }
+
+    /** Where to start a file that has [saved] as its resume point. */
+    fun startAt(saved: PlaybackPosition?, mode: ResumeMode, laterInQueue: Boolean, firstOnly: Boolean): StartAt {
+        if (saved == null || mode == ResumeMode.No) return StartAt.Beginning
+        if (firstOnly && laterInQueue) return StartAt.Beginning
+        if (saved.positionMs < 1000) return StartAt.Beginning
+        if (saved.durationMs > 0 && saved.positionMs >= saved.durationMs * FINISHED_SHARE) return StartAt.Beginning
+        return if (mode == ResumeMode.Ask) StartAt.Ask(saved.positionMs) else StartAt.Resume(saved.positionMs)
+    }
+}
