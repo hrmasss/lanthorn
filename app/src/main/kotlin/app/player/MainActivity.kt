@@ -14,14 +14,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import app.player.core.designsystem.PlayerTheme
+import app.player.core.designsystem.theme.LanthornTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            PlayerTheme {
+            LanthornTheme {
                 Scaffold { padding ->
                     Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                         Text(
