@@ -48,8 +48,6 @@ junit = { module = "junit:junit", version.ref = "junit" }
 # Real org.json for JVM unit tests; Android's copy is a stub there.
 json = { module = "org.json:json", version.ref = "json" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
