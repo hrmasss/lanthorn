@@ -72,6 +72,7 @@ dependencies {
     implementation(project(":feature:subtitles"))
     implementation(project(":feature:audio"))
     implementation(project(":core:player-api"))
+    implementation(project(":feature:library"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

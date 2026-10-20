@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +61,7 @@ fun PlayerScreen(
     Box(
         modifier
             .fillMaxSize()
+            .semantics { testTagsAsResourceId = true }
             .background(Color.Black)
             .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls },
     ) {

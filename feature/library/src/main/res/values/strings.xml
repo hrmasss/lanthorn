@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_title">Videos</string>
+    <string name="library_back">Back</string>
+
+    <string name="access_title">See your videos</string>
+    <string name="access_body">To list your videos by folder, the app needs to read them. It reads videos only, not photos or other files, and nothing leaves your phone.</string>
+    <string name="access_allow">Allow access</string>
+    <string name="access_settings">Open app settings</string>
+    <string name="access_denied_body">Access is off. Turn on Photos and videos in the app settings to see your library.</string>
+    <string name="access_open_file">Open a single file</string>
+
+    <string name="partial_banner">Showing only the videos you picked.</string>
+    <string name="partial_more">Choose more</string>
+
+    <string name="library_scanning">Looking for videos</string>
+    <string name="library_empty_in">No videos found in %1$s.</string>
+    <string name="library_empty_nowhere">No videos found.</string>
+    <string name="library_folder_settings">Folder settings</string>
+    <string name="library_storage_root">Storage root</string>
+    <plurals name="library_video_count">
+        <item quantity="one">%d video</item>
+        <item quantity="other">%d videos</item>
+    </plurals>
+
+    <string name="library_unavailable">Storage not available</string>
+
+    <string name="view_folders">Show folders</string>
+    <string name="view_all_videos">Show all videos</string>
+    <string name="view_as_list">Show as list</string>
+    <string name="view_as_grid">Show as grid</string>
+    <string name="view_fields">Fields shown</string>
+    <string name="field_size">Size</string>
+    <string name="field_resolution">Resolution</string>
+    <string name="field_frame_rate">Frame rate</string>
+    <string name="field_date">Date</string>
+    <string name="field_extension">Extension</string>
+
+    <string name="more_options">More options</string>
+    <string name="row_menu">More options for %1$s</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_unhide">Show again</string>
+    <string name="action_exclude">Don\'t scan this folder</string>
+
+    <string name="sort">Sort</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_date">Date modified</string>
+    <string name="sort_size">Size</string>
+    <string name="sort_length">Length</string>
+    <string name="sort_resolution">Resolution</string>
+    <string name="sort_descending">Descending</string>
+
+    <string name="search">Search</string>
+    <string name="search_hint">Search videos and folders</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_remove">Remove %1$s from recent searches</string>
+    <string name="search_none">Nothing matches.</string>
+
+    <string name="folders_title">Folders</string>
+    <string name="folders_scanned">Scanned storage</string>
+    <string name="folders_all">All folders</string>
+    <string name="folders_nomedia_note">Folders holding a .nomedia file, and hidden folders whose names start with a dot, are never scanned.</string>
+    <string name="folders_excluded">Not scanned</string>
+    <string name="folders_exclude_add">Add a folder</string>
+    <string name="folders_include_again">Scan again</string>
+    <string name="folders_hidden">Hidden</string>
+    <string name="folders_hidden_none">Nothing hidden.</string>
+    <string name="folders_types">File types</string>
+</resources>
