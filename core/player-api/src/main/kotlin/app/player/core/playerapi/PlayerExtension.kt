@@ -24,6 +24,14 @@ interface PlayerExtension {
      * here (subtitle style, audio delay defaults) through the engine's generic property API.
      */
     fun onEngineCreated(context: Context, engine: PlayerEngine) {}
+
+    /**
+     * Drawn over the video, under the controls and panels, full size, always present while the
+     * player shows. For state the feature owns, such as network buffering and an error card.
+     * Draw nothing when there is nothing to say: it must not block touches it does not use.
+     */
+    @Composable
+    fun Overlay(host: PanelHost) {}
 }
 
 /** A sheet or side panel shown over the video. The player screen owns placement and animation. */
