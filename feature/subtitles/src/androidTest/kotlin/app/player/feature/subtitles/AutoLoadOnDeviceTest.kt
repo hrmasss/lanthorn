@@ -58,9 +58,9 @@ class AutoLoadOnDeviceTest {
     }
 
     /** Opens the clip and waits until the auto-load picked (sid settles after the two files load). */
-    private suspend fun openClip(uri: Uri = Uri.fromFile(clip)): List<Track> {
+    private suspend fun openClip(uri: Uri = Uri.fromFile(clip), tracks: Int = 7): List<Track> {
         engine.open(uri)
-        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 7 }
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= tracks }
         delay(1500)
         return parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" }
     }
@@ -84,7 +84,7 @@ class AutoLoadOnDeviceTest {
         openClip()
         assertEquals("Clip.it.srt", selected()?.title)
         prefs.setLanguage("en")
-        openClip(Uri.fromFile(OnDevice.asset("wide.mkv"))) // another file between
+        openClip(Uri.fromFile(OnDevice.asset("wide.mkv")), tracks = 2) // another file between
         openClip()
         val english = selected()
         assertEquals("eng", english?.lang)
@@ -105,7 +105,7 @@ class AutoLoadOnDeviceTest {
         val italian = subs.first { it.title == "Clip.it.srt" }
         SubtitleController(engine.asMpv()).select(SubSelection(italian.id))
         SubtitlesExtension.autoLoad(OnDevice.context).remember(Uri.fromFile(clip).toString(), italian)
-        openClip(Uri.fromFile(OnDevice.asset("wide.mkv")))
+        openClip(Uri.fromFile(OnDevice.asset("wide.mkv")), tracks = 2)
         openClip()
         assertEquals("Clip.it.srt", selected()?.title)
         evidence("US-39.4 picked Clip.it.srt by hand; reopened with English preferred: Clip.it.srt restored")
