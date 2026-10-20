@@ -53,8 +53,9 @@ object SubtitlesExtension : PlayerExtension {
 
     const val TRACKS_PANEL = "subtitle-tracks"
     const val SYNC_PANEL = "subtitle-sync"
+    const val STYLE_PANEL = "subtitle-style"
 
-    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel)
+    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel, StylePanel)
 
     override val menuEntries = listOf(
         PlayerMenuEntry(id = TRACKS_PANEL, group = MenuGroup.Subtitle, order = 0, opensPanel = TRACKS_PANEL) {
@@ -63,19 +64,28 @@ object SubtitlesExtension : PlayerExtension {
         PlayerMenuEntry(id = SYNC_PANEL, group = MenuGroup.Subtitle, order = 10, opensPanel = SYNC_PANEL) {
             stringResource(R.string.subs_menu_sync)
         },
+        PlayerMenuEntry(id = STYLE_PANEL, group = MenuGroup.Subtitle, order = 20, opensPanel = STYLE_PANEL) {
+            stringResource(R.string.subs_menu_style)
+        },
     )
 
     private var files: SubtitleFiles? = null
+    private var styles: SubtitleStyles? = null
+
+    internal fun styles(context: Context): SubtitleStyles =
+        styles ?: SubtitleStyles(context).also { styles = it }
 
     internal fun files(context: Context): SubtitleFiles =
         files ?: SubtitleFiles(context).also { files = it }
 
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
-        SubtitleFonts.install(context)
+        val styles = styles(context)
+        SubtitleFonts.install(context, listOf(styles.userFontDir.path))
         // We find and decode subtitle files ourselves (UTF-8 for mpv, which has no iconv here).
         engine.set("sub-auto", "no")
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
+        styles.attach(engine)
     }
 }
 

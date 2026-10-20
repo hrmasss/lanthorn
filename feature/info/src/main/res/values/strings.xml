@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="decoder_settings">Decoder</string>
+    <string name="decoder_prefer_sw">Prefer software decoding</string>
+    <string name="decoder_prefer_sw_summary">Use SW for files without a choice of their own. Plays more formats, uses more battery.</string>
+    <string name="decoder_by_extension">Decoder by file type</string>
+    <string name="decoder_by_extension_summary">Used for every file with this extension, unless you picked a decoder for the file itself.</string>
+    <string name="decoder_mode_auto">Auto (HW, then HW+, then SW)</string>
+    <string name="decoder_mode_hw">HW</string>
+    <string name="decoder_mode_hw_plus">HW+</string>
+    <string name="decoder_mode_sw">SW</string>
+    <string name="backup_per_file_choices">Per-file choices (decoder, tracks, delays)</string>
+</resources>

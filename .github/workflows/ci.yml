@@ -47,7 +47,7 @@ jobs:
           PLAYER_KEYSTORE_PASSWORD: ${{ secrets.PLAYER_KEYSTORE_PASSWORD }}
           PLAYER_KEY_ALIAS: ${{ secrets.PLAYER_KEY_ALIAS }}
           PLAYER_KEY_PASSWORD: ${{ secrets.PLAYER_KEY_PASSWORD }}
-        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest lint --console=plain
+        run: ./gradlew assembleDebug assembleRelease assembleBench assembleDebugAndroidTest testDebugUnitTest lint --console=plain
 
       - name: APK sizes
         run: find app/build/outputs/apk -name '*.apk' -printf '%s\t%p\n' | sort -n | tee -a "$GITHUB_STEP_SUMMARY"
@@ -57,6 +57,101 @@ jobs:
           name: apks
           path: app/build/outputs/apk/**/*.apk
           retention-days: 14
+
+      # Small artifacts for emulator runs: downloads need no lock and run at about 0.3 MB/s on
+      # hapl-aux, so each one holds a single x86_64 APK (test APKs carry x86_64 libraries only).
+      #   gh run download <id> -R hrmasss/player-app -n app-debug-x86_64
+      #   gh run download <id> -R hrmasss/player-app -n test-core-engine
+      # A new module with instrumented tests adds its own step below.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-debug-x86_64
+          path: app/build/outputs/apk/debug/app-x86_64-debug.apk
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-bench-x86_64
+          path: app/build/outputs/apk/bench/app-x86_64-bench.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-core-engine
+          path: core/engine/build/outputs/apk/androidTest/debug/engine-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-core-data
+          path: core/data/build/outputs/apk/androidTest/debug/data-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-core-designsystem
+          path: core/designsystem/build/outputs/apk/androidTest/debug/designsystem-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-core-player-api
+          path: core/player-api/build/outputs/apk/androidTest/debug/player-api-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-core-settings-api
+          path: core/settings-api/build/outputs/apk/androidTest/debug/settings-api-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-feature-player
+          path: feature/player/build/outputs/apk/androidTest/debug/player-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-feature-info
+          path: feature/info/build/outputs/apk/androidTest/debug/info-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-feature-library
+          path: feature/library/build/outputs/apk/androidTest/debug/library-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-feature-subtitles
+          path: feature/subtitles/build/outputs/apk/androidTest/debug/subtitles-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-feature-audio
+          path: feature/audio/build/outputs/apk/androidTest/debug/audio-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-bench
+          path: bench/build/outputs/apk/androidTest/debug/bench-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
 
       - uses: actions/upload-artifact@v7
         if: always()

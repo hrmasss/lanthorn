@@ -42,6 +42,7 @@ import app.player.core.designsystem.component.SettingsChoice
 import app.player.core.designsystem.component.SettingsHeader
 import app.player.core.designsystem.component.SettingsNote
 import app.player.core.designsystem.component.SettingsSwitch
+import app.player.core.designsystem.component.SettingsText
 import app.player.core.designsystem.theme.ThemeMode
 import app.player.core.settingsapi.PreferencesJson
 import app.player.core.settingsapi.SettingsEntry
@@ -51,6 +52,7 @@ import app.player.feature.library.LibraryPrefs
 import app.player.feature.library.LibraryPrefsStore
 import app.player.feature.library.LibraryViewModel
 import app.player.feature.library.R
+import app.player.feature.library.network.NetworkPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -127,6 +129,7 @@ object GeneralSettings : SettingsGroup {
     private const val CLEAR = "clear_history"
     private const val THUMBS = "clear_thumbnails"
     private const val RESET = "reset"
+    private const val AGENT = "user_agent"
 
     override val entries = listOf(
         SettingsEntry(THEME, R.string.setting_theme),
@@ -138,6 +141,7 @@ object GeneralSettings : SettingsGroup {
         SettingsEntry(PAUSE, R.string.setting_pause_history, R.string.setting_pause_history_summary),
         SettingsEntry(CLEAR, R.string.setting_clear_history, R.string.setting_clear_history_summary),
         SettingsEntry(THUMBS, R.string.setting_clear_thumbnails, R.string.setting_clear_thumbnails_summary),
+        SettingsEntry(AGENT, R.string.setting_user_agent, R.string.setting_user_agent_summary),
         SettingsEntry(RESET, R.string.setting_reset, R.string.setting_reset_summary),
     )
 
@@ -151,6 +155,8 @@ object GeneralSettings : SettingsGroup {
         val history = remember { HistoryPrefs(context) }
         val appearance by appearancePrefs.appearance.collectAsStateWithLifecycle(Appearance())
         val paused by history.paused.collectAsStateWithLifecycle(false)
+        val network = remember { NetworkPrefs(context) }
+        val userAgent by network.userAgent.collectAsStateWithLifecycle("")
         var confirm by remember { mutableStateOf<String?>(null) }
         var imported by remember { mutableStateOf<JSONObject?>(null) }
         var report by remember { mutableStateOf<String?>(null) }
@@ -168,7 +174,7 @@ object GeneralSettings : SettingsGroup {
             }
         }
 
-        val order = listOf("h1", THEME, BLACK, DYNAMIC, LANGUAGE, "h2", EXPORT, IMPORT, "h3", PAUSE, CLEAR, THUMBS, "h4", RESET)
+        val order = listOf("h1", THEME, BLACK, DYNAMIC, LANGUAGE, "h2", EXPORT, IMPORT, "h3", PAUSE, CLEAR, THUMBS, "h5", AGENT, "h4", RESET)
         SettingsPage(highlight, order) {
             item("h1") { SettingsHeader(stringResource(R.string.settings_section_look)) }
             item(THEME) {
@@ -255,6 +261,16 @@ object GeneralSettings : SettingsGroup {
                     },
                     summary = stringResource(R.string.setting_clear_thumbnails_summary),
                     highlighted = highlight == THUMBS,
+                )
+            }
+            item("h5") { SettingsHeader(stringResource(R.string.settings_section_network)) }
+            item(AGENT) {
+                SettingsText(
+                    stringResource(R.string.setting_user_agent),
+                    userAgent,
+                    { scope.launch { network.setUserAgent(it) } },
+                    placeholder = stringResource(R.string.setting_user_agent_default),
+                    highlighted = highlight == AGENT,
                 )
             }
             item("h4") { SettingsHeader(stringResource(R.string.settings_section_reset)) }

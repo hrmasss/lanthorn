@@ -65,6 +65,23 @@
     <string name="settings_section_backup">Backup</string>
     <string name="settings_section_history">History</string>
     <string name="settings_section_reset">Reset</string>
+    <string name="settings_section_network">Network</string>
+    <string name="setting_user_agent">User agent</string>
+    <string name="setting_user_agent_summary">Name the player sends to stream servers</string>
+    <string name="setting_user_agent_default">Default</string>
+
+    <string name="stream_title">Open network stream</string>
+    <string name="stream_url">URL</string>
+    <string name="stream_hint">http, https, HLS, DASH, RTSP or RTMP</string>
+    <string name="stream_invalid">Not a stream address this player can open</string>
+    <string name="stream_play">Play</string>
+    <string name="stream_connecting">Connecting</string>
+    <string name="stream_buffering">Buffering %1$d%%</string>
+    <string name="stream_fail_not_found">The server says this stream does not exist.</string>
+    <string name="stream_fail_timeout">The server did not answer in time. Check the address and your connection.</string>
+    <string name="stream_fail_unsupported">This stream\'s format is not supported.</string>
+    <string name="stream_fail_other">This stream could not be played.</string>
+    <string name="stream_retry">Retry</string>
     <string name="settings_history_note">Nothing you watch leaves your phone. History is only what this app keeps to resume videos and list your searches.</string>
 
     <string name="setting_cache_thumbnails">Keep thumbnails</string>

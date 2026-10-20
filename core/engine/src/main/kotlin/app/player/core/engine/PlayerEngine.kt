@@ -100,11 +100,19 @@ class PlayerEngine(context: Context) {
         Log.i(TAG, "libmpv ready in ${SystemClock.elapsedRealtime() - t0} ms")
     }
 
-    /** Opens a file and starts playback at [startMs]. Accepts content://, file:// and plain paths. */
-    fun open(uri: Uri, startMs: Long = 0) {
+    /**
+     * Opens a file and starts playback at [startMs]. Accepts content://, file:// and plain paths.
+     * [decoder] is the mode for this file, normally from [DecoderSettings.choose]; null keeps the
+     * current one.
+     */
+    fun open(uri: Uri, startMs: Long = 0, decoder: DecoderMode? = null) {
         openedAt = SystemClock.elapsedRealtime()
-        _state.value = PlaybackState(uri = uri.toString(), decoderMode = _state.value.decoderMode)
+        val mode = decoder ?: _state.value.decoderMode
+        // open() starts playback (pause=no below). Say so now: when mpv was already unpaused it
+        // sends no change event, and the default `paused = true` would stick for the whole file.
+        _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode, paused = false)
         post {
+            setProperty("hwdec", mode.hwdec)
             val path = resolve(uri)
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
             val load: () -> Unit = {
@@ -143,7 +151,7 @@ class PlayerEngine(context: Context) {
 
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
     fun setDecoder(mode: DecoderMode) {
-        _state.update { it.copy(decoderMode = mode) }
+        _state.update { it.copy(decoderMode = mode, decoderNotice = null) }
         post { setProperty("hwdec", mode.hwdec) }
     }
 
@@ -316,7 +324,11 @@ class PlayerEngine(context: Context) {
             pixelFormat = lib.getPropertyString("video-params/hw-pixelformat")
                 ?: lib.getPropertyString("video-params/pixelformat"),
         )
-        _state.update { it.copy(video = info) }
+        // The decoder is settled once video is reconfigured: compare it with what was chosen.
+        val running = ActiveDecoder.fromHwdecCurrent(lib.getPropertyString("hwdec-current"))
+        _state.update {
+            it.copy(video = info, activeDecoder = running, decoderNotice = fallbackNotice(it.decoderMode, running))
+        }
     }
 
     private val observer = object : MPVLib.EventObserver {
@@ -352,7 +364,12 @@ class PlayerEngine(context: Context) {
         override fun eventProperty(property: String, value: String) {
             publish(property, MpvFormat.MPV_FORMAT_STRING, value)
             when (property) {
-                "hwdec-current" -> _state.update { it.copy(activeDecoder = ActiveDecoder.fromHwdecCurrent(value)) }
+                "hwdec-current" -> _state.update {
+                    val running = ActiveDecoder.fromHwdecCurrent(value)
+                    // An empty value is mpv between decoders; judge only settled values on loaded video.
+                    val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
+                    it.copy(activeDecoder = running, decoderNotice = notice)
+                }
             }
         }
 
