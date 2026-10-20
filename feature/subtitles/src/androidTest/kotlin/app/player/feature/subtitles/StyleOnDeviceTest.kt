@@ -93,7 +93,8 @@ class StyleOnDeviceTest {
         delay(300)
         shot("us43-left-margin25")
         OnDevice.main { styles.update { it.copy(align = SubAlign.Centre, bottomMarginPercent = 0f, fitToVideo = true) } }
-        engine.await("sub-margin-y", PropertyType.Int64) { it == 0L }
+        // Margin 0 still keeps the line above the navigation handle (gate fix), so not 0 here.
+        engine.await("sub-margin-y", PropertyType.Int64) { it != null && it in 1L..80L }
         delay(300)
         shot("us43-fit-on")
         evidence("US-43.2 fit on: osd ${engine.get("osd-dimensions", PropertyType.Text)}")
