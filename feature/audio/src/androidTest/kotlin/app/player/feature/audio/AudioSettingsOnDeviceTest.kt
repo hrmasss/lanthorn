@@ -31,6 +31,7 @@ class AudioSettingsOnDeviceTest {
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { AudioExtension.onEngineCreated(OnDevice.context, it) }
         scenario.onActivity { it.surface.engine = engine }
+        Unit
     }
 
     @After fun close() = runBlocking {
@@ -70,12 +71,27 @@ class AudioSettingsOnDeviceTest {
         evidence("US-48.3 default 250 ms applied on open; changed to -500 ms; the next file started at 250 ms again")
     }
 
+    @Test fun remembersTrackPerFile_US47_4() = runBlocking {
+        open("tracks.mkv")
+        val ita = parseTracks(engine.get("track-list", PropertyType.Text)).first { it.type == "audio" && it.lang == "ita" }.id
+        OnDevice.main {
+            AudioController(engine.asMpv()).select(ita)
+            AudioExtension.rememberTrack(OnDevice.context, engine, ita)
+        }
+        delay(500)
+        open("long.mp4")
+        open("tracks.mkv")
+        engine.await("current-tracks/audio/lang", PropertyType.Text, 10_000) { it == "ita" }
+        app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(Uri.fromFile(OnDevice.asset("tracks.mkv")).toString())
+        evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored")
+    }
+
     @Test fun settingsPage_P1_31() = runBlocking {
         store.setLanguage("it")
         store.setDefaultDelay(120)
         store.setBluetoothDelay(200)
         val page = ActivityScenario.launch(SettingsTestActivity::class.java)
-        delay(1500)
+        delay(3000)
         shot("audio-settings-page")
         page.close()
         evidence("Audio settings page: language Italian, default +0.12 s, Bluetooth +0.20 s; screenshot")

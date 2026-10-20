@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.player.core.engine.PlayerEngine
+import app.player.core.data.choice.PerFileChoices
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.MenuGroup
 import app.player.core.playerapi.PanelHost
@@ -42,6 +43,7 @@ import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -76,6 +78,17 @@ object AudioExtension : PlayerExtension {
 
     internal fun delay(engine: PlayerEngine): AudioDelay? = bound?.takeIf { it.engine === engine }?.delay
 
+    private var choices: PerFileChoices? = null
+
+    /** US-47.4: the viewer picked [trackId] for the open file. A no-op while "remember choices" is off. */
+    internal fun rememberTrack(context: Context, engine: PlayerEngine, trackId: Long) {
+        val uri = engine.state.value.uri ?: return
+        val store = choices ?: PerFileChoices(context).also { choices = it }
+        scope.launch { store.put(uri, TRACK_KEY, trackId.toString()) }
+    }
+
+    private const val TRACK_KEY = "audio.track"
+
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
         bound?.effects?.release()
         val audio = context.getSystemService(AudioManager::class.java)
@@ -99,6 +112,13 @@ object AudioExtension : PlayerExtension {
                     // US-47.2: mpv picks the matching track at open, else the default-flagged one.
                     engine.set("alang", alangFor(it.preferredLanguage))
                     delay.setBluetooth(it.bluetoothDelayMs, bluetooth.active())
+                }
+            },
+            // US-47.4: the track the viewer picked for this file, once it has loaded.
+            scope.launch {
+                val store = choices ?: PerFileChoices(context).also { choices = it }
+                engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+                    store.get(uri, TRACK_KEY)?.toLongOrNull()?.let { engine.set("aid", it.toString()) }
                 }
             },
             // US-48.3: every new file starts at the default delay.
@@ -150,7 +170,10 @@ private object TracksPanel : PlayerPanel {
                         headlineContent = { Text(track.title ?: track.lang ?: stringResource(R.string.audio_track_fallback, track.id)) },
                         supportingContent = { Text(track.details()) },
                         leadingContent = { RadioButton(track.id == selected, onClick = null) },
-                        modifier = Modifier.clickable { controller.select(track.id) }.testTag("audio-track-${track.id}"),
+                        modifier = Modifier.clickable {
+                            controller.select(track.id)
+                            AudioExtension.rememberTrack(context, host.engine, track.id)
+                        }.testTag("audio-track-${track.id}"),
                     )
                 }
             }
