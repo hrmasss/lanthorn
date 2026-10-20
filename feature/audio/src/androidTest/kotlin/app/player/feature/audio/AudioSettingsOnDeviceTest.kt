@@ -82,8 +82,17 @@ class AudioSettingsOnDeviceTest {
         open("long.mp4")
         open("tracks.mkv")
         engine.await("current-tracks/audio/lang", PropertyType.Text, 10_000) { it == "ita" }
+        // "Remember choices" off: the file opens on its default track again.
+        val remember = app.player.core.data.choice.RememberPerFile(OnDevice.context)
+        remember.set(false)
+        open("long.mp4")
+        open("tracks.mkv")
+        delay(1000)
+        val whenOff = engine.get("current-tracks/audio/lang", PropertyType.Text)
+        remember.set(true)
         app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(Uri.fromFile(OnDevice.asset("tracks.mkv")).toString())
-        evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored")
+        assertEquals("eng", whenOff)
+        evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored; with remember choices off it opened on 'eng'")
     }
 
     @Test fun settingsPage_P1_31() = runBlocking {
