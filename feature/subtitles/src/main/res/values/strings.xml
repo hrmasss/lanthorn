@@ -20,4 +20,23 @@
     <string name="subs_speed_value">%1$.2fx</string>
     <string name="subs_reset">Reset</string>
     <string name="subs_open_failed">Could not open that subtitle file</string>
+    <string name="subs_menu_style">Subtitle style</string>
+    <string name="subs_style_title">Subtitle style</string>
+    <string name="subs_font">Font</string>
+    <string name="subs_font_folder">Add fonts from a folder</string>
+    <string name="subs_fonts_imported">%1$d fonts added. They apply to the next video.</string>
+    <string name="subs_size_value">Size %1$d</string>
+    <string name="subs_color">Colour</string>
+    <string name="subs_bold">Bold</string>
+    <string name="subs_outline">Outline</string>
+    <string name="subs_thickness_value">Thickness %1$.1f</string>
+    <string name="subs_shadow">Shadow</string>
+    <string name="subs_box">Background box</string>
+    <string name="subs_opacity_value">Opacity %1$d%%</string>
+    <string name="subs_alignment">Alignment</string>
+    <string name="subs_align_left">Left</string>
+    <string name="subs_align_centre">Centre</string>
+    <string name="subs_align_right">Right</string>
+    <string name="subs_margin_value">Bottom margin %1$d%%</string>
+    <string name="subs_fit_video">Keep inside the picture</string>
 </resources>

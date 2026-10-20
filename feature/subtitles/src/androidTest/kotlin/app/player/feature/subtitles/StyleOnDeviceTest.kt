@@ -1,0 +1,108 @@
+package app.player.feature.subtitles
+
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.SystemClock
+import androidx.test.core.app.ActivityScenario
+import app.player.core.engine.PlayerEngine
+import app.player.core.engine.PropertyType
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import java.io.File
+
+/** P1.28 style and placement on the real libmpv: property read-back plus screenshots. */
+class StyleOnDeviceTest {
+    private lateinit var scenario: ActivityScenario<VideoTestActivity>
+    private lateinit var engine: PlayerEngine
+    private lateinit var styles: SubtitleStyles
+    private val holder = Any()
+
+    @Before fun open() = runBlocking {
+        scenario = ActivityScenario.launch(VideoTestActivity::class.java)
+        engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
+        styles = OnDevice.main { SubtitlesExtension.styles(OnDevice.context) }
+        OnDevice.main { styles.reset() }
+        scenario.onActivity { it.surface.engine = engine }
+        engine.open(Uri.fromFile(OnDevice.asset("wide.mkv")))
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.pause()
+        repeat(20) {
+            engine.seekTo(1000)
+            delay(500)
+            if ((engine.get("time-pos", PropertyType.Real) ?: 0.0) >= 0.9) {
+                engine.set("sid", "1")
+                engine.await("sub-text", PropertyType.Text) { it == "Inside or outside the picture" }
+                delay(1500) // font cache on first load
+                return@runBlocking
+            }
+        }
+        throw AssertionError("seek to 1 s never landed")
+    }
+
+    @After fun close() {
+        if (!::scenario.isInitialized) return
+        OnDevice.main { styles.reset() }
+        scenario.onActivity { it.surface.engine = null }
+        OnDevice.release(holder)
+        scenario.close()
+    }
+
+    @Test fun defaultsAndLiveEdit_US42_1_US42_2_US42_3() = runBlocking {
+        assertEquals("#FFFFFFFF", engine.get("sub-color", PropertyType.Text))
+        assertEquals(true, engine.get("sub-bold", PropertyType.Flag))
+        assertEquals(0.0, engine.get("sub-border-size", PropertyType.Real)!!, 0.0)
+        assertEquals(2.0, engine.get("sub-shadow-offset", PropertyType.Real)!!, 0.0)
+        shot("us42-defaults")
+        val t0 = SystemClock.elapsedRealtime()
+        OnDevice.main { styles.update { it.copy(color = 0xFFFFEB3B, outline = true, outlineSize = 4f, font = "serif", size = 60) } }
+        engine.await("sub-color", PropertyType.Text) { it == "#FFFFEB3B" }
+        engine.await("sub-font", PropertyType.Text) { it == "serif" }
+        val took = SystemClock.elapsedRealtime() - t0
+        delay(300)
+        shot("us42-yellow-serif-outline")
+        OnDevice.main { styles.update { it.copy(outline = false, box = true, boxOpacity = 0.6f, font = "monospace", color = 0xFFFFFFFF) } }
+        engine.await("sub-border-style", PropertyType.Text) { it == "background-box" }
+        delay(300)
+        shot("us42-box-monospace")
+        evidence("US-42.2 defaults: white #FFFFFFFF, bold, border 0, shadow 2")
+        evidence("US-42.3 colour, outline, font, size change applied to mpv in $took ms (limit 100); screenshots before/after")
+        assertTrue("took $took ms", took < 100)
+    }
+
+    @Test fun alignmentMarginAndFit_US43_1_US43_2() = runBlocking {
+        OnDevice.main { styles.update { it.copy(align = SubAlign.Left, bottomMarginPercent = 25f) } }
+        engine.await("sub-margin-y", PropertyType.Int64) { it == 180L }
+        engine.await("sub-align-x", PropertyType.Text) { it == "left" }
+        delay(300)
+        shot("us43-left-margin25")
+        OnDevice.main { styles.update { it.copy(align = SubAlign.Centre, bottomMarginPercent = 0f, fitToVideo = true) } }
+        engine.await("sub-margin-y", PropertyType.Int64) { it == 0L }
+        delay(300)
+        shot("us43-fit-on")
+        OnDevice.main { styles.update { it.copy(fitToVideo = false) } }
+        engine.await("sub-use-margins", PropertyType.Flag) { it == true }
+        delay(300)
+        shot("us43-fit-off")
+        evidence("US-43.1 left alignment and 25% margin (sub-margin-y 180 of 720) applied; screenshot")
+        evidence("US-43.2 fit on keeps text in the picture, fit off puts it in the bottom bar; screenshots")
+    }
+
+    @Test fun styleIsSaved() = runBlocking {
+        OnDevice.main { styles.update { it.copy(size = 70) } }
+        delay(1200) // saved after 500 ms of quiet
+        val saved = SubtitleStyleStore(OnDevice.context).load()
+        assertEquals(70, saved.size)
+        evidence("Style saved to DataStore and read back (size 70)")
+    }
+
+    private fun shot(name: String) {
+        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
+        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+}
