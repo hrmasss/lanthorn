@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.BatteryManager
 import android.provider.Settings
+import android.util.Log
 import android.text.format.DateFormat
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
@@ -40,6 +41,7 @@ internal fun SystemBarsEffect(activity: Activity?, visible: Boolean) {
 internal fun KeepScreenOnEffect(activity: Activity?, on: Boolean) {
     DisposableEffect(activity, on) {
         val window = activity?.window
+        Log.i("PlayerChrome", "keep screen on: $on")
         window?.decorView?.post {
             if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
