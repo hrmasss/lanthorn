@@ -125,7 +125,7 @@ if want first-frame; then
       log=$(adb logcat -d -v epoch -s ActivityTaskManager:I PlayerEngine:I | tr -d '\r')
       t0=$(echo "$log" | grep "START u0" | grep PlayerActivity | head -1 | awk '{print $1}' || true)
       t1=$(echo "$log" | grep "first frame" | head -1 | awk '{print $1}' || true)
-      [ -n "$t1" ] && dec=$(echo "$log" | grep "first frame" | head -1 | sed 's/.*decoder //' || true)
+      dec=$(echo "$log" | grep -o 'decoder [A-Z+]* ([a-z-]*)' | head -1 | cut -d' ' -f2 || true)
       if [ -n "$t0" ] && [ -n "$t1" ]; then python3 -c "print(round(($t1-$t0)*1000))" >> "$RAW/first-frame-$f.txt"; fi
     done
     echo "| $f | $(wc -l < "$RAW/first-frame-$f.txt") | $(p 50 < "$RAW/first-frame-$f.txt") | $(p 90 < "$RAW/first-frame-$f.txt") | ${dec:--} |" >> "$OUT"
