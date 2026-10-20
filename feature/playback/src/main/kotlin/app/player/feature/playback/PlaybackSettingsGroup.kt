@@ -2,7 +2,9 @@ package app.player.feature.playback
 
 import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.annotation.StringRes
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-/** The Playback group: resume (US-22) and opening links (US-13.2). Queue settings join with P1.12. */
+/** The Playback group: resume (US-22), lists (US-24, US-75), buttons (US-29) and opening links (US-13.2). */
 object PlaybackSettingsGroup : SettingsGroup {
     override val id = "playback"
     override val order = 25
@@ -34,10 +36,20 @@ object PlaybackSettingsGroup : SettingsGroup {
     private const val RESUME = "resume"
     private const val FIRST_ONLY = "resume_first_only"
     private const val LINKS = "open_links"
+    private const val BACK = "back_to_list"
+    private const val SKIP = "skip_failed"
+    private const val SMART = "smart_previous"
+    private const val STEPS = "step_buttons"
+    private const val PREV_NEXT = "show_previous_next"
 
     override val entries = listOf(
         SettingsEntry(RESUME, R.string.setting_resume),
         SettingsEntry(FIRST_ONLY, R.string.setting_resume_first_only, R.string.setting_resume_first_only_summary),
+        SettingsEntry(BACK, R.string.setting_back_to_list, R.string.setting_back_to_list_summary),
+        SettingsEntry(SKIP, R.string.setting_skip_failed, R.string.setting_skip_failed_summary),
+        SettingsEntry(SMART, R.string.setting_smart_previous, R.string.setting_smart_previous_summary),
+        SettingsEntry(STEPS, R.string.setting_step_buttons, R.string.setting_step_buttons_summary),
+        SettingsEntry(PREV_NEXT, R.string.setting_show_previous_next),
         SettingsEntry(LINKS, R.string.setting_open_links, R.string.setting_open_links_summary),
     )
 
@@ -47,7 +59,7 @@ object PlaybackSettingsGroup : SettingsGroup {
         val scope = rememberCoroutineScope()
         val prefs = remember { PlaybackPrefs(context) }
         val s by prefs.settings.collectAsStateWithLifecycle(PlaybackSettings())
-        val order = listOf("h1", RESUME, FIRST_ONLY, "h2", LINKS)
+        val order = listOf("h1", RESUME, FIRST_ONLY, "h3", BACK, SKIP, "h4", SMART, STEPS, PREV_NEXT, "h2", LINKS)
         val list = rememberLazyListState()
         LaunchedEffect(highlight) {
             val i = order.indexOf(highlight)
@@ -77,6 +89,13 @@ object PlaybackSettingsGroup : SettingsGroup {
                     highlighted = highlight == FIRST_ONLY,
                 )
             }
+            item("h3") { SettingsHeader(stringResource(R.string.settings_section_queue)) }
+            switch(BACK, R.string.setting_back_to_list, R.string.setting_back_to_list_summary, s.backToList, highlight) { scope.launch { prefs.setBackToList(it) } }
+            switch(SKIP, R.string.setting_skip_failed, R.string.setting_skip_failed_summary, s.skipFailed, highlight) { scope.launch { prefs.setSkipFailed(it) } }
+            item("h4") { SettingsHeader(stringResource(R.string.settings_section_buttons)) }
+            switch(SMART, R.string.setting_smart_previous, R.string.setting_smart_previous_summary, s.smartPrevious, highlight) { scope.launch { prefs.setSmartPrevious(it) } }
+            switch(STEPS, R.string.setting_step_buttons, R.string.setting_step_buttons_summary, s.stepButtons, highlight) { scope.launch { prefs.setStepButtons(it) } }
+            switch(PREV_NEXT, R.string.setting_show_previous_next, null, s.showPreviousNext, highlight) { scope.launch { prefs.setShowPreviousNext(it) } }
             item("h2") { SettingsHeader(stringResource(R.string.settings_section_open)) }
             item(LINKS) {
                 SettingsSwitch(
@@ -91,6 +110,16 @@ object PlaybackSettingsGroup : SettingsGroup {
                     highlighted = highlight == LINKS,
                 )
             }
+        }
+    }
+
+    private fun LazyListScope.switch(key: String, @StringRes title: Int, @StringRes summary: Int?, checked: Boolean, highlight: String?, onChange: (Boolean) -> Unit) {
+        item(key) {
+            SettingsSwitch(
+                stringResource(title), checked, onChange,
+                summary = summary?.let { stringResource(it) },
+                highlighted = highlight == key,
+            )
         }
     }
 

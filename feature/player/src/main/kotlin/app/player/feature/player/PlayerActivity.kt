@@ -13,7 +13,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
-import app.player.core.playerapi.playbackController
 import app.player.core.playerapi.playerExtensions
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
@@ -44,7 +43,7 @@ class PlayerActivity : ComponentActivity() {
 
     /** Resume and the queue decide where and what plays (feature/playback); without them, the uri as is. */
     private fun open(intent: Intent) {
-        if (playbackController?.open(engine, intent, ::finish) != true) intent.data?.let { engine.open(it) }
+        if (playerExtensions.firstNotNullOfOrNull { it.playback }?.open(engine, intent, ::finish) != true) intent.data?.let { engine.open(it) }
     }
 
     override fun onStop() {

@@ -25,6 +25,9 @@ interface PlayerExtension {
      */
     fun onEngineCreated(context: Context, engine: PlayerEngine) {}
 
+    /** Resume, queue, lock and PiP. Only playback's extension sets it; the player uses the first one. */
+    val playback: PlaybackControls? get() = null
+
     /**
      * Drawn over the video, under the controls and panels, full size, always present while the
      * player shows. For state the feature owns, such as network buffering and an error card.
@@ -67,9 +70,6 @@ class PlayerMenuEntry(
 /** Implemented by the Application in `app`, which lists every feature's extension. */
 interface PlayerExtensionHost {
     val playerExtensions: List<PlayerExtension>
-
-    /** What plays and in what order. Null leaves the player opening the intent's uri as is. */
-    val playbackController: PlaybackController? get() = null
 }
 
 /** The extensions wired into this app, or none if the Application does not host any. */

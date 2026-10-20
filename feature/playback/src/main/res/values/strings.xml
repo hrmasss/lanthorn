@@ -16,4 +16,32 @@
     <string name="setting_resume_first_only_summary">Later files in a queue start from the beginning</string>
     <string name="setting_open_links">Open media links</string>
     <string name="setting_open_links_summary">Offer to play http and https links to video and audio files</string>
+
+    <string name="playback_menu_loop">Loop and shuffle</string>
+    <string name="loop_off">No loop</string>
+    <string name="loop_one">Loop this video</string>
+    <string name="loop_all">Loop the whole list</string>
+    <string name="shuffle">Shuffle</string>
+    <string name="playback_skipped">Skipped %1$s</string>
+
+    <string name="failure_title">Can\'t play this file</string>
+    <string name="failure_all_title">None of these files would play</string>
+    <string name="failure_missing">The file is missing. It may have been moved or deleted.</string>
+    <string name="failure_codec">This file uses a format no decoder here can play.</string>
+    <string name="failure_damaged">The file is damaged or is not a video.</string>
+    <string name="failure_permission">The app has no permission to read this file.</string>
+    <string name="failure_skip">Skip</string>
+    <string name="failure_info">Info</string>
+
+    <string name="settings_section_queue">Playing a list</string>
+    <string name="setting_back_to_list">Back to list at the end</string>
+    <string name="setting_back_to_list_summary">Close the player after the last video</string>
+    <string name="setting_skip_failed">Skip files that will not play</string>
+    <string name="setting_skip_failed_summary">Go on to the next file and show a short note</string>
+    <string name="settings_section_buttons">Buttons</string>
+    <string name="setting_smart_previous">Smart previous</string>
+    <string name="setting_smart_previous_summary">Previous restarts the video when more than 5 s in</string>
+    <string name="setting_step_buttons">Step buttons</string>
+    <string name="setting_step_buttons_summary">Back and forward buttons beside play</string>
+    <string name="setting_show_previous_next">Previous and next buttons</string>
 </resources>

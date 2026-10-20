@@ -1,20 +1,19 @@
 package app.player.core.playerapi
 
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import app.player.core.engine.PlayerEngine
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Decides what plays, in what order and from where (resume, queue, loop). Implemented by
- * feature/playback and read with [Context.playbackController]. The player activity opens every
- * intent through [open]; the controls call [previous], [next] and [step].
+ * What plays, in what order and from where (resume, queue, loop, lock, PiP), one per app, from
+ * feature/playback through [PlayerExtension.playback]. The player activity opens every intent
+ * through [open]; the controls read the flows and call the actions. Members playback has not built
+ * yet keep their defaults, and the button they drive stays disabled.
  */
-interface PlaybackController {
-    val state: StateFlow<QueueState>
-
+interface PlaybackControls {
     /**
      * Opens what [intent] asks for on [engine]: one file, a link, or a queue built with
      * [PlayerIntents.withQueue]. [onClose] closes the player when the queue ends with "back to
@@ -22,24 +21,35 @@ interface PlaybackController {
      */
     fun open(engine: PlayerEngine, intent: Intent, onClose: () -> Unit): Boolean
 
-    fun previous()
+    val hasPrevious: StateFlow<Boolean> get() = OFF
+    val hasNext: StateFlow<Boolean> get() = OFF
+    fun previous() {}
+    fun next() {}
 
-    fun next()
-
-    /** Seeks back or forward by the step size (US-29.2). */
-    fun step(forward: Boolean)
-}
-
-/** What the controls show for the queue. */
-data class QueueState(
-    val hasPrevious: Boolean = false,
-    val hasNext: Boolean = false,
     /** False hides previous and next (US-29.3). */
-    val showPreviousNext: Boolean = true,
+    val showPreviousNext: StateFlow<Boolean> get() = ON
+
     /** True shows back and forward step buttons beside play/pause (US-29.2). */
-    val stepButtons: Boolean = false,
-    val stepMs: Long = 10_000,
-)
+    val stepButtons: StateFlow<Boolean> get() = OFF
+
+    /** While true the player hides its controls and gestures and passes touches to playback's Overlay (US-28). */
+    val locked: StateFlow<Boolean> get() = OFF
+    fun lock() {}
+    fun rotate() {}
+
+    /** Enters picture-in-picture. False when not available. */
+    fun pip(): Boolean = false
+
+    val shuffle: StateFlow<Boolean> get() = OFF
+    fun toggleShuffle() {}
+    val backgroundPlay: StateFlow<Boolean> get() = OFF
+    fun toggleBackgroundPlay() {}
+
+    private companion object {
+        val OFF: StateFlow<Boolean> = MutableStateFlow(false)
+        val ON: StateFlow<Boolean> = MutableStateFlow(true)
+    }
+}
 
 /** How an opener passes the list it shows, so next and previous follow it (US-24.1). */
 object PlayerIntents {
@@ -70,7 +80,3 @@ object PlayerIntents {
         return if (index in uris.indices) uris to index else null
     }
 }
-
-/** The app's playback controller, or null if the Application wires none. */
-val Context.playbackController: PlaybackController?
-    get() = (applicationContext as? PlayerExtensionHost)?.playbackController

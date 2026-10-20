@@ -1,7 +1,6 @@
 package app.player
 
 import android.app.Application
-import app.player.core.playerapi.PlaybackController
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerExtensionHost
 import app.player.core.settingsapi.BackupPart
@@ -24,9 +23,6 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
         AudioExtension,
         PlaybackExtension,
     )
-
-    /** Resume and the play queue (feature/playback). */
-    override val playbackController: PlaybackController = Playback
 
     override fun onCreate() {
         super.onCreate()
