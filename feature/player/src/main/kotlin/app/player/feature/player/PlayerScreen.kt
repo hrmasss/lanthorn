@@ -124,6 +124,17 @@ fun PlayerScreen(
     var note by remember { mutableStateOf<Pair<String, Long>?>(null) }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
 
+    // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
+    val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
+    val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
+    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
+    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
+    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle()
+    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle()
+    // While locked, playback's Overlay owns every touch and the controls stay hidden (US-28).
+    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle()
+    LaunchedEffect(locked) { if (locked) { controls = false; openPanel = null } }
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
@@ -182,10 +193,12 @@ fun PlayerScreen(
             openSubtitles = { subtitleEntry?.let { openPanel = it.opensPanel } },
             openAudio = { audioEntry?.let { openPanel = it.opensPanel } },
             openMenu = { openPanel = OwnPanel.MENU },
-            lock = {},
-            previous = {},
-            next = {},
-            rotate = { activity?.let(::toggleOrientation) },
+            lock = { playback?.lock() },
+            previous = { playback?.previous() },
+            next = { playback?.next() },
+            rotate = { playback?.rotate() ?: activity?.let(::toggleOrientation) },
+            stepBack = { engine.seekTo((currentState.positionMs - SEEK_STEP_MS).coerceAtLeast(0)) },
+            stepForward = { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
             fit = {},
         )
     }
@@ -229,7 +242,7 @@ fun PlayerScreen(
             Modifier
                 .fillMaxSize()
                 .testTag("video")
-                .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls }
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked) { controls = !controls }
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions
@@ -271,9 +284,11 @@ fun PlayerScreen(
                     status = if (prefs.statusInTopBar) status else null,
                     subtitleButton = subtitleEntry?.label?.invoke(),
                     audioButton = audioEntry?.label?.invoke(),
-                    hasPrevious = false,
-                    hasNext = false,
-                    canLock = false,
+                    hasPrevious = hasPrevious,
+                    hasNext = hasNext,
+                    canLock = playback != null,
+                    showPreviousNext = showPreviousNext,
+                    stepButtons = stepButtons,
                 ),
                 actions,
             )

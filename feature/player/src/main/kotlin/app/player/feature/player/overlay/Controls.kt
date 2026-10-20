@@ -65,6 +65,10 @@ data class ControlsUi(
     val hasPrevious: Boolean,
     val hasNext: Boolean,
     val canLock: Boolean,
+    /** False hides previous and next (US-29.3, playback's setting). */
+    val showPreviousNext: Boolean = true,
+    /** Back and forward step buttons beside play/pause (US-29.2, playback's setting). */
+    val stepButtons: Boolean = false,
 )
 
 @Immutable
@@ -86,6 +90,8 @@ class ControlsActions(
     val next: () -> Unit,
     val rotate: () -> Unit,
     val fit: () -> Unit,
+    val stepBack: () -> Unit = {},
+    val stepForward: () -> Unit = {},
 )
 
 /**
@@ -225,12 +231,18 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
         )
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            OverlayIconButton(
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipPrevious,
                 stringResource(R.string.player_previous),
                 actions.previous,
                 Modifier.testTag("previous"),
                 enabled = ui.hasPrevious,
+            )
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Back10,
+                stringResource(R.string.a11y_seek_back),
+                actions.stepBack,
+                Modifier.testTag("step-back"),
             )
             PlayPauseButton(
                 playing = ui.playing,
@@ -239,7 +251,13 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
                 size = 56.dp,
                 modifier = Modifier.testTag("play-pause"),
             )
-            OverlayIconButton(
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Forward10,
+                stringResource(R.string.a11y_seek_forward),
+                actions.stepForward,
+                Modifier.testTag("step-forward"),
+            )
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipNext,
                 stringResource(R.string.player_next),
                 actions.next,
