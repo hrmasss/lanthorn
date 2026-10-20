@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import app.player.feature.player.R
+import app.player.feature.player.tools.PlaybackTools
+import kotlin.math.roundToInt
 
 /**
  * The Player settings group. Shown inside the player (US-65.3) and, once the library's settings
@@ -34,6 +36,15 @@ fun PlayerSettingsContent(prefs: PlayerPrefs, update: ((PlayerPrefs) -> PlayerPr
             { v -> update { it.copy(autoHideDelayMs = PlayerPrefs.clampDelay(v.toLong())) } },
             enabled = prefs.autoHide,
             modifier = Modifier.testTag("set-auto-hide-delay"),
+        )
+        SliderRow(
+            stringResource(R.string.settings_default_speed),
+            "${(prefs.defaultSpeed * 100).roundToInt()}%",
+            prefs.defaultSpeed.toFloat(),
+            0.25f..4.0f,
+            74,
+            { v -> update { it.copy(defaultSpeed = PlaybackTools.snapSpeed(v.toDouble())) } },
+            modifier = Modifier.testTag("set-default-speed"),
         )
         SwitchRow(
             stringResource(R.string.settings_show_remaining),

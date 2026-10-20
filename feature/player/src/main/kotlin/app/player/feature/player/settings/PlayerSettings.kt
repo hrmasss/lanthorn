@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -32,6 +33,8 @@ data class PlayerPrefs(
     val keepStatusVisible: Boolean = false,
     /** US-78. */
     val backTwice: Boolean = false,
+    /** US-23.2: speed new videos start at, 0.25 to 4.0. */
+    val defaultSpeed: Double = 1.0,
 ) {
     companion object {
         const val MIN_DELAY_MS = 1_000L
@@ -71,6 +74,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
                 p[STATUS_TOP_BAR] = next.statusInTopBar
                 p[STATUS_KEEP] = next.keepStatusVisible
                 p[BACK_TWICE] = next.backTwice
+                p[DEFAULT_SPEED] = next.defaultSpeed.coerceIn(0.25, 4.0)
             }
         }
     }
@@ -85,6 +89,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
             statusInTopBar = this[STATUS_TOP_BAR] ?: d.statusInTopBar,
             keepStatusVisible = this[STATUS_KEEP] ?: d.keepStatusVisible,
             backTwice = this[BACK_TWICE] ?: d.backTwice,
+            defaultSpeed = this[DEFAULT_SPEED] ?: d.defaultSpeed,
         )
     }
 
@@ -96,6 +101,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
         private val STATUS_TOP_BAR = booleanPreferencesKey("status_top_bar")
         private val STATUS_KEEP = booleanPreferencesKey("status_keep_visible")
         private val BACK_TWICE = booleanPreferencesKey("back_twice")
+        private val DEFAULT_SPEED = doublePreferencesKey("default_speed")
 
         @Volatile private var instance: PlayerSettings? = null
 
