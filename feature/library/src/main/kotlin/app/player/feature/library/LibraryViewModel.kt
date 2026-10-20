@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.player.core.data.history.HistoryPrefs
 import app.player.core.data.library.LibraryFolder
 import app.player.core.data.library.LibraryIndex
 import app.player.core.data.library.LibraryVideo
@@ -72,6 +73,7 @@ class LibraryViewModel(
     volumes: suspend () -> List<Volume>,
     io: CoroutineDispatcher = Dispatchers.IO,
     prefs: Flow<LibraryPrefs> = prefsStore?.prefs ?: flowOf(LibraryPrefs()),
+    private val historyPaused: suspend () -> Boolean = { false },
 ) : ViewModel() {
     private data class Access(val access: MediaAccess, val permanentlyDenied: Boolean)
 
@@ -141,7 +143,8 @@ class LibraryViewModel(
     fun setExcluded(folderKey: String, excluded: Boolean) = edit { setExcluded(folderKey, excluded) }
     fun setHidden(id: String, hidden: Boolean) = edit { setHidden(id, hidden) }
     fun setExtension(extension: String, on: Boolean) = edit { setExtension(extension, on) }
-    fun addSearch(query: String) = edit { addSearch(query) }
+    /** Records a search unless history is paused (US-73.2). */
+    fun addSearch(query: String) = edit { if (!historyPaused()) addSearch(query) }
     fun removeSearch(query: String) = edit { removeSearch(query) }
 
     private fun edit(block: suspend LibraryPrefsStore.() -> Unit) {
@@ -157,7 +160,12 @@ class LibraryViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY]!!
-                LibraryViewModel(LibraryIndex.get(app), LibraryPrefsStore(app), { mountedVolumes(app) })
+                LibraryViewModel(
+                    LibraryIndex.get(app),
+                    LibraryPrefsStore(app),
+                    { mountedVolumes(app) },
+                    historyPaused = HistoryPrefs(app)::isPaused,
+                )
             }
         }
 

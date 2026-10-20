@@ -62,6 +62,12 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    // US-68.1: declare the app's languages so the system per-app language page lists them.
+    // Generated from the values-* folders; the default locale is in res/resources.properties.
+    androidResources {
+        generateLocaleConfig = true
+    }
 }
 
 dependencies {
@@ -72,6 +78,7 @@ dependencies {
     implementation(project(":feature:subtitles"))
     implementation(project(":feature:audio"))
     implementation(project(":core:player-api"))
+    implementation(project(":core:settings-api"))
     implementation(project(":feature:library"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
