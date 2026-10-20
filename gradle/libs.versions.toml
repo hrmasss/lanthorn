@@ -20,7 +20,7 @@ androidx-test-runner = "1.7.0"
 androidx-test-core = "1.7.0"
 junit = "4.13.2"
 json = "20250517"
-libmpv = "v1.0.0-player.1"
+libmpv = "v1.0.0-player.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }

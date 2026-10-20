@@ -68,6 +68,17 @@ class LibmpvBuildTest {
         assertFalse("mpv kept a filter that does not exist, so the check above proves nothing", chainHas("vf", "bogus"))
     }
 
+    @Test fun screenshotToPng_US33_1() = runBlocking {
+        val shot = File(context.cacheDir, "shot.png").apply { delete() }
+        delay(1000)
+        engine.command("screenshot-to-file", shot.path, "video")
+        delay(2000)
+        Log.i("P1.33", "screenshot ${shot.length()} bytes")
+        assertTrue("no PNG written", shot.length() > 1000)
+        val magic = shot.inputStream().use { it.readNBytes(8) }
+        assertEquals("PNG signature", listOf(0x89, 0x50, 0x4E, 0x47), magic.take(4).map { it.toInt() and 0xFF })
+    }
+
     @Test fun subtitleCharsetDetectedWithUchardet_US44_1() = runBlocking {
         val text = "Привет, мир. Это проверка кодировки субтитров."
         val srt = File(context.cacheDir, "cp1251.srt")
