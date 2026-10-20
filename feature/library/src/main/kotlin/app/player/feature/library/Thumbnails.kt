@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import androidx.core.net.toUri
 import android.util.LruCache
 import android.util.Size
 import app.player.core.data.library.LibraryIndex
@@ -54,7 +55,7 @@ class ThumbnailLoader(context: Context) {
         return withContext(decode) {
             val file = File(dir, "${video.key}.jpg")
             val bitmap = (if (cacheOnDisk) readDisk(file) else null)?.also { stats.disk.incrementAndGet() }
-                ?: generate(Uri.parse(video.uri))?.also {
+                ?: generate(video.uri.toUri())?.also {
                     stats.decoded.incrementAndGet()
                     if (cacheOnDisk) writeDisk(file, it)
                 }
@@ -109,7 +110,7 @@ class VideoProbe(context: Context, private val index: LibraryIndex) {
         index.extra(video.id)?.takeIf { it.modifiedSec == video.modifiedSec }?.let { return@withContext it.fps }
         val fps = runCatching {
             MediaMetadataRetriever().use { r ->
-                r.setDataSource(app, Uri.parse(video.uri))
+                r.setDataSource(app, video.uri.toUri())
                 val frames = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT)?.toLongOrNull()
                 val ms = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
                 if (frames != null && ms != null && ms > 0) frames * 1000f / ms else 0f

@@ -72,6 +72,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -292,7 +293,7 @@ internal fun rowContext(
         fields = state.prefs.fields,
         volumeLabel = state::volumeLabel,
         onFolder = onFolder,
-        onVideo = { v: LibraryVideo -> onPlay(Uri.parse(v.uri)) },
+        onVideo = { v: LibraryVideo -> onPlay(v.uri.toUri()) },
         folderActions = listOf(
             RowAction(R.string.action_hide) { f -> vm.setHidden(f.key, true) },
             RowAction(R.string.action_exclude) { f -> vm.setExcluded(f.key, true) },
