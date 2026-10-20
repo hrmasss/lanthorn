@@ -175,8 +175,11 @@ class PlayerChromeTest {
         log("decoder before switch: ${engine.state.value.activeDecoder} (${engine.state.value.decoderMode})")
         val before = engine.state.value.positionMs
         val t0 = SystemClock.elapsedRealtime()
-        compose.onNodeWithTag("decoder-SW").performClick()
-        waitUntil(3_000) { engine.state.value.activeDecoder == ActiveDecoder.SW }
+        // Pick a decoder other than the one running, so the switch is real.
+        val from = engine.state.value.activeDecoder
+        val target = if (from == ActiveDecoder.SW) "HW" else "SW"
+        compose.onNodeWithTag("decoder-$target").performClick()
+        waitUntil(3_000) { engine.state.value.activeDecoder != from }
         val switchMs = SystemClock.elapsedRealtime() - t0
         // US-35.2: continues from the same position. Read the first position once the new decoder
         // runs; playback may stall during the switch, which the criterion allows.
