@@ -2,6 +2,11 @@ package app.player.feature.playback
 
 import kotlin.random.Random
 
+/** Smart previous (US-29.1): more than 5 s in, previous restarts the file instead. */
+const val SMART_PREVIOUS_MS = 5_000L
+
+fun previousRestarts(smartPrevious: Boolean, positionMs: Long) = smartPrevious && positionMs > SMART_PREVIOUS_MS
+
 /** Loop setting (US-24). */
 enum class LoopMode { Off, One, All }
 

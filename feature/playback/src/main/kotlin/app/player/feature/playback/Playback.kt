@@ -54,9 +54,6 @@ internal data class Note(val engine: PlayerEngine, val text: String, val id: Lon
 object Playback : PlaybackControls {
     private const val TAG = "Playback"
 
-    /** Previous restarts the file instead after this far in (US-29.1). */
-    const val SMART_PREVIOUS_MS = 5_000L
-
     /** How long after load a decoder failure is still this file's (US-75.1). */
     private const val DECODER_CHECK_MS = 1_500L
 
@@ -132,7 +129,7 @@ object Playback : PlaybackControls {
 
     override fun previous() {
         val e = engine ?: return
-        if (_settings.value.smartPrevious && e.state.value.positionMs > SMART_PREVIOUS_MS) {
+        if (previousRestarts(_settings.value.smartPrevious, e.state.value.positionMs)) {
             e.seekTo(0)
             return
         }

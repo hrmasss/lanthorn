@@ -78,4 +78,10 @@ class PlayQueueTest {
         assertEquals(FailureReason.UnsupportedCodec, Failures.classify(null, listOf(line("Failed to initialize a decoder for codec 'prores'."))))
         assertEquals(FailureReason.Damaged, Failures.classify("cannot play this file", listOf(line("Failed to recognize file format."))))
     }
+
+    @Test fun `smart previous restarts after 5 s, otherwise goes back (US-29_1)`() {
+        assertTrue(previousRestarts(smartPrevious = true, positionMs = 5_001))
+        assertFalse(previousRestarts(smartPrevious = true, positionMs = 5_000))
+        assertFalse(previousRestarts(smartPrevious = false, positionMs = 60_000))
+    }
 }
