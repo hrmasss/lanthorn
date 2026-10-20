@@ -75,6 +75,8 @@ import app.player.feature.player.overlay.menuItems
 import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
+import app.player.feature.player.tools.FitMode
+import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -88,6 +90,7 @@ internal object OwnPanel {
 
 private const val SEEK_STEP_MS = 10_000L
 private const val NOTE_MS = 2_000L
+private const val FIT_NOTE_MS = 1_000L
 
 /**
  * The player: video, overlay controls, panels from features. Owns where things go and when the
@@ -116,6 +119,9 @@ fun PlayerScreen(
     var touches by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<Pair<String, Long>?>(null) }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
+    val video = remember(engine) { VideoTools(engine, context) }
+    var fitMode by remember { mutableStateOf(FitMode.Fit) }
+    val fitNames = FitMode.entries.associateWith { stringResource(it.label) }
 
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
@@ -135,7 +141,7 @@ fun PlayerScreen(
     SystemBarsEffect(activity, controls)
     KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
     LaunchedEffect(note) {
-        note?.let { delay(NOTE_MS); note = null }
+        note?.let { (text, _) -> delay(if (text in fitNames.values) FIT_NOTE_MS else NOTE_MS); note = null }
     }
     fun show(message: String) { note = message to SystemClock.elapsedRealtime() }
 
@@ -156,7 +162,7 @@ fun PlayerScreen(
         }
     }
     val currentState by rememberUpdatedState(state)
-    val actions = remember(engine, activity) {
+    val actions = remember(engine, activity, fitNames) {
         ControlsActions(
             back = { activity?.finish() },
             togglePause = engine::togglePause,
@@ -177,7 +183,12 @@ fun PlayerScreen(
             previous = {},
             next = {},
             rotate = { activity?.let(::toggleOrientation) },
-            fit = {},
+            fit = {
+                // US-53.1: cycle and name the mode for 1 s.
+                fitMode = fitMode.next()
+                video.setFit(fitMode)
+                note = fitNames.getValue(fitMode) to SystemClock.elapsedRealtime()
+            },
         )
     }
 
@@ -338,4 +349,11 @@ private suspend fun displayName(context: android.content.Context, uri: String?):
             }
         }.getOrNull()
     }?.let { name -> name.substringBeforeLast('.', name) }
+}
+
+private val FitMode.label get() = when (this) {
+    FitMode.Fit -> R.string.fit_fit
+    FitMode.Stretch -> R.string.fit_stretch
+    FitMode.Crop -> R.string.fit_crop
+    FitMode.Original -> R.string.fit_original
 }
