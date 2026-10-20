@@ -1,5 +1,6 @@
 package app.player.core.data.library
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -33,6 +34,18 @@ data class LibraryVideo(
     /** Last modified, epoch seconds. */
     val modifiedSec: Long,
     val mimeType: String?,
+    /** False while the file's volume is unmounted (US-80.3). The row stays so lists can show it greyed. */
+    @ColumnInfo(defaultValue = "1") val available: Boolean = true,
+)
+
+/** What the library learns by opening a file, cached so it opens each file once. */
+@Entity(tableName = "video_extra")
+data class VideoExtra(
+    @PrimaryKey val id: Long,
+    /** The file's [LibraryVideo.modifiedSec] when probed. A newer file is probed again. */
+    val modifiedSec: Long,
+    /** Average frames per second, 0 when unknown. */
+    val fps: Float,
 )
 
 @Dao
@@ -48,6 +61,12 @@ interface LibraryDao {
 
     @Query("DELETE FROM library_video WHERE id IN (:ids)")
     suspend fun delete(ids: List<Long>)
+
+    @Query("SELECT * FROM video_extra WHERE id = :id")
+    suspend fun extra(id: Long): VideoExtra?
+
+    @Upsert
+    suspend fun putExtra(extra: VideoExtra)
 
     /** Applies a scan result in one transaction, so observers see one change, not two. */
     @Transaction
