@@ -247,7 +247,7 @@ private fun VideoCell(video: LibraryVideo, ctx: RowContext) {
 
 private fun Modifier.unavailable(video: LibraryVideo) = if (video.available) this else alpha(0.38f)
 
-/** The fields line (US-02.2). Shows "unavailable" for a video on removed storage (US-80.3). */
+/** The fields line (US-02.2), up to two lines so five fields fit at any font scale. Shows "unavailable" for a video on removed storage (US-80.3). */
 @Composable
 private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
     val context = LocalContext.current
@@ -273,7 +273,7 @@ private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
             parts.joinToString(" · "),
             style = MaterialTheme.typography.bodySmall.tabular(),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.testTag("video-fields"),
         )

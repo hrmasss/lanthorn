@@ -564,6 +564,14 @@ private fun PerfLog(state: LibraryUiState, vm: LibraryViewModel) {
             Log.i(PERF_TAG, "first-content state=${state::class.simpleName} sinceStart=${sinceProcessStart()}ms")
         }
     }
+    val scans by vm.scanCount.collectAsStateWithLifecycle()
+    val unavailable = content?.indexed?.count { !it.available }
+    LaunchedEffect(scans, unavailable) {
+        // Wall-clock time, so a test can compare it with the moment storage was mounted or removed.
+        if (scans > 0) {
+            Log.i(PERF_TAG, "scan-done #$scans at=${System.currentTimeMillis()} unavailable=$unavailable scan=${vm.lastScan}")
+        }
+    }
     LaunchedEffect(content?.videoCount, content?.scanned) {
         if (content != null && content.scanned) {
             Log.i(PERF_TAG, "listed n=${content.videoCount} scan=${vm.lastScan} sinceStart=${sinceProcessStart()}ms")
