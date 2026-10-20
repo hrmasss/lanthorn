@@ -207,7 +207,10 @@ fun PlayerScreen(
 
     // US-23.2: every new video starts at the default speed.
     LaunchedEffect(state.uri, prefs.defaultSpeed) {
-        if (state.uri != null) tools.setSpeed(prefs.defaultSpeed)
+        if (state.uri != null) {
+            android.util.Log.i("PlayerChrome", "default speed ${prefs.defaultSpeed} for a new video")
+            tools.setSpeed(prefs.defaultSpeed)
+        }
     }
 
     // US-33: grab the frame, then offer to share it.

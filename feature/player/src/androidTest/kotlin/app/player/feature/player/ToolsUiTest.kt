@@ -49,8 +49,9 @@ class ToolsUiTest {
     }
 
     private fun menu(item: String) {
-        showControls()
-        compose.onNodeWithTag("more").performClick()
+        // Controls may hide between the check and the tap (auto-hide); show them again if so.
+        runCatching { showControls(); compose.onNodeWithTag("more").performClick() }
+            .onFailure { showControls(); compose.onNodeWithTag("more").performClick() }
         compose.waitUntil(2_000) { shown("menu-$item") }
         compose.onNodeWithTag("menu-$item").performClick()
     }
