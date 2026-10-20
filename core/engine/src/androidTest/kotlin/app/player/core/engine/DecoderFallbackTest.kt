@@ -18,7 +18,8 @@ import java.io.File
  * P1.1 against the real libmpv: the one-line notice when the chosen decoder cannot play the file
  * (US-35.3). Emulator MediaCodec refuses H.264 4:4:4, which stands in for a phone's hardware
  * refusing a stream. A hardware failure in the middle of playback cannot be produced on the
- * emulator; it is a phone check (work/evidence/P1.1).
+ * emulator: a 4:2:0 to 4:4:4 stream is refused from its first frame, and a jump to 7680x4320
+ * crashes the emulator's host-side decoder. It is a phone check (work/evidence/P1.1).
  */
 @RunWith(AndroidJUnit4::class)
 class DecoderFallbackTest {
@@ -47,29 +48,5 @@ class DecoderFallbackTest {
         withTimeout(10_000) { engine.state.first { it.video != null } }
         delay(500)
         assertEquals(null, engine.state.value.decoderNotice)
-    }
-
-    /**
-     * NF-5 mid-playback: 3 s of 640x360 the hardware decodes, then 7680x4320, beyond the emulator
-     * MediaCodec's limits. The decoder must switch to SW inside the player and keep the clock going.
-     * (No surface in this test, so the hardware path is HW+, copy-back.)
-     */
-    @Test fun hardwareFailsMidStreamSoftwareTakesOver_NF5(): Unit = runBlocking {
-        engine.open(asset("midswitch8k.ts"), decoder = DecoderMode.AUTO)
-        val first = withTimeout(10_000) { engine.state.first { it.video != null && it.activeDecoder != ActiveDecoder.NONE } }
-        Log.i("P1.1", "mid-stream: started on ${first.activeDecoder.label} at ${first.video?.width}x${first.video?.height}")
-        val t0 = android.os.SystemClock.elapsedRealtime()
-        val sw = withTimeout(15_000) { engine.state.first { it.activeDecoder == ActiveDecoder.SW || it.ended || it.error != null } }
-        val took = android.os.SystemClock.elapsedRealtime() - t0
-        val end = withTimeout(10_000) { engine.state.first { it.ended || it.error != null || it.positionMs > 3300 } }
-        Log.i(
-            "P1.1",
-            "mid-stream: ${first.activeDecoder.label} -> ${sw.activeDecoder.label} at ${sw.positionMs} ms " +
-                "(${sw.video?.width}x${sw.video?.height}), $took ms after the first frame; then position ${end.positionMs} ms, " +
-                "ended ${end.ended}, error ${end.error}",
-        )
-        org.junit.Assert.assertNotEquals("hardware never started, nothing to fall back from", ActiveDecoder.SW, first.activeDecoder)
-        assertEquals(ActiveDecoder.SW, sw.activeDecoder)
-        assertEquals(null, end.error)
     }
 }
