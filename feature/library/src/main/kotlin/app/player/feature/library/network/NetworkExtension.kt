@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.player.core.engine.PlayerEngine
+import androidx.compose.runtime.Composable
+import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.feature.library.settings.generalStore
 import kotlinx.coroutines.flow.Flow
@@ -30,7 +32,7 @@ class NetworkPrefs(context: Context) {
 
 /**
  * Network wiring in the player (P1.8): the custom user agent goes to mpv before the first file
- * opens, so every request of a stream carries it (US-61.5).
+ * opens, so every request of a stream carries it (US-61.5); the overlay shows buffering and failures.
  */
 object NetworkExtension : PlayerExtension {
     override val id = "network"
@@ -41,4 +43,7 @@ object NetworkExtension : PlayerExtension {
         val agent = runBlocking { withTimeoutOrNull(300) { NetworkPrefs(context).userAgent.first() } }
         if (!agent.isNullOrBlank()) engine.set("user-agent", agent)
     }
+
+    @Composable
+    override fun Overlay(host: PanelHost) = NetworkOverlay(host.engine)
 }
