@@ -15,6 +15,8 @@ data class PlaybackState(
     val droppedFrames: Long = 0,
     /** Time from [PlayerEngine.open] to the first frame after load, in ms. Null until shown. */
     val firstFrameMs: Long? = null,
+    /** One line when the chosen decoder could not play the stream and another took over (US-35.3). */
+    val decoderNotice: String? = null,
     val error: String? = null,
 )
 

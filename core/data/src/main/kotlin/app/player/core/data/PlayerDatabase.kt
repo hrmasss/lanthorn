@@ -10,6 +10,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
+import app.player.core.data.choice.PerFileChoice
+import app.player.core.data.choice.PerFileChoiceDao
 import app.player.core.data.library.LibraryDao
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.VideoExtra
@@ -33,14 +35,15 @@ interface PlaybackPositionDao {
 }
 
 @Database(
-    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class],
-    version = 3,
+    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class, PerFileChoice::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class PlayerDatabase : RoomDatabase() {
     abstract fun playbackPositions(): PlaybackPositionDao
     abstract fun library(): LibraryDao
+    abstract fun perFileChoices(): PerFileChoiceDao
 
     companion object {
         @Volatile private var instance: PlayerDatabase? = null
