@@ -77,6 +77,8 @@ import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
 import app.player.feature.player.tools.FitMode
+import app.player.feature.player.tools.Deinterlace
+import app.player.feature.player.overlay.DeinterlaceContent
 import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,6 +89,7 @@ internal object OwnPanel {
     const val MENU = "player-menu"
     const val DECODER = "player-decoder"
     const val SETTINGS = "player-settings"
+    const val DEINTERLACE = "player-deinterlace"
 }
 
 private const val SEEK_STEP_MS = 10_000L
@@ -149,8 +152,13 @@ fun PlayerScreen(
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
     val settingsLabel = stringResource(R.string.menu_player_settings)
+    val deinterlaceLabel = stringResource(R.string.video_deinterlace)
+    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle()
     val items = remember(entries, settingsLabel) {
-        val own = listOf(MenuItem("player-settings", MenuGroup.Tools, 900, { settingsLabel }) { openPanel = OwnPanel.SETTINGS })
+        val own = listOf(
+            MenuItem("deinterlace", MenuGroup.Video, 120, { deinterlaceLabel }) { openPanel = OwnPanel.DEINTERLACE },
+            MenuItem("player-settings", MenuGroup.Tools, 900, { settingsLabel }) { openPanel = OwnPanel.SETTINGS },
+        )
         menuItems(entries, own) { openPanel = it }
     }
     val title by produceState(titleOf(state.uri), state.uri) { value = displayName(context, state.uri) ?: titleOf(state.uri) }
@@ -339,6 +347,15 @@ fun PlayerScreen(
                     openPanel = null
                 }
                 OwnPanel.SETTINGS -> PlayerSettingsContent(prefs, { change -> settings?.update(change) })
+                OwnPanel.DEINTERLACE -> DeinterlaceContent(
+                    Deinterlace.fromMpv(deinterlaceMode),
+                    state.activeDecoder,
+                    pick = video::setDeinterlace,
+                    switchDecoder = { mode ->
+                        engine.setDecoder(mode)
+                        onDecoderPicked(mode)
+                    },
+                )
                 null -> Unit
                 else -> panels[id]?.Content(host)
             }
