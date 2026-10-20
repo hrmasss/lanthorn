@@ -269,7 +269,10 @@ class PlayerChromeTest {
         val out = InstrumentationRegistry.getInstrumentation().uiAutomation
             .executeShellCommand("dumpsys window windows")
             .let { pfd -> android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().readText() }
-        val start = Regex("Window #\\d+ Window\\{[^}]*PlayerActivity\\}").find(out)?.range?.first ?: return ""
+        // The newest player window: windows of players closed by earlier tests can still be listed.
+        val start = Regex("Window #\\d+ Window\\{[^}]*PlayerActivity\\}").findAll(out)
+            .filter { m -> out.substring(m.range.first, (m.range.first + 3_000).coerceAtMost(out.length)).contains("mViewVisibility=0x0") }
+            .lastOrNull()?.range?.first ?: return ""
         val next = Regex("Window #\\d+ ").find(out, start + 10)?.range?.first ?: out.length
         return out.substring(start, next)
     }
