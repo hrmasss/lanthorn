@@ -115,6 +115,7 @@ class LibraryViewModel(
         if (access.value?.access?.let { it != MediaAccess.None } != true) return
         viewModelScope.launch {
             lastScan = index.refresh()
+            scanCount.value++
             scanned.value = true
         }
     }
@@ -153,6 +154,9 @@ class LibraryViewModel(
     }
 
     /** The last scan's numbers, logged by the screen for NF-9. */
+    /** Counts finished scans, so the screen can log each one (US-80.2 timing). */
+    val scanCount = MutableStateFlow(0)
+
     var lastScan: LibraryIndex.ScanResult? = null
         private set
 

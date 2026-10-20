@@ -12,12 +12,17 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
+import org.junit.rules.Timeout
 import org.junit.Test
 import java.io.File
 import java.nio.charset.Charset
 
 /** P1.3 subtitle wiring against the real libmpv, on the emulator. */
 class SubtitlesOnDeviceTest {
+    /** A stuck wait fails the test instead of holding the shared emulator. */
+    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
     private lateinit var controller: SubtitleController
@@ -99,11 +104,9 @@ class SubtitlesOnDeviceTest {
         delay(500)
         shot("us42-ass-file-styling")
         controller.setOverrideStyles(true)
-        engine.await("sub-ass-override", PropertyType.Text) { it == "force" }
+        engine.await("sub-ass-override", PropertyType.Text) { it == "strip" }
         delay(500)
         shot("us42-ass-override")
-        controller.setIgnoreEmbeddedFonts(true)
-        engine.await("embeddedfonts", PropertyType.Flag) { it == false }
         // Karaoke over 8 s of playback: count dropped frames (function only; emulator numbers make no NF claim).
         controller.setOverrideStyles(false)
         val dropped0 = engine.get("frame-drop-count", PropertyType.Int64) ?: 0
@@ -113,7 +116,7 @@ class SubtitlesOnDeviceTest {
         shot("nf7-karaoke-playing")
         delay(5500)
         val dropped = (engine.get("frame-drop-count", PropertyType.Int64) ?: 0) - dropped0
-        evidence("US-42.4 sub-ass-override scale by default, force on override; embeddedfonts off on ignore")
+        evidence("US-42.4 sub-ass-override scale by default, strip on override (plain text in our style)")
         evidence("NF-7 emulator: karaoke ASS rendered 8 s, frame-drop-count +$dropped (swiftshader, no claim)")
     }
 
@@ -128,6 +131,7 @@ class SubtitlesOnDeviceTest {
         val expected = "Příliš žluťoučký kůň"
         engine.await("sub-text", PropertyType.Text) { !it.isNullOrEmpty() && it != "External UTF-8 line" }
         val before = engine.get("sub-text", PropertyType.Text)
+        delay(1000) // let the paused frame redraw with the new track
         shot("us44-before-reload")
         val t0 = SystemClock.elapsedRealtime()
         files.reencode(cz.path, Charset.forName("windows-1250"))
@@ -135,9 +139,34 @@ class SubtitlesOnDeviceTest {
         controller.reload(id)
         engine.await("sub-text", PropertyType.Text) { it == expected }
         val took = SystemClock.elapsedRealtime() - t0
+        delay(100)
+        shot("us44-after-reload-100ms")
+        delay(900)
         shot("us44-after-reload")
         evidence("US-44.2 '$before' -> '$expected' after picking windows-1250 in $took ms (limit 1000)")
         assertTrue("took $took ms", took < 1000)
+    }
+
+    @Test fun ignoreEmbeddedFonts_US42_4() = runBlocking {
+        openFonts()
+        delay(1500)
+        shot("us42-embedded-font-used")
+        controller.setIgnoreEmbeddedFonts(true)
+        engine.await("embeddedfonts", PropertyType.Flag) { it == false }
+        // mpv reads fonts when a file loads: open it again, as the switch's note says.
+        openFonts()
+        delay(1500)
+        shot("us42-embedded-font-ignored")
+        controller.setIgnoreEmbeddedFonts(false)
+        evidence("US-42.4 embedded DejaVu Sans Mono used by default, ignored after the switch and a reopen; screenshots")
+    }
+
+    /** The ASS track has no default flag, so mpv does not pick it by itself. */
+    private suspend fun openFonts() {
+        engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.set("sid", "1")
+        engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
     }
 
     private suspend fun selectEnglish() {

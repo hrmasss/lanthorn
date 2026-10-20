@@ -62,7 +62,14 @@ class SubtitleControllerTest {
         controller.setOverrideStyles(false)
         controller.setOverrideStyles(true)
         controller.setIgnoreEmbeddedFonts(true)
-        assertEquals(listOf("set sub-ass-override=scale", "set sub-ass-override=force", "set embeddedfonts=no"), mpv.calls)
+        assertEquals(listOf("set sub-ass-override=scale", "set sub-ass-override=strip", "set embeddedfonts=no"), mpv.calls)
+    }
+
+    @Test fun `track changes redraw the frame while paused (US-44_2)`() {
+        mpv.emit("pause", true)
+        controller.reload(4)
+        controller.select(SubSelection(1))
+        assertEquals(listOf("sub-reload 4", "seek 0 relative+exact", "set secondary-sid=no", "set sid=1", "set secondary-sid=no", "seek 0 relative+exact"), mpv.calls)
     }
 
     @Test fun `external file is added and selected, reload by id (US-44_2)`() {

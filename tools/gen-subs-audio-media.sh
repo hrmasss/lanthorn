@@ -53,3 +53,32 @@ ffmpeg -loglevel error -y \
   -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 45 -g 50 -pix_fmt yuv420p -c:a aac -b:a 32k "$AUD/long.mp4"
 ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=600:duration=300:sample_rate=48000" -c:a aac -b:a 32k "$AUD/dub.m4a"
 du -h "$SUB"/* "$AUD"/*
+
+# Wide 2.39:1 clip with a text subtitle: on a phone screen it gets black bars top and bottom,
+# so "keep inside the picture" (US-43.2) is visible.
+printf '1\n00:00:00,000 --> 00:00:10,000\nInside or outside the picture\n' > "$T/wide.srt"
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x268:rate=25:duration=10 -i "$T/wide.srt" \
+  -map 0:v -map 1:s -c:v libx264 -preset veryfast -crf 32 -pix_fmt yuv420p -c:s srt -metadata:s:s:0 language=eng "$SUB/wide.mkv"
+# ASS that names a font only the file carries (DejaVu Sans Mono, Bitstream Vera licence, free to
+# redistribute), for "ignore embedded fonts" (US-42.4).
+FONT=/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf
+cat > "$T/fonts.ass" <<'ASS'
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Mono,DejaVu Sans Mono,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,20,20,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:10.00,Mono,,0,0,0,,iiii WWWW embedded font
+ASS
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=10 -i "$T/fonts.ass" \
+  -attach "$FONT" -metadata:s:t:0 mimetype=application/x-truetype-font -metadata:s:t:0 filename=DejaVuSansMono-Bold.ttf \
+  -map 0:v -map 1:s -c:v libx264 -preset veryfast -crf 32 -pix_fmt yuv420p -c:s ass "$SUB/fonts.mkv"
+
+# Loud tone for the limiter check (US-49.2): 1 kHz at -3 dBFS, lossless so the peak is exact.
+ffmpeg -loglevel error -y -f lavfi -i "aevalsrc=0.7079*sin(2*PI*1000*t):s=48000:d=10" -c:a flac "$AUD/loud.flac"

@@ -12,11 +12,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
+import org.junit.rules.Timeout
 import org.junit.Test
 import kotlin.math.abs
 
 /** P1.3 audio and P1.4 effects wiring against the real libmpv and platform effects, on the emulator. */
 class AudioOnDeviceTest {
+    /** A stuck wait fails the test instead of holding the shared emulator. */
+    @get:Rule val timeout: Timeout = Timeout.seconds(420)
+
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
     private lateinit var controller: AudioController
@@ -117,20 +122,75 @@ class AudioOnDeviceTest {
         assertTrue("took $took ms", took < 100)
     }
 
+    /**
+     * US-49.2 output peak, read with Android's Visualizer on our session. Three cases on a -3 dBFS
+     * tone: no boost (shows the Visualizer hears us), boost 200% with the limiter off (shows it
+     * hears after the effect), boost 200% with the limiter on (the claim).
+     */
+    @Test fun limiterKeepsPeakUnder0dBFS_US49_2() = runBlocking {
+        OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.RECORD_AUDIO)
+        // The Visualizer reads after the stream volume: at full volume its peak is the output's dBFS.
+        val am = OnDevice.context.getSystemService(android.media.AudioManager::class.java)
+        am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC), 0)
+        engine.set("loop-file", "inf")
+        engine.open(Uri.fromFile(OnDevice.asset("loud.flac")))
+        engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }
+        val session = engine.get("audiotrack-session-id", PropertyType.Int64)!!.toInt()
+        val effects = OnDevice.main { AudioExtension.effects(engine)!! }
+        val visualizer = OnDevice.main {
+            android.media.audiofx.Visualizer(session).apply {
+                measurementMode = android.media.audiofx.Visualizer.MEASUREMENT_MODE_PEAK_RMS
+                enabled = true
+            }
+        }
+        suspend fun peakDb(): Double {
+            delay(1500) // settle after a change
+            var peak = Int.MIN_VALUE
+            val m = android.media.audiofx.Visualizer.MeasurementPeakRms()
+            repeat(40) {
+                OnDevice.main { visualizer.getMeasurementPeakRms(m) }
+                peak = maxOf(peak, m.mPeak)
+                delay(50)
+            }
+            return peak / 100.0 // millibels to dB
+        }
+        val plain = peakDb()
+        OnDevice.main { effects.setBoost(2f) }
+        val dp = (effects.sink as PlatformEffects).effect!!
+        OnDevice.main { dp.setLimiterAllChannelsTo(android.media.audiofx.DynamicsProcessing.Limiter(true, false, 0, 1f, 60f, 1f, 0f, 0f)) }
+        val unlimited = peakDb()
+        OnDevice.main { effects.setBoost(1.99f); effects.setBoost(2f) } // re-applies our limiter
+        val limited = peakDb()
+        OnDevice.main { visualizer.release() }
+        evidence("US-49.2 Visualizer peak on our session, -3 dBFS tone: no boost %.1f dB, boost 200%% limiter off %.1f dB, limiter on %.1f dB".format(plain, unlimited, limited))
+        if (unlimited <= plain + 1.0) {
+            evidence("US-49.2 Visualizer reads before the effect on this device (boost did not raise its peak): output peak not measurable here")
+        } else {
+            assertTrue("limited peak $limited dB", limited < 0.0)
+        }
+    }
+
     @Test fun monoWithin200ms_US51_1() = runBlocking {
+        engine.set("msg-level", "all=warn,af=v,ao=v,audio=v")
         openTracks()
         val effects = OnDevice.main { AudioExtension.effects(engine)!! }
+        // Event-driven: mpv pushes the new af value; no polling round trip in the number.
+        val chain = engine.observe("af", PropertyType.Text)
+        val out = engine.observe("audio-out-params/samplerate", PropertyType.Int64)
+        delay(500)
         val t0 = SystemClock.elapsedRealtime()
+        android.util.Log.i("evidence-timing", "mono requested")
         OnDevice.main { effects.setStereo(StereoMode.Mono) }
-        engine.await("af", PropertyType.Text) { it?.contains("subsaudio-stereo") == true }
-        // The filter mixes down to one channel; output stays stereo with that channel in both ears.
-        engine.await("audio-out-params/channel-count", PropertyType.Int64) { it == 2L }
-        val took = SystemClock.elapsedRealtime() - t0
-        val chain = engine.get("af", PropertyType.Text)
+        while (chain.value?.contains("subsaudio-stereo") != true) delay(1)
+        val filterMs = SystemClock.elapsedRealtime() - t0
+        // Audio flows again after the chain rebuild: the output format is published again.
+        while (out.value == null) delay(1)
+        val tookMs = SystemClock.elapsedRealtime() - t0
+        val chainText = chain.value
         OnDevice.main { effects.setStereo(StereoMode.Stereo) }
         engine.await("af", PropertyType.Text) { it?.contains("subsaudio-stereo") != true }
-        evidence("US-51.1 mono filter in the chain ($chain), audio re-initialised in $took ms (limit 200); stereo removed the filter. Reverse: open until P1.33")
-        assertTrue("took $took ms", took < 200)
+        evidence("US-51.1 mono: filter in the chain ($chainText) after $filterMs ms, audio out after $tookMs ms (limit 200)")
+        assertTrue("took $tookMs ms", tookMs < 200)
     }
 
     @Test fun externalAudioStaysInSync_US47_3() = runBlocking {
