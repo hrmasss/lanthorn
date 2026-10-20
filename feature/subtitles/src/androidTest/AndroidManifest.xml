@@ -21,7 +21,6 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
-        <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" />
         <activity android:name="app.player.feature.subtitles.GrantTestActivity" android:exported="false" />
     </application>
 </manifest>
