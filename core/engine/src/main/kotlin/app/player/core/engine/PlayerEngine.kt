@@ -9,6 +9,8 @@ import dev.jdtech.mpv.MPVLib
 import dev.jdtech.mpv.MPVLib.MpvEvent
 import dev.jdtech.mpv.MPVLib.MpvFormat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -119,6 +121,26 @@ class PlayerEngine(context: Context) {
         setProperty("vo", "null")
         mpv?.setOptionString("force-window", "no")
         mpv?.detachSurface()
+    }
+
+    /** Reads mpv's frame counters on the engine thread. Null once released. */
+    suspend fun stats(): EngineStats? = suspendCancellableCoroutine { cont ->
+        if (released) cont.resume(null)
+        else post {
+            val lib = mpv
+            cont.resume(
+                lib?.let {
+                    EngineStats(
+                        voDropped = it.getPropertyInt("frame-drop-count")?.toLong() ?: 0,
+                        decoderDropped = it.getPropertyInt("decoder-frame-drop-count")?.toLong() ?: 0,
+                        delayed = it.getPropertyInt("vo-delayed-frame-count")?.toLong() ?: 0,
+                        mistimed = it.getPropertyInt("mistimed-frame-count")?.toLong() ?: 0,
+                        frameNumber = it.getPropertyInt("estimated-frame-number")?.toLong() ?: 0,
+                        displayFps = it.getPropertyDouble("display-fps") ?: 0.0,
+                    )
+                },
+            )
+        }
     }
 
     fun release() {
@@ -233,8 +255,8 @@ class PlayerEngine(context: Context) {
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> thread.execute { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
-                    if (it.firstFrameMs != null) it
-                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt).also { s ->
+                    if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
+                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
                         Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
                     }
                 }

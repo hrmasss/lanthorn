@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,9 +36,14 @@ import app.player.core.engine.VideoSurfaceView
 
 /** Bare player: video, tap to show controls, play/pause, seek bar, decoder picker, info line. */
 @Composable
-fun PlayerScreen(engine: PlayerEngine, modifier: Modifier = Modifier) {
+fun PlayerScreen(
+    engine: PlayerEngine,
+    modifier: Modifier = Modifier,
+    /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
+    controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
+) {
     val state by engine.state.collectAsStateWithLifecycle()
-    var controls by remember { mutableStateOf(true) }
+    var controls by controlsState
     Box(
         modifier
             .fillMaxSize()

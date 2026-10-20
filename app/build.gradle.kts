@@ -44,6 +44,20 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
+        // Release code with the bench mode added, debug-signed so any phone can install it.
+        // Debuggable builds run slower, so perf numbers come from this one (perf/README.md).
+        create("bench") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            applicationIdSuffix = ".bench"
+        }
+    }
+
+    // Bench mode ships in debug and bench builds, never in release.
+    sourceSets.getByName("debug") {
+        kotlin.directories.add("src/bench/kotlin")
+        manifest.srcFile("src/bench/AndroidManifest.xml")
     }
 
     splits {
