@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The bench reads its media from /sdcard/Movies/PlayerBench, the same files MX is measured on.
+         Debug and bench builds only; release gets media access from the library item (P1.17). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <application>
+        <!-- Bench mode for perf/bench.sh. -->
+        <activity
+            android:name="app.player.bench.BenchActivity"
+            android:exported="true"
+            android:screenOrientation="sensorLandscape"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+    </application>
+</manifest>

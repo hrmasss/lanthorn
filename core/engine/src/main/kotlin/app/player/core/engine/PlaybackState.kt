@@ -15,7 +15,22 @@ data class PlaybackState(
     val droppedFrames: Long = 0,
     /** Time from [PlayerEngine.open] to the first frame after load, in ms. Null until shown. */
     val firstFrameMs: Long? = null,
+    /** Goes up each time playback restarts after a load or a seek: the new frame is ready. */
+    val restarts: Int = 0,
     val error: String? = null,
+)
+
+/** Frame counters from mpv, read on demand with [PlayerEngine.stats]. */
+data class EngineStats(
+    /** Frames the video output dropped to keep sync. */
+    val voDropped: Long,
+    /** Frames the decoder dropped because it fell behind. */
+    val decoderDropped: Long,
+    val delayed: Long,
+    val mistimed: Long,
+    /** Frames of the file's video up to the current position. */
+    val frameNumber: Long,
+    val displayFps: Double,
 )
 
 data class VideoInfo(
@@ -25,3 +40,8 @@ data class VideoInfo(
     val fps: Double,
     val pixelFormat: String?,
 )
+
+/** One mpv log line at warning level or worse. [prefix] is mpv's module, for example "stream". */
+data class EngineMessage(val prefix: String, val level: Level, val text: String) {
+    enum class Level { Warn, Error }
+}

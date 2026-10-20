@@ -6,7 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -70,6 +70,15 @@ fun PlayerScreen(
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
+        // Extension overlays (network state and the like): over the video, under the controls.
+        val overlayHost = remember(engine) {
+            object : PanelHost {
+                override val engine = engine
+                override fun close() = Unit
+                override fun open(panelId: String) { openPanel = panelId }
+            }
+        }
+        extensions.forEach { it.Overlay(overlayHost) }
         if (controls) Controls(state, engine, entries, { openPanel = it }, Modifier.align(Alignment.BottomCenter))
         state.error?.let {
             Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
@@ -127,7 +136,7 @@ private fun Controls(
                 scrubbing = false
             },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             FilledTonalButton(onClick = engine::togglePause, modifier = Modifier.testTag("play-pause")) {
                 Text(if (state.paused) "Play" else "Pause")
             }

@@ -80,7 +80,7 @@
     <string name="setting_language">Language</string>
     <string name="setting_language_summary">App language, in the system settings</string>
     <string name="setting_export">Back up</string>
-    <string name="setting_export_summary">Save settings, resume points and playlists to a file</string>
+    <string name="setting_export_summary">Save settings and resume points to a file</string>
     <string name="setting_import">Restore</string>
     <string name="setting_import_summary">Load settings and history from a backup file</string>
     <string name="setting_pause_history">Pause history</string>
