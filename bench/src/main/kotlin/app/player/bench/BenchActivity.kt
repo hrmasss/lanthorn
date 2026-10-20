@@ -7,6 +7,16 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import app.player.core.engine.PropertyType
+import app.player.feature.player.SeekPreview
+import app.player.feature.player.SeekPreviewState
+import kotlinx.coroutines.coroutineScope
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
@@ -28,7 +38,7 @@ import kotlin.random.Random
  * Debug-only bench mode, driven by perf/bench.sh over adb:
  *
  *   am start -n app.player/app.player.bench.BenchActivity \
- *     --es scenario playback|seek|scrub --es file <path> [--ei seconds 300] [--ei runs 20] [--es decoder AUTO]
+ *     --es scenario playback|seek|scrub|preview --es file <path> [--ei seconds 300] [--ei runs 20] [--es decoder AUTO]
  *
  * Plays through the real player screen. Writes one JSON object to
  * <external files>/bench/<scenario>-<file name>.json and logs it under tag "Bench".
@@ -36,6 +46,8 @@ import kotlin.random.Random
 class BenchActivity : ComponentActivity() {
     private lateinit var engine: PlayerEngine
     private val controls = mutableStateOf(false)
+    private var preview by mutableStateOf<SeekPreviewState?>(null)
+    private var previewTarget by mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +57,16 @@ class BenchActivity : ComponentActivity() {
         val decoder = DecoderMode.valueOf(intent.getStringExtra("decoder") ?: "AUTO")
         engine = PlayerSessions.acquire(this, this)
         engine.setDecoder(decoder)
-        setContent { LanthornPlayerTheme { PlayerScreen(engine, controlsState = controls) } }
+        setContent {
+            LanthornPlayerTheme {
+                Box(Modifier.fillMaxSize()) {
+                    PlayerScreen(engine, controlsState = controls, seekPreview = false)
+                    val p = preview
+                    val target = previewTarget
+                    if (p != null && target != null) SeekPreview(p, target, Modifier.align(Alignment.Center))
+                }
+            }
+        }
 
         lifecycleScope.launch {
             engine.open(Uri.fromFile(File(file)))
@@ -62,6 +83,7 @@ class BenchActivity : ComponentActivity() {
                     "playback" -> playback(result, intent.getIntExtra("seconds", 300))
                     "seek" -> seek(result, intent.getIntExtra("runs", 20))
                     "scrub" -> scrub(result, intent.getIntExtra("seconds", 5))
+                    "preview" -> preview(result, Uri.fromFile(File(file)), intent.getIntExtra("seconds", 5))
                     else -> result.put("error", "unknown scenario $scenario")
                 }
             }
@@ -113,23 +135,62 @@ class BenchActivity : ComponentActivity() {
         out.put("seekMs", times).put("seekP50", percentile(times, 50)).put("seekP90", percentile(times, 90))
     }
 
-    /** NF-6: keyframe seeks at 30 per second, like a finger dragging the bar; count frames shown per second. */
+    /**
+     * NF-6, US-17.3: a finger dragging at 30 positions a second through the engine's scrub path;
+     * frames shown per second and how far each shown frame is from the newest target.
+     */
     private suspend fun scrub(out: JSONObject, seconds: Int) {
         engine.pause()
+        drag(engine, out, seconds) { engine.scrub(it) }
+        engine.endScrub(engine.state.value.positionMs)
+    }
+
+    /** US-30.1: the seek-preview engine fed the same drag; frames per second and distance to target. */
+    private suspend fun preview(out: JSONObject, uri: Uri, seconds: Int) {
+        engine.pause()
+        val p = SeekPreviewState(PlayerEngine.preview(this))
+        preview = p
+        p.engine.open(uri)
+        withTimeoutOrNull(10_000) { p.engine.state.first { it.loaded } }
+        previewTarget = engine.state.value.durationMs / 10
+        delay(1500)
+        drag(p.engine, out, seconds) { previewTarget = it }
+        previewTarget = null
+        preview = null
+        p.engine.release()
+    }
+
+    /** Sends a drag across 10 to 90% of the file, 30 targets a second, and scores the frames [target] shows. */
+    private suspend fun drag(shown: PlayerEngine, out: JSONObject, seconds: Int, target: (Long) -> Unit) = coroutineScope {
         val duration = engine.state.value.durationMs
-        val before = engine.state.value.restarts
+        var latest = 0L
+        val distances = JSONArray()
+        val watcher = launch {
+            var seen = shown.state.value.restarts
+            shown.state.collect { s ->
+                if (s.restarts > seen) {
+                    seen = s.restarts
+                    val pos = shown.get("time-pos", PropertyType.Real)?.let { (it * 1000).toLong() } ?: return@collect
+                    distances.put(kotlin.math.abs(pos - latest))
+                }
+            }
+        }
         val t0 = SystemClock.elapsedRealtime()
         var i = 0
         while (SystemClock.elapsedRealtime() - t0 < seconds * 1000L) {
-            val frac = (i % 300) / 300.0
-            engine.seekTo((0.1 * duration + frac * 0.8 * duration).toLong(), exact = false)
+            latest = (0.1 * duration + ((i % 300) / 300.0) * 0.8 * duration).toLong()
+            target(latest)
             i++
             delay(33)
         }
         delay(300)
+        watcher.cancel()
         val elapsed = (SystemClock.elapsedRealtime() - t0) / 1000.0
-        val updates = engine.state.value.restarts - before
-        out.put("seeksIssued", i).put("previewUpdates", updates).put("updatesPerSecond", updates / elapsed)
+        out.put("targetsSent", i)
+            .put("framesShown", distances.length())
+            .put("framesPerSecond", distances.length() / elapsed)
+            .put("distanceP50Ms", percentile(distances, 50))
+            .put("distanceP90Ms", percentile(distances, 90))
     }
 
     private fun percentile(a: JSONArray, p: Int): Long {

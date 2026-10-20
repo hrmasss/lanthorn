@@ -27,7 +27,7 @@ import app.player.core.engine.VideoSurfaceView
  * Holds the seek-preview engine for one file (US-30.1). Create it when the file opens so the
  * preview is loaded before the first drag; release it with the screen.
  */
-class SeekPreviewState internal constructor(internal val engine: PlayerEngine) {
+class SeekPreviewState(val engine: PlayerEngine) {
     /** Shows the frame nearest [positionMs] (keyframe), newest target wins. */
     fun show(positionMs: Long) = engine.scrub(positionMs)
 }
