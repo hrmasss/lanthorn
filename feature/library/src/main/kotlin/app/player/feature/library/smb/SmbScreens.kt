@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -131,6 +132,7 @@ internal fun SmbServersScreen(onOpen: (SmbServer) -> Unit, onBack: () -> Unit) {
 @Composable
 private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSaved: (SmbServer) -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var name by rememberSaveable { mutableStateOf(prefill?.name.orEmpty()) }
     var address by rememberSaveable {
@@ -179,7 +181,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
                         } else {
                             SmbClient.forget(server.id)
                             store.remove(server.id)
-                            error = context.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason().orEmpty())
+                            error = resources.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason().orEmpty())
                         }
                     }
                 },
