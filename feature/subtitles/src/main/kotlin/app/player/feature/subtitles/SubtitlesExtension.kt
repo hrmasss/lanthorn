@@ -45,6 +45,13 @@ import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import app.player.core.engine.PlayerSessions
 import java.nio.charset.Charset
 
 /** Subtitle tracks, external files, sync and ASS options inside the player (P1.3). */
@@ -78,6 +85,11 @@ object SubtitlesExtension : PlayerExtension {
     internal fun files(context: Context): SubtitleFiles =
         files ?: SubtitleFiles(context).also { files = it }
 
+    private var autoLoad: SubtitleAutoLoad? = null
+
+    internal fun autoLoad(context: Context): SubtitleAutoLoad =
+        autoLoad ?: SubtitleAutoLoad(context, files(context)).also { autoLoad = it }
+
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
         val styles = styles(context)
         SubtitleFonts.install(context, listOf(styles.userFontDir.path))
@@ -86,7 +98,20 @@ object SubtitlesExtension : PlayerExtension {
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
+        // US-39: subtitle files beside the video, and which track turns on, once the file has loaded.
+        val loader = autoLoad(context)
+        val loadJob = scope.launch {
+            engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+                runCatching { loader.onFileLoaded(engine, uri) }
+            }
+        }
+        scope.launch {
+            PlayerSessions.current.first { it !== engine }
+            loadJob.cancel()
+        }
     }
+
+    private val scope = MainScope()
 }
 
 private object TracksPanel : PlayerPanel {
@@ -112,6 +137,21 @@ private object TracksPanel : PlayerPanel {
 
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(::add) }
 
+        val loader = remember { SubtitlesExtension.autoLoad(context) }
+        fun rememberPick(id: Long?) {
+            val uri = host.engine.state.value.uri ?: return
+            val track = tracks.firstOrNull { it.id == id }
+            scope.launch { loader.remember(uri, track) }
+        }
+        // Scoped storage: the viewer allows this folder once, then its subtitles load by themselves.
+        val folderGrant = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+            if (tree != null) {
+                context.contentResolver.takePersistableUriPermission(tree, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                scope.launch { host.engine.state.value.uri?.let { loader.onFileLoaded(host.engine, it) } }
+            }
+        }
+        val offerFolder = loader.lastResult?.takeIf { !it.folderGranted }?.place?.let(loader::folderUri)
+
         Column(Modifier.padding(bottom = 16.dp)) {
             Text(
                 stringResource(R.string.subs_tracks_title),
@@ -123,7 +163,10 @@ private object TracksPanel : PlayerPanel {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.subs_off)) },
                         leadingContent = { Checkbox(selection.primary == null, onCheckedChange = null) },
-                        modifier = Modifier.clickable { controller.select(SubSelection()) }.testTag("sub-off"),
+                        modifier = Modifier.clickable {
+                            controller.select(SubSelection())
+                            rememberPick(null)
+                        }.testTag("sub-off"),
                     )
                 }
                 items(tracks, key = { it.id }) { track ->
@@ -133,7 +176,11 @@ private object TracksPanel : PlayerPanel {
                         supportingContent = { Text(track.details(track.id == selection.secondary)) },
                         leadingContent = { Checkbox(on, onCheckedChange = null) },
                         modifier = Modifier
-                            .clickable { controller.select(selection.toggle(track.id)) }
+                            .clickable {
+                                val next = selection.toggle(track.id)
+                                controller.select(next)
+                                rememberPick(next.primary)
+                            }
                             .testTag("sub-track-${track.id}"),
                     )
                     if (on && files.isOurs(track.externalFilename)) {
@@ -144,6 +191,12 @@ private object TracksPanel : PlayerPanel {
                         }
                     }
                 }
+            }
+            if (offerFolder != null) {
+                OutlinedButton(
+                    onClick = { folderGrant.launch(offerFolder) },
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag("sub-allow-folder"),
+                ) { Text(stringResource(R.string.subs_allow_folder)) }
             }
             OutlinedButton(
                 onClick = { picker.launch(arrayOf("*/*")) },

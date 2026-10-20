@@ -7,7 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 import org.json.JSONObject
 
-private val Context.subtitleStore by preferencesDataStore("subtitles")
+internal val Context.subtitleStore by preferencesDataStore("subtitles")
 
 /** Saved subtitle style (US-42, US-43). One JSON value, so a style is read and written whole. */
 internal class SubtitleStyleStore(context: Context) {
