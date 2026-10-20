@@ -92,11 +92,16 @@ class VideoToolsTest {
     @Test fun rotationMetadata_US56_4() = runBlocking<Unit> {
         open("rotated.mp4")
         waitUntil(3_000) { tools.rotation.value != null }
-        val w = engine.get("video-out-params/dw", PropertyType.Int64)
-        val h = engine.get("video-out-params/dh", PropertyType.Int64)
-        log("rotated.mp4: rotate ${tools.rotation.value}, shown ${w}x$h")
-        assertEquals(90L, tools.rotation.value)
-        assertTrue("portrait after rotation: ${w}x$h", (h ?: 0) > (w ?: 0))
+        // The file is 320x180 with a 90 degree display-rotation flag (ffmpeg counts it counter-
+        // clockwise, mpv reports it clockwise as 270). Proof that it is honoured: the picture mpv
+        // draws is taller than wide (screen rectangle from osd-dimensions).
+        val m = listOf("w", "h", "ml", "mr", "mt", "mb").associateWith { engine.get("osd-dimensions/$it", PropertyType.Int64)!! }
+        val shownW = m.getValue("w") - m.getValue("ml") - m.getValue("mr")
+        val shownH = m.getValue("h") - m.getValue("mt") - m.getValue("mb")
+        log("rotated.mp4: rotate ${tools.rotation.value}, picture drawn ${shownW}x$shownH")
+        grab("rotated")
+        assertTrue("rotation flag read", tools.rotation.value == 90L || tools.rotation.value == 270L)
+        assertTrue("portrait after rotation: ${shownW}x$shownH", shownH > shownW)
     }
 
     @Test fun mirrorFlipNight_US57() = runBlocking<Unit> {
