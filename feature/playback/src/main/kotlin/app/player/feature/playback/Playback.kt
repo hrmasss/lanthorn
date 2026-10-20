@@ -12,6 +12,7 @@ import app.player.core.engine.EngineMessage
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
+import app.player.core.engine.PropertyType
 import app.player.core.playerapi.PlaybackControls
 import app.player.core.playerapi.PlayerIntents
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -244,7 +246,10 @@ object Playback : PlaybackControls {
                 if (this@Playback.engine === engine) this@Playback.engine = null
                 watcher?.cancel()
             }
-            engine.state.collect { s ->
+            // mpv's own pause flag: PlaybackState.paused starts true after open() and only changes
+            // when mpv reports a change, so a file that plays from the start can read as paused.
+            val pause = engine.observe("pause", PropertyType.Flag)
+            combine(engine.state, pause) { st, p -> if (p == null) st else st.copy(paused = p) }.collect { s ->
                 val prev = last
                 val now = SystemClock.elapsedRealtime()
                 when {
