@@ -3,11 +3,13 @@ package app.player.feature.library
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
@@ -63,7 +65,8 @@ class StreamDialogTest {
         rule.waitUntil(3_000) { runBlocking { prefs.history.first() }.isNotEmpty() }
         assertEquals(listOf("http://10.0.2.2:8000/clip.mp4"), runBlocking { prefs.history.first() })
 
-        rule.onNodeWithText("http://10.0.2.2:8000/clip.mp4").assertExists()
+        // The URL is also still in the field; look in the history list only.
+        rule.onNode(hasText("http://10.0.2.2:8000/clip.mp4") and hasAnyAncestor(hasTestTag("stream-history"))).assertExists()
         rule.onNodeWithContentDescription("Remove http://10.0.2.2:8000/clip.mp4 from recent").performClick()
         rule.waitUntil(3_000) { runBlocking { prefs.history.first() }.isEmpty() }
     }
