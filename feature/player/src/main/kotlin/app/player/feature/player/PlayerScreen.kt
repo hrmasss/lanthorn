@@ -78,6 +78,15 @@ import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
 import app.player.feature.player.tools.Chapter
+import app.player.feature.player.tools.VideoState
+import app.player.feature.player.overlay.DeinterlaceContent
+import app.player.feature.player.overlay.FitAspectContent
+import app.player.feature.player.overlay.PictureContent
+import app.player.feature.player.overlay.Shortcut
+import app.player.feature.player.overlay.ShortcutState
+import app.player.feature.player.overlay.ShortcutsGrid
+import app.player.feature.player.overlay.label
+import app.player.core.engine.ActiveDecoder
 import app.player.feature.player.gesture.GestureController
 import app.player.feature.player.gesture.GestureEffects
 import app.player.feature.player.gesture.GestureReadout
@@ -99,7 +108,6 @@ import app.player.feature.player.overlay.SpeedContent
 import app.player.feature.player.overlay.rememberLeft
 import androidx.compose.material3.TextButton
 import app.player.feature.player.tools.Deinterlace
-import app.player.feature.player.overlay.DeinterlaceContent
 import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -116,6 +124,8 @@ internal object OwnPanel {
     const val AB = "player-ab"
     const val SLEEP = "player-sleep"
     const val CHAPTERS = "player-chapters"
+    const val FIT = "player-fit"
+    const val PICTURE = "player-picture"
     const val DEINTERLACE = "player-deinterlace"
 }
 
@@ -172,8 +182,11 @@ fun PlayerScreen(
     val chapterCount by remember(engine) { tools.chapterCount }.collectAsStateWithLifecycle(context = Main)
     val chapters by produceState(emptyList<Chapter>(), state.uri, chapterCount, state.loaded) { value = tools.chapters() }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
-    val video = remember(engine) { VideoTools(engine, context) }
-    var fitMode by remember { mutableStateOf(FitMode.Fit) }
+    val video = remember(engine) { VideoState(VideoTools(engine, context)) }
+    val videoTools = remember(engine) { VideoTools(engine, context) }
+    var rotationLocked by remember { mutableStateOf(false) }
+    val loopFile by remember(engine) { engine.observe("loop-file", PropertyType.Text) }.collectAsStateWithLifecycle(context = Main)
+    val muted by remember(engine) { engine.observe("mute", PropertyType.Flag) }.collectAsStateWithLifecycle(context = Main)
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
     val currentControls by rememberUpdatedState(controls)
@@ -220,11 +233,10 @@ fun PlayerScreen(
             override var boost: Float
                 get() = volumeBoost?.gain?.value ?: 1f
                 set(v) { volumeBoost?.setGain(v) }
-            override fun setZoom(scale: Double) = video.setZoom(scale)
-            override fun setPan(x: Double, y: Double) = video.setPan(x, y)
+            override fun setZoom(scale: Double) = videoTools.setZoom(scale)
+            override fun setPan(x: Double, y: Double) = videoTools.setPan(x, y)
             override fun toggleFitCrop() {
-                fitMode = if (fitMode == FitMode.Crop) FitMode.Fit else FitMode.Crop
-                video.setFit(fitMode)
+                video.setFit(if (video.fit == FitMode.Crop) FitMode.Fit else FitMode.Crop)
             }
         })
     }
@@ -282,6 +294,8 @@ fun PlayerScreen(
     val hasChapters = chapters.isNotEmpty()
     val items = remember(entries, hasChapters) {
         val own = listOfNotNull(
+            MenuItem("fit-aspect", MenuGroup.Video, 100, { stringResource(R.string.video_fit_aspect) }) { openPanel = OwnPanel.FIT },
+            MenuItem("picture", MenuGroup.Video, 110, { stringResource(R.string.video_picture) }) { openPanel = OwnPanel.PICTURE },
             MenuItem("deinterlace", MenuGroup.Video, 120, { stringResource(R.string.video_deinterlace) }) { openPanel = OwnPanel.DEINTERLACE },
             MenuItem("speed", MenuGroup.Tools, 100, { stringResource(R.string.tool_speed) }) { openPanel = OwnPanel.SPEED },
             MenuItem("ab-repeat", MenuGroup.Tools, 110, { stringResource(R.string.tool_ab) }) { openPanel = OwnPanel.AB },
@@ -376,9 +390,8 @@ fun PlayerScreen(
             stepForward = { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
             fit = {
                 // US-53.1: cycle and name the mode for 1 s.
-                fitMode = fitMode.next()
-                video.setFit(fitMode)
-                note = Note(fitNames.getValue(fitMode), FIT_NOTE_MS)
+                video.setFit(video.fit.next())
+                note = Note(fitNames.getValue(video.fit), FIT_NOTE_MS)
             },
         )
     }
@@ -392,6 +405,26 @@ fun PlayerScreen(
         stringResource(R.string.a11y_brightness_up) to { brightness?.let { it.set(it.level + 0.1f) }; Unit },
         stringResource(R.string.a11y_brightness_down) to { brightness?.let { it.set(it.level - 0.1f) }; Unit },
     ).map { (label, run) -> CustomAccessibilityAction(label) { run(); true } }
+    // US-32.1: each shortcut's state and action. Null action = its item has not landed yet.
+    fun shortcutState(sc: Shortcut): ShortcutState = when (sc) {
+        Shortcut.RotationLock -> ShortcutState(rotationLocked) {
+            rotationLocked = !rotationLocked
+            activity?.requestedOrientation =
+                if (rotationLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        Shortcut.Speed -> ShortcutState(speedLabel(speed) != null) { openPanel = OwnPanel.SPEED }
+        Shortcut.Background -> ShortcutState(false, null)
+        Shortcut.Loop -> ShortcutState(loopFile != null && loopFile != "no") { tools.setLoopFile(loopFile == null || loopFile == "no") }
+        Shortcut.Mute -> ShortcutState(muted == true) { engine.set("mute", muted != true) }
+        Shortcut.Shuffle -> ShortcutState(false, null)
+        Shortcut.Equalizer -> ShortcutState(false, null)
+        Shortcut.SleepTimer -> ShortcutState(sleep != null) { openPanel = OwnPanel.SLEEP }
+        Shortcut.AbRepeat -> ShortcutState(abMs(abA) != null) { openPanel = OwnPanel.AB }
+        Shortcut.NightMode -> ShortcutState(video.night) { video.setNight(!video.night) }
+        Shortcut.Screenshot -> ShortcutState(false) { openPanel = null; screenshotRequests++ }
+        Shortcut.Mirror -> ShortcutState(video.mirror) { video.setMirror(!video.mirror) }
+        Shortcut.VerticalFlip -> ShortcutState(video.verticalFlip) { video.setVerticalFlip(!video.verticalFlip) }
+    }
     val videoDesc = stringResource(R.string.a11y_video)
     val toggleLabel = stringResource(if (controls) R.string.a11y_hide_controls else R.string.a11y_show_controls)
 
@@ -526,7 +559,11 @@ fun PlayerScreen(
         val shownPanel = openPanel ?: lastPanel
         PanelFrame(visible = openPanel != null, panelId = shownPanel, onClose = { openPanel = null }) {
             when (val id = shownPanel) {
-                OwnPanel.MENU -> MenuContent(items)
+                OwnPanel.MENU -> MenuContent(items) {
+                    ShortcutsGrid(Shortcut.parse(prefs.shortcuts)) { sc -> shortcutState(sc) }
+                }
+                OwnPanel.FIT -> FitAspectContent(video)
+                OwnPanel.PICTURE -> PictureContent(video)
                 OwnPanel.DECODER -> DecoderContent(state.decoderMode, state.activeDecoder.label) {
                     engine.setDecoder(it)
                     onDecoderPicked(it)
@@ -600,12 +637,6 @@ private suspend fun displayName(context: android.content.Context, uri: String?):
     }?.let { name -> name.substringBeforeLast('.', name) }
 }
 
-private val FitMode.label get() = when (this) {
-    FitMode.Fit -> R.string.fit_fit
-    FitMode.Stretch -> R.string.fit_stretch
-    FitMode.Crop -> R.string.fit_crop
-    FitMode.Original -> R.string.fit_original
-}
 
 /** "Sleep timer", or "Sleep timer · 12:30 left" while one runs (US-26.3). */
 @Composable
