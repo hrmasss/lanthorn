@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="playback_resume_title">Resume?</string>
+    <string name="playback_resume_text">You stopped at %1$s.</string>
+    <string name="playback_resume">Resume</string>
+    <string name="playback_start_over">Start over</string>
+
+    <string name="settings_playback">Playback</string>
+    <string name="settings_section_resume">Resume</string>
+    <string name="settings_section_open">Opening from other apps</string>
+    <string name="setting_resume">Resume where I stopped</string>
+    <string name="resume_yes">Yes</string>
+    <string name="resume_ask">Ask</string>
+    <string name="resume_no">No, always from the start</string>
+    <string name="setting_resume_first_only">Resume only the first file</string>
+    <string name="setting_resume_first_only_summary">Later files in a queue start from the beginning</string>
+    <string name="setting_open_links">Open media links</string>
+    <string name="setting_open_links_summary">Offer to play http and https links to video and audio files</string>
+</resources>

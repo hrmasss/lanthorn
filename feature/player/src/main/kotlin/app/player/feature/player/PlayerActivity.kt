@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
+import app.player.core.playerapi.playbackController
 import app.player.core.playerapi.playerExtensions
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
@@ -30,7 +31,7 @@ class PlayerActivity : ComponentActivity() {
         engine = PlayerSessions.acquire(this, this) { created ->
             extensions.forEach { it.onEngineCreated(applicationContext, created) }
         }
-        if (savedInstanceState == null) intent.data?.let { engine.open(it) }
+        if (savedInstanceState == null) open(intent)
         setContent {
             LanthornPlayerTheme { PlayerScreen(engine, extensions = extensions) }
         }
@@ -38,7 +39,12 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { engine.open(it) }
+        open(intent)
+    }
+
+    /** Resume and the queue decide where and what plays (feature/playback); without them, the uri as is. */
+    private fun open(intent: Intent) {
+        if (playbackController?.open(engine, intent, ::finish) != true) intent.data?.let { engine.open(it) }
     }
 
     override fun onStop() {

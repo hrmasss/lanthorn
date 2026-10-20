@@ -67,6 +67,9 @@ class PlayerMenuEntry(
 /** Implemented by the Application in `app`, which lists every feature's extension. */
 interface PlayerExtensionHost {
     val playerExtensions: List<PlayerExtension>
+
+    /** What plays and in what order. Null leaves the player opening the intent's uri as is. */
+    val playbackController: PlaybackController? get() = null
 }
 
 /** The extensions wired into this app, or none if the Application does not host any. */
