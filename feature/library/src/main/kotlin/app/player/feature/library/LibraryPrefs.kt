@@ -36,7 +36,7 @@ private val Context.libraryStore: DataStore<Preferences> by preferencesDataStore
 
 /** Library view choices, kept across restarts. */
 class LibraryPrefsStore(context: Context) {
-    private val store = context.applicationContext.libraryStore
+    internal val store = context.applicationContext.libraryStore
 
     val prefs: Flow<LibraryPrefs> = store.data.map { it.toPrefs() }
 
@@ -77,7 +77,14 @@ class LibraryPrefsStore(context: Context) {
         it[SEARCHES] = (recent(it) - query).joinToString("\n")
     }
 
-    private companion object {
+    suspend fun clearSearches() = store.edit { it.remove(SEARCHES) }
+
+    /** Reset settings (US-65.2): every choice back to default. Hidden items and search history stay. */
+    suspend fun reset() = store.edit { prefs ->
+        prefs.asMap().keys.filter { it.name != HIDDEN.name && it.name != SEARCHES.name }.forEach { prefs.remove(it) }
+    }
+
+    internal companion object {
         val VIEW_MODE = stringPreferencesKey("view_mode")
         val LAYOUT = stringPreferencesKey("layout")
         val FIELDS = stringSetPreferencesKey("fields")
