@@ -100,6 +100,7 @@ class VideoToolsTest {
         val shownH = m.getValue("h") - m.getValue("mt") - m.getValue("mb")
         log("rotated.mp4: rotate ${tools.rotation.value}, picture drawn ${shownW}x$shownH")
         grab("rotated")
+        grabScreen("p15-rotated-full")
         assertTrue("rotation flag read", tools.rotation.value == 90L || tools.rotation.value == 270L)
         assertTrue("portrait after rotation: ${shownW}x$shownH", shownH > shownW)
     }
@@ -151,20 +152,182 @@ class VideoToolsTest {
 
     @Test fun deinterlaceModes_US38() = runBlocking<Unit> {
         open("interlaced.mp4")
-        val modes = Deinterlace.entries.associateWith { mode ->
-            tools.setDeinterlace(mode)
-            SystemClock.sleep(500)
-            engine.get("deinterlace", PropertyType.Text)
+        // Deinterlacing needs frames in memory: zero-copy HW cannot run it (US-35.4).
+        engine.setDecoder(app.player.core.engine.DecoderMode.SW)
+        waitUntil(5_000) { engine.state.value.activeDecoder == app.player.core.engine.ActiveDecoder.SW }
+        tools.setDeinterlace(Deinterlace.Off)
+        SystemClock.sleep(800)
+        engine.pause()
+        val off = grab("deint-off")
+        val offActive = engine.get("deinterlace-active", PropertyType.Flag)
+        engine.play()
+        tools.setDeinterlace(Deinterlace.On)
+        waitUntil(3_000) { runBlocking { engine.get("deinterlace-active", PropertyType.Flag) } == true }
+        SystemClock.sleep(800)
+        engine.pause()
+        val on = grab("deint-on")
+        engine.play()
+        tools.setDeinterlace(Deinterlace.Auto)
+        SystemClock.sleep(1_000)
+        val autoInterlaced = engine.get("deinterlace-active", PropertyType.Flag)
+        log("US-38 interlaced.mp4 on SW: off active=$offActive, on active=true, auto active=$autoInterlaced; " +
+            "row-to-row difference (comb energy) off ${comb(off)} on ${comb(on)}")
+        scenario.close()
+
+        open("clip.mp4")
+        engine.setDecoder(app.player.core.engine.DecoderMode.SW)
+        waitUntil(5_000) { engine.state.value.activeDecoder == app.player.core.engine.ActiveDecoder.SW }
+        tools.setDeinterlace(Deinterlace.Auto)
+        SystemClock.sleep(1_000)
+        val autoProgressive = engine.get("deinterlace-active", PropertyType.Flag)
+        log("US-38.1 clip.mp4 (progressive) on SW, auto: deinterlace-active=$autoProgressive")
+        assertEquals(false, offActive)
+        assertEquals(true, autoInterlaced)
+        assertEquals(false, autoProgressive)
+        assertTrue("comb lines reduced: off ${comb(off)} on ${comb(on)}", comb(on) < comb(off))
+    }
+
+    @Test fun aspectRatiosDrawn_US54_1() = runBlocking<Unit> {
+        open("clip.mp4")
+        for ((name, ratio) in listOf("1:1" to 1.0, "21:9" to 21.0 / 9, "custom 1.85" to 1.85)) {
+            tools.setAspect(ratio)
+            SystemClock.sleep(400)
+            val drawn = drawn()
+            val got = drawn.first.toDouble() / drawn.second
+            log("US-54.1 $name: picture drawn ${drawn.first}x${drawn.second}, ratio %.3f (asked %.3f)".format(got, ratio))
+            assertEquals(ratio, got, ratio * 0.02)
+            grabScreen("p15-aspect-${name.replace(' ', '-').replace(':', 'x')}")
         }
-        val active = engine.get("deinterlace-active", PropertyType.Flag)
-        log("deinterlace read back: $modes, deinterlace-active $active, error ${engine.state.value.error}")
-        assertEquals("no", modes[Deinterlace.Off])
+    }
+
+    @Test fun zoomDrawn_US55_1() = runBlocking<Unit> {
+        open("clip.mp4")
+        val fit = drawn()
+        tools.setZoom(4.0)
+        SystemClock.sleep(400)
+        val big = drawn()
+        grabScreen("p15-zoom-400")
+        tools.setZoom(0.25)
+        SystemClock.sleep(400)
+        val small = drawn()
+        grabScreen("p15-zoom-25")
+        log("US-55.1 picture width: fit ${fit.first}, 400% ${big.first} (x%.2f), 25% ${small.first} (x%.2f)"
+            .format(big.first.toDouble() / fit.first, small.first.toDouble() / fit.first))
+        assertEquals(4.0, big.first.toDouble() / fit.first, 0.05)
+        assertEquals(0.25, small.first.toDouble() / fit.first, 0.02)
+    }
+
+    /** US-57.1, US-57.2 on the whole screen: a subtitle and the controls stay as they are. */
+    @Test fun mirrorAndNightFullScreen_US57() = runBlocking<Unit> {
+        open("clip.mp4")
+        engine.command("sub-add", copyFile("sub.srt").path, "select")
+        SystemClock.sleep(1_000)
+        engine.pause()
+        shell("input tap 540 600")
+        SystemClock.sleep(800)
+        val plain = grabScreen("p15-full-plain")
+        tools.setMirror(true)
+        val mirror = grabScreen("p15-full-mirror")
+        tools.setMirror(false)
+        tools.setNightMode(true)
+        val night = grabScreen("p15-full-night")
+        tools.setNightMode(false)
+        // Subtitle: the white text pixels sit in the same place with mirror on (not mirrored).
+        val (sx, sy, sw, sh) = subtitleBox()
+        val textSame = overlap(white(plain, sx, sy, sw, sh), white(mirror, sx, sy, sw, sh))
+        // Controls: the bottom bar is pixel-identical under night mode (video only).
+        val bar = maxDiffRegion(plain, night, 0, plain.height - 260, plain.width, 200)
+        log("US-57 full screen: subtitle white-pixel overlap plain vs mirror %.2f; bottom bar max difference plain vs night $bar".format(textSame))
+        assertTrue("subtitle not mirrored", textSame > 0.8)
+        assertEquals(0, bar)
+    }
+
+    /** US-57.3 as an emulator regression number; the 100 ms claim is for the phone. */
+    @Test fun pictureAdjustTiming_US57_3() = runBlocking<Unit> {
+        open("clip.mp4")
+        engine.pause()
+        SystemClock.sleep(500)
+        val before = grab("timing-before")
+        val t0 = SystemClock.elapsedRealtime()
+        tools.setPicture(PictureAdjust(brightness = 60))
+        var seen = -1L
+        while (SystemClock.elapsedRealtime() - t0 < 3_000) {
+            val now = grabQuick()
+            if (maxDiff(before, now) > 20) { seen = SystemClock.elapsedRealtime() - t0; break }
+        }
+        log("US-57.3 brightness +60 visible on screen after $seen ms (emulator, screen capture polling)")
+        tools.setPicture(PictureAdjust())
+        assertTrue(seen in 0..3_000)
+    }
+
+    /** Picture rectangle mpv draws, from osd-dimensions. */
+    private suspend fun drawn(): Pair<Int, Int> {
+        val m = listOf("w", "h", "ml", "mr", "mt", "mb").associateWith { engine.get("osd-dimensions/$it", PropertyType.Int64)!!.toInt() }
+        return (m.getValue("w") - m.getValue("ml") - m.getValue("mr")) to (m.getValue("h") - m.getValue("mt") - m.getValue("mb"))
+    }
+
+    /** Where the subtitle sits: bottom fifth of the drawn picture, full width. */
+    private suspend fun subtitleBox(): List<Int> {
+        val mt = engine.get("osd-dimensions/mt", PropertyType.Int64)!!.toInt()
+        val (w, h) = drawn()
+        val at = IntArray(2)
+        scenario.onActivity { a -> findSurface(a.window.decorView)?.getLocationOnScreen(at) }
+        return listOf(0, at[1] + mt + h * 4 / 5, w.coerceAtMost(1080), h / 5)
+    }
+
+    private fun white(b: Bitmap, x: Int, y: Int, w: Int, h: Int): Set<Int> {
+        val out = HashSet<Int>()
+        for (yy in y until (y + h).coerceAtMost(b.height)) for (xx in x until (x + w).coerceAtMost(b.width)) {
+            val p = b.getPixel(xx, yy)
+            if (Color.red(p) > 235 && Color.green(p) > 235 && Color.blue(p) > 235) out += yy * 10_000 + xx
+        }
+        return out
+    }
+
+    private fun overlap(a: Set<Int>, b: Set<Int>): Double =
+        if (a.isEmpty() && b.isEmpty()) 0.0 else a.intersect(b).size.toDouble() / a.union(b).size
+
+    private fun maxDiffRegion(a: Bitmap, b: Bitmap, x: Int, y: Int, w: Int, h: Int): Int =
+        maxDiff(Bitmap.createBitmap(a, x, y, w, h), Bitmap.createBitmap(b, x, y, w, h))
+
+    /** Mean absolute difference between neighbouring rows: comb lines raise it. */
+    private fun comb(b: Bitmap): Long {
+        var sum = 0L
+        var n = 0L
+        for (y in 0 until b.height - 1 step 2) for (x in 0 until b.width step 3) {
+            sum += abs(Color.green(b.getPixel(x, y)) - Color.green(b.getPixel(x, y + 1)))
+            n++
+        }
+        return if (n == 0L) 0 else sum * 100 / n
+    }
+
+    private fun grabScreen(name: String): Bitmap {
+        SystemClock.sleep(500)
+        val screen = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            .copy(Bitmap.Config.ARGB_8888, false)
+        val file = File(File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }, "$name.png")
+        file.outputStream().use { screen.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return screen
+    }
+
+    private suspend fun grabQuick(): Bitmap {
+        val ml = engine.get("osd-dimensions/ml", PropertyType.Int64)!!.toInt()
+        val mt = engine.get("osd-dimensions/mt", PropertyType.Int64)!!.toInt()
+        val (w, h) = drawn()
+        val at = IntArray(2)
+        scenario.onActivity { a -> findSurface(a.window.decorView)?.getLocationOnScreen(at) }
+        val screen = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            .copy(Bitmap.Config.ARGB_8888, false)
+        return Bitmap.createBitmap(screen, at[0] + ml + 2, at[1] + mt + 2, w - 4, h - 4)
+    }
+
+    private fun shell(cmd: String) {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(cmd).close()
     }
 
     /**
-     * The video area of the screen as composited (the libmpv build cannot write image files, so
-     * mpv's own screenshots are not available). The picture rectangle comes from mpv's
-     * `osd-dimensions` margins, offset by where the video surface sits on screen.
+     * The video area of the screen as composited, so what the viewer sees. The picture rectangle
+     * comes from mpv's `osd-dimensions` margins, offset by where the video surface sits on screen.
      */
     private suspend fun grab(name: String): Bitmap {
         SystemClock.sleep(500)
@@ -237,6 +400,14 @@ class VideoToolsTest {
             if (SystemClock.elapsedRealtime() > end) throw AssertionError("timed out after $ms ms")
             SystemClock.sleep(20)
         }
+    }
+
+    private fun copyFile(asset: String): File {
+        val file = File(context.cacheDir, asset)
+        InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
+            file.outputStream().use { input.copyTo(it) }
+        }
+        return file
     }
 
     private fun copy(asset: String): Uri {
