@@ -1,179 +1,359 @@
 package app.player.feature.player
 
+import android.content.pm.ActivityInfo
+import android.net.Uri
+import android.os.SystemClock
+import android.provider.OpenableColumns
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.player.core.designsystem.component.BufferingIndicator
+import app.player.core.designsystem.theme.PlayerColors
+import app.player.core.designsystem.theme.PlayerMotion
+import app.player.core.designsystem.theme.tabular
 import app.player.core.engine.DecoderMode
-import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerEngine
+import app.player.core.engine.PropertyType
 import app.player.core.engine.VideoSurfaceView
+import app.player.core.playerapi.MenuGroup
 import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
+import app.player.feature.player.overlay.Controls
+import app.player.feature.player.overlay.ControlsActions
+import app.player.feature.player.overlay.ControlsUi
+import app.player.feature.player.overlay.DecoderContent
+import app.player.feature.player.overlay.MenuContent
+import app.player.feature.player.overlay.MenuItem
+import app.player.feature.player.overlay.PanelFrame
+import app.player.feature.player.overlay.StatusText
+import app.player.feature.player.overlay.menuItems
+import app.player.feature.player.settings.PlayerPrefs
+import app.player.feature.player.settings.PlayerSettings
+import app.player.feature.player.settings.PlayerSettingsContent
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
-/** Bare player: video, tap to show controls, play/pause, seek bar, decoder picker, info line. */
+/** The player's own panels. Feature panels use their own ids. */
+internal object OwnPanel {
+    const val MENU = "player-menu"
+    const val DECODER = "player-decoder"
+    const val SETTINGS = "player-settings"
+}
+
+private const val SEEK_STEP_MS = 10_000L
+private const val NOTE_MS = 2_000L
+
+/**
+ * The player: video, overlay controls, panels from features. Owns where things go and when the
+ * overlay hides; the engine and the features own what they do.
+ */
 @Composable
 fun PlayerScreen(
     engine: PlayerEngine,
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
-    controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
+    /** Hidden on open, as MX users expect (recon/ux-map.md, defaults). */
+    controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
-    /** Seek preview on the seek bar (US-30.1, default on). Off: the video itself follows the finger. */
+    settings: PlayerSettings? = null,
+    /** Seek preview above the seek bar (US-30.1, default on). Off: the video itself follows the finger. */
     seekPreview: Boolean = true,
+    /** The viewer picked a decoder by hand (US-36.3: remembered for the file). */
+    onDecoderPicked: (DecoderMode) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val activity = LocalActivity.current
     val state by engine.state.collectAsStateWithLifecycle()
+    val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
+    val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
+        .collectAsStateWithLifecycle()
+    val talkBack = rememberTalkBackOn()
     var controls by controlsState
-    val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
-    val entries = remember(extensions) {
-        extensions.flatMap { it.menuEntries }.sortedWith(compareBy({ it.group }, { it.order }))
-    }
     var openPanel by remember { mutableStateOf<String?>(null) }
-    // US-30.1: the seek preview loads with the file, so the first drag shows frames at once.
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubTargetMs by remember { mutableLongStateOf(0L) }
+    // US-30.1: the preview engine loads with the file, so the first drag shows frames at once.
     val preview = if (seekPreview) rememberSeekPreview(state.uri) else null
+    var touches by remember { mutableIntStateOf(0) }
+    var note by remember { mutableStateOf<Pair<String, Long>?>(null) }
+    val brightness = remember(activity) { activity?.let(::WindowBrightness) }
+
+    val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
+    val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
+    val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
+    val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
+    val settingsLabel = stringResource(R.string.menu_player_settings)
+    val items = remember(entries, settingsLabel) {
+        val own = listOf(MenuItem("player-settings", MenuGroup.Tools, 900, { settingsLabel }) { openPanel = OwnPanel.SETTINGS })
+        menuItems(entries, own) { openPanel = it }
+    }
+    val title by produceState(titleOf(state.uri), state.uri) { value = displayName(context, state.uri) ?: titleOf(state.uri) }
+
+    // Auto-hide (US-16.3, US-79): restarts on every touch; the delay is read when it starts, so a
+    // changed delay applies from the next time the controls show (US-79.2).
+    val hideAfter = autoHideDelay(prefs.autoHide, prefs.autoHideDelayMs, state.paused, talkBack, openPanel != null || scrubbing)
+    AutoHideEffect(controls, touches, hideAfter) { controls = false }
+    SystemBarsEffect(activity, controls)
+    KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
+    LaunchedEffect(note) {
+        note?.let { delay(NOTE_MS); note = null }
+    }
+    fun show(message: String) { note = message to SystemClock.elapsedRealtime() }
+
+    // Back twice (US-78). With the callback enabled the system shows no predictive back animation,
+    // so the first press keeps the player on screen (US-78.2).
+    val backTwice = remember { BackTwice() }
+    val backHint = stringResource(R.string.player_back_again)
+    BackHandler(enabled = prefs.backTwice && openPanel == null) {
+        if (backTwice.press(SystemClock.elapsedRealtime())) activity?.finish() else show(backHint)
+    }
+
+    val host = remember(engine) {
+        object : PanelHost {
+            override val engine = engine
+            override fun close() { openPanel = null }
+            override fun open(panelId: String) { openPanel = panelId }
+            override fun notify(message: String) = show(message)
+        }
+    }
+    // US-35.3: one line when the chosen decoder could not play the stream.
+    LaunchedEffect(state.decoderNotice) { state.decoderNotice?.let(::show) }
+    val currentState by rememberUpdatedState(state)
+    val actions = remember(engine, activity, preview) {
+        ControlsActions(
+            back = { activity?.finish() },
+            togglePause = engine::togglePause,
+            scrub = { f ->
+                scrubbing = true
+                scrubTargetMs = (f * currentState.durationMs).toLong()
+                // With a preview the video holds still until release; without, it follows the finger (US-17.3).
+                if (preview == null) engine.scrub(scrubTargetMs)
+            },
+            seek = { f ->
+                scrubbing = false
+                engine.endScrub((f * currentState.durationMs).toLong())
+            },
+            toggleRemaining = { settings?.update { it.copy(showRemaining = !it.showRemaining) } },
+            openDecoder = { openPanel = OwnPanel.DECODER },
+            openSubtitles = { subtitleEntry?.let { openPanel = it.opensPanel } },
+            openAudio = { audioEntry?.let { openPanel = it.opensPanel } },
+            openMenu = { openPanel = OwnPanel.MENU },
+            lock = {},
+            previous = {},
+            next = {},
+            rotate = { activity?.let(::toggleOrientation) },
+            fit = {},
+        )
+    }
+
+    // TalkBack gets seek, volume and brightness as actions on the video instead of gestures (US-69.2).
+    val a11yActions = listOf(
+        stringResource(R.string.a11y_seek_forward) to { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
+        stringResource(R.string.a11y_seek_back) to { engine.seekTo((currentState.positionMs - SEEK_STEP_MS).coerceAtLeast(0)) },
+        stringResource(R.string.a11y_volume_up) to { stepVolume(context, up = true) },
+        stringResource(R.string.a11y_volume_down) to { stepVolume(context, up = false) },
+        stringResource(R.string.a11y_brightness_up) to { brightness?.let { it.set(it.level + 0.1f) }; Unit },
+        stringResource(R.string.a11y_brightness_down) to { brightness?.let { it.set(it.level - 0.1f) }; Unit },
+    ).map { (label, run) -> CustomAccessibilityAction(label) { run(); true } }
+    val videoDesc = stringResource(R.string.a11y_video)
+    val toggleLabel = stringResource(if (controls) R.string.a11y_hide_controls else R.string.a11y_show_controls)
+
     Box(
         modifier
             .fillMaxSize()
+            // Test tags double as resource ids, so uiautomator scripts (perf/, bench) find controls.
             .semantics { testTagsAsResourceId = true }
             .background(Color.Black)
-            .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls },
+            // Every touch restarts the auto-hide timer; nothing is consumed here.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val type = awaitPointerEvent(PointerEventPass.Initial).type
+                        if (type == PointerEventType.Press || type == PointerEventType.Release) touches++
+                    }
+                }
+            },
     ) {
         AndroidView(
             factory = { VideoSurfaceView(it).apply { this.engine = engine } },
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
-        if (controls) Controls(state, engine, entries, { openPanel = it }, preview, Modifier.align(Alignment.BottomCenter))
+        // Touch layer over the video. Single tap toggles the controls (US-16.2); the gesture model
+        // replaces this with P1.10.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .testTag("video")
+                .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls }
+                .semantics {
+                    contentDescription = videoDesc
+                    customActions = a11yActions
+                    onClick(toggleLabel) { controls = !controls; true }
+                },
+        )
+        // Extension overlays (network state and the like): over the video, under the controls.
+        extensions.forEach { it.Overlay(host) }
+        if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
-            Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
+            Text(it, color = PlayerColors.Content, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
         }
-        openPanel?.let { id -> panels[id] }?.let { panel ->
-            PanelSheet(panel, engine, onOpen = { openPanel = it }, onClose = { openPanel = null })
+
+        val status = rememberStatus(active = (controls && prefs.statusInTopBar) || (!controls && prefs.keepStatusVisible))
+        AnimatedVisibility(
+            controls,
+            enter = fadeIn(PlayerMotion.overlayIn()),
+            exit = fadeOut(PlayerMotion.overlayOut()),
+        ) {
+            Controls(
+                ControlsUi(
+                    title = title,
+                    playing = !state.paused,
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    decoder = state.activeDecoder.label,
+                    speed = speedLabel(speed),
+                    endTime = endTime(state, prefs.showRemaining),
+                    showRemaining = prefs.showRemaining,
+                    status = if (prefs.statusInTopBar) status else null,
+                    subtitleButton = subtitleEntry?.label?.invoke(),
+                    audioButton = audioEntry?.label?.invoke(),
+                    hasPrevious = false,
+                    hasNext = false,
+                    canLock = false,
+                ),
+                actions,
+            )
+        }
+        // Status kept in the corners while the controls are hidden (US-60.4).
+        if (!controls && prefs.keepStatusVisible) {
+            KeptStatus(time(state.positionMs), status, Modifier.align(Alignment.TopCenter))
+        }
+
+        note?.let { (text, _) ->
+            Text(
+                text,
+                color = PlayerColors.Content,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.displayCutout)
+                    .padding(top = 72.dp)
+                    .background(PlayerColors.Scrim, CircleShape)
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .testTag("note"),
+            )
+        }
+
+        if (scrubbing && preview != null) {
+            SeekPreview(preview, scrubTargetMs, Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp))
+        }
+
+        // Keep the last panel's content during the exit animation.
+        var lastPanel by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(openPanel) { if (openPanel != null) lastPanel = openPanel }
+        val shownPanel = openPanel ?: lastPanel
+        PanelFrame(visible = openPanel != null, panelId = shownPanel, onClose = { openPanel = null }) {
+            when (val id = shownPanel) {
+                OwnPanel.MENU -> MenuContent(items)
+                OwnPanel.DECODER -> DecoderContent(state.decoderMode, state.activeDecoder.label) {
+                    engine.setDecoder(it)
+                    onDecoderPicked(it)
+                    openPanel = null
+                }
+                OwnPanel.SETTINGS -> PlayerSettingsContent(prefs, { change -> settings?.update(change) })
+                null -> Unit
+                else -> panels[id]?.Content(host)
+            }
         }
     }
 }
 
-/** Hosts a feature's panel. A bottom sheet for now; player-ui owns the final look. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PanelSheet(panel: PlayerPanel, engine: PlayerEngine, onOpen: (String) -> Unit, onClose: () -> Unit) {
-    val host = remember(panel, engine) {
-        object : PanelHost {
-            override val engine = engine
-            override fun close() = onClose()
-            override fun open(panelId: String) = onOpen(panelId)
-        }
-    }
-    ModalBottomSheet(onDismissRequest = onClose, modifier = Modifier.testTag("panel-${panel.id}")) {
-        panel.Content(host)
-    }
-}
-
-@Composable
-private fun Controls(
-    state: PlaybackState,
-    engine: PlayerEngine,
-    entries: List<PlayerMenuEntry>,
-    onOpenPanel: (String) -> Unit,
-    preview: SeekPreviewState?,
-    modifier: Modifier,
-) {
-    var scrubbing by remember { mutableStateOf(false) }
-    var scrubTo by remember { mutableFloatStateOf(0f) }
-    Column(
+private fun KeptStatus(elapsed: String, status: app.player.feature.player.overlay.StatusUi?, modifier: Modifier) {
+    Row(
         modifier
             .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.6f))
-            .safeDrawingPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .windowInsetsPadding(WindowInsets.displayCutout)
+            .padding(12.dp)
+            .testTag("kept-status"),
     ) {
-        Text(infoLine(state), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("player-info"))
-        val duration = state.durationMs.coerceAtLeast(1)
-        if (scrubbing && preview != null) {
-            SeekPreview(preview, (scrubTo * duration).toLong(), Modifier.align(Alignment.CenterHorizontally))
-        }
-        Slider(
-            value = if (scrubbing) scrubTo else state.positionMs.toFloat() / duration,
-            onValueChange = {
-                scrubbing = true
-                scrubTo = it
-                // With a preview the video holds still until release; without, it follows the finger.
-                if (preview == null) engine.scrub((it * duration).toLong())
-            },
-            onValueChangeFinished = {
-                engine.endScrub((scrubTo * duration).toLong())
-                scrubbing = false
-            },
+        Text(
+            elapsed,
+            color = PlayerColors.Content,
+            style = MaterialTheme.typography.labelLarge.tabular(),
+            modifier = Modifier.background(PlayerColors.Scrim, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            FilledTonalButton(onClick = engine::togglePause, modifier = Modifier.testTag("play-pause")) {
-                Text(if (state.paused) "Play" else "Pause")
-            }
-            Text("${time(state.positionMs)} / ${time(state.durationMs)}", color = Color.White)
-            DecoderMode.entries.forEach { mode ->
-                FilledTonalButton(
-                    onClick = { engine.setDecoder(mode) },
-                    enabled = mode != state.decoderMode,
-                    modifier = Modifier.testTag("decoder-${mode.name}"),
-                ) { Text(mode.label) }
-            }
-            entries.forEach { entry ->
-                FilledTonalButton(onClick = { onOpenPanel(entry.opensPanel) }, modifier = Modifier.testTag("menu-${entry.id}")) {
-                    Text(entry.label())
-                }
-            }
+        Box(Modifier.weight(1f))
+        status?.let {
+            StatusText(it, Modifier.background(PlayerColors.Scrim, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp))
         }
     }
 }
 
-private val DecoderMode.label get() = when (this) {
-    DecoderMode.AUTO -> "Auto"
-    DecoderMode.HW -> "HW"
-    DecoderMode.HW_PLUS -> "HW+"
-    DecoderMode.SW -> "SW"
+/** Switches to the other orientation and holds it until the player closes (US-56.2 seed). */
+private fun toggleOrientation(activity: android.app.Activity) {
+    val landscape = activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    activity.requestedOrientation =
+        if (landscape) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 }
 
-/** The info panel line NF-5 asks for: which decoder is running, plus stream basics. */
-internal fun infoLine(s: PlaybackState): String = buildString {
-    append("Decoder ").append(s.activeDecoder.label)
-    s.video?.let { append(" · ").append(it.codec).append(' ').append(it.width).append('x').append(it.height) }
-    s.video?.takeIf { it.fps > 0 }?.let { append(" · %.2f fps".format(it.fps)) }
-    append(" · dropped ").append(s.droppedFrames)
-    s.firstFrameMs?.let { append(" · first frame ").append(it).append(" ms") }
-}
-
-internal fun time(ms: Long): String {
-    val s = ms / 1000
-    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+/** The file name a content uri stands for, read off the main thread. */
+private suspend fun displayName(context: android.content.Context, uri: String?): String? {
+    val parsed = uri?.let(Uri::parse)?.takeIf { it.scheme == "content" } ?: return null
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            context.contentResolver.query(parsed, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        }.getOrNull()
+    }?.let { name -> name.substringBeforeLast('.', name) }
 }

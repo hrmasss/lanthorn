@@ -10,8 +10,11 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Upsert
+import app.player.core.data.choice.PerFileChoice
+import app.player.core.data.choice.PerFileChoiceDao
 import app.player.core.data.library.LibraryDao
 import app.player.core.data.library.LibraryVideo
+import app.player.core.data.library.VideoExtra
 
 /** Where the viewer left a file. Keyed by the uri string the player was opened with. */
 @Entity(tableName = "playback_position")
@@ -29,17 +32,29 @@ interface PlaybackPositionDao {
 
     @Upsert
     suspend fun put(position: PlaybackPosition)
+
+    /** Every resume point, for backup (US-66.1) and library progress marks. */
+    @Query("SELECT * FROM playback_position")
+    suspend fun all(): List<PlaybackPosition>
+
+    @Upsert
+    suspend fun putAll(positions: List<PlaybackPosition>)
+
+    /** Clear history (US-73.1). */
+    @Query("DELETE FROM playback_position")
+    suspend fun clear()
 }
 
 @Database(
-    entities = [PlaybackPosition::class, LibraryVideo::class],
-    version = 2,
+    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class, PerFileChoice::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class PlayerDatabase : RoomDatabase() {
     abstract fun playbackPositions(): PlaybackPositionDao
     abstract fun library(): LibraryDao
+    abstract fun perFileChoices(): PerFileChoiceDao
 
     companion object {
         @Volatile private var instance: PlayerDatabase? = null

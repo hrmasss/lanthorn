@@ -10,14 +10,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import app.player.core.data.choice.DecoderChoices
 import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.playerExtensions
+import app.player.feature.player.settings.PlayerSettings
+import app.player.feature.player.tools.PlaybackTools
+import kotlinx.coroutines.launch
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
 class PlayerActivity : ComponentActivity() {
     private lateinit var engine: PlayerEngine
+    private val decoders by lazy { DecoderChoices(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -28,17 +34,31 @@ class PlayerActivity : ComponentActivity() {
         }
         val extensions = playerExtensions
         engine = PlayerSessions.acquire(this, this) { created ->
+            PlaybackTools(created).applyDefaults()
             extensions.forEach { it.onEngineCreated(applicationContext, created) }
         }
-        if (savedInstanceState == null) intent.data?.let { engine.open(it) }
+        if (savedInstanceState == null) intent.data?.let(::open)
         setContent {
-            LanthornPlayerTheme { PlayerScreen(engine, extensions = extensions) }
+            LanthornPlayerTheme {
+                PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this), onDecoderPicked = { mode ->
+                    val uri = engine.state.value.uri ?: return@PlayerScreen
+                    lifecycleScope.launch { decoders.rememberManualChoice(uri, mode) }
+                })
+            }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { engine.open(it) }
+        intent.data?.let(::open)
+    }
+
+    /**
+     * Opens with the decoder US-36.1 picks. The lookup overlaps the engine's wait for the surface,
+     * so it does not delay the first frame.
+     */
+    private fun open(uri: Uri) {
+        lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
 
     override fun onStop() {
