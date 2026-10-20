@@ -12,6 +12,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(project(":core:settings-api"))
+    implementation(project(":core:player-api"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.json)
     androidTestImplementation(platform(libs.compose.bom))

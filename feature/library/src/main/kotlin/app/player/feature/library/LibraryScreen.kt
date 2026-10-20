@@ -87,6 +87,7 @@ import app.player.core.data.library.childrenOf
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.BrandPolygon
+import app.player.feature.library.network.StreamDialog
 import app.player.feature.library.settings.SettingsGroupScreen
 import app.player.feature.library.settings.SettingsHome
 
@@ -209,13 +210,21 @@ private fun LibraryHome(
     val scroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    var streamOpen by rememberSaveable { mutableStateOf(false) }
+    if (streamOpen) StreamDialog(onPlay = { onPlay(it.toUri()) }, onDismiss = { streamOpen = false })
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
-                actions = { OverflowMenu(onFolderSettings.takeIf { state is LibraryUiState.Content }, onSettings) },
+                actions = {
+                    OverflowMenu(
+                        onFolderSettings.takeIf { state is LibraryUiState.Content },
+                        onSettings,
+                        onStream = { streamOpen = true },
+                    )
+                },
                 scrollBehavior = scroll,
             )
         },
@@ -437,13 +446,21 @@ private val Field.label
 
 /** Top bar overflow menu. */
 @Composable
-private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit) {
+private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit, onStream: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("library-overflow")) {
             Icon(LanthornIcons.More, contentDescription = stringResource(R.string.more_options))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.stream_title)) },
+                onClick = {
+                    open = false
+                    onStream()
+                },
+                modifier = Modifier.testTag("open-stream"),
+            )
             if (onFolderSettings != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.library_folder_settings)) },
