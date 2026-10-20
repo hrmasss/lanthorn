@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Dependency verification, used only to pin the libmpv AAR from our fork's GitHub release.
+  Every other artifact is trusted, so only hrmasss:libmpv is checked. Upgrading libmpv: change
+  the tag in libs.versions.toml and the sha256 below (the release's .sha256 asset).
+-->
+<verification-metadata xmlns="https://schema.gradle.org/dependency-verification"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="https://schema.gradle.org/dependency-verification https://schema.gradle.org/dependency-verification/dependency-verification-1.3.xsd">
+   <configuration>
+      <verify-metadata>false</verify-metadata>
+      <verify-signatures>false</verify-signatures>
+      <trusted-artifacts>
+         <trust group="^(?!hrmasss$).*$" regex="true"/>
+      </trusted-artifacts>
+   </configuration>
+   <components>
+      <component group="hrmasss" name="libmpv" version="v1.0.0-player.3">
+         <artifact name="libmpv-v1.0.0-player.3.aar">
+            <sha256 value="b0d5bd8181bd824cb86f013c65e53b594ee170b87fab47676452a2ce4c722381" origin="hrmasss/libmpv-android release v1.0.0-player.3"/>
+         </artifact>
+      </component>
+   </components>
+</verification-metadata>
