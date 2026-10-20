@@ -34,7 +34,7 @@ class SubtitleMatchTest {
         assertNull(SubtitleMatch.languageOf("Movie.mkv", "Movie.srt"))
     }
 
-    @Test fun `auto track: preferred language, else first external, else default embedded (US-39_2)`() {
+    @Test fun `auto track is the preferred language, else first external, else default embedded (US-39_2)`() {
         val tracks = listOf(t(1, "eng", default = true), t(2, "fre"), t(3, "ita", external = true), t(4, "spa", external = true))
         assertEquals(2L, SubtitleMatch.autoTrack(tracks, setOf("fr", "fra", "fre"))?.id)
         assertEquals(3L, SubtitleMatch.autoTrack(tracks, setOf("de", "deu", "ger"))?.id)
