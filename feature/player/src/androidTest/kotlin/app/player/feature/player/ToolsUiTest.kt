@@ -42,15 +42,20 @@ class ToolsUiTest {
         scenario.close()
     }
 
-    private fun menu(item: String) {
-        compose.onNodeWithTag("video").performClick()
+    private fun showControls() {
+        compose.waitForIdle()
+        if (!shown("more")) compose.onNodeWithTag("video").performClick()
         compose.waitUntil(2_000) { shown("more") }
+    }
+
+    private fun menu(item: String) {
+        showControls()
         compose.onNodeWithTag("more").performClick()
         compose.waitUntil(2_000) { shown("menu-$item") }
         compose.onNodeWithTag("menu-$item").performClick()
     }
 
-    @Test fun speedFromMenuShowsInTopBar_US23() = runBlocking {
+    @Test fun speedFromMenuShowsInTopBar_US23() = runBlocking<Unit> {
         open("clip.mp4")
         menu("speed")
         compose.waitUntil(2_000) { shown("speed-panel") }
@@ -58,12 +63,12 @@ class ToolsUiTest {
         waitUntil(1_000) { runBlocking { engine.get("speed", PropertyType.Real) } == 1.5 }
         shot("p113-speed-panel")
         compose.onNodeWithTag("panel-outside").performClick()
-        compose.onNodeWithTag("video").performClick()
+        showControls()
         compose.waitUntil(2_000) { shown("speed-badge") }
         shot("p113-speed-badge")
     }
 
-    @Test fun defaultSpeedForNewVideos_US23_2() = runBlocking {
+    @Test fun defaultSpeedForNewVideos_US23_2() = runBlocking<Unit> {
         PlayerSettings.get(context).update { it.copy(defaultSpeed = 1.25) }
         SystemClock.sleep(500)
         open("clip.mp4")
@@ -71,7 +76,7 @@ class ToolsUiTest {
         log("default speed 1.25: new video started at ${engine.get("speed", PropertyType.Real)}")
     }
 
-    @Test fun abMarksOnSeekBar_US25_2() = runBlocking {
+    @Test fun abMarksOnSeekBar_US25_2() = runBlocking<Unit> {
         open("clip.mp4")
         menu("ab-repeat")
         compose.waitUntil(2_000) { shown("ab-panel") }
@@ -81,7 +86,7 @@ class ToolsUiTest {
         SystemClock.sleep(300)
         shot("p113-ab-panel")
         compose.onNodeWithTag("panel-outside").performClick()
-        compose.onNodeWithTag("video").performClick()
+        showControls()
         compose.waitUntil(2_000) { shown("seek-marks") }
         shot("p113-ab-marks")
         val a = engine.get("ab-loop-a", PropertyType.Text)
@@ -90,7 +95,7 @@ class ToolsUiTest {
         assertTrue(a != "no" && b != "no")
     }
 
-    @Test fun chaptersInMenuAndOnBar_US27() = runBlocking {
+    @Test fun chaptersInMenuAndOnBar_US27() = runBlocking<Unit> {
         open("chapters.mkv")
         menu("chapters")
         compose.waitUntil(2_000) { shown("chapters-panel") }
@@ -98,7 +103,7 @@ class ToolsUiTest {
         compose.onNodeWithTag("chapter-2").performClick()
         waitUntil(2_000) { engine.state.value.positionMs in 12_000..13_500 }
         compose.onNodeWithTag("panel-outside").performClick()
-        compose.onNodeWithTag("video").performClick()
+        showControls()
         compose.waitUntil(2_000) { shown("seek-marks") }
         shot("p113-chapter-ticks")
     }
