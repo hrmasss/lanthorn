@@ -148,9 +148,9 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
         title = { Text(stringResource(R.string.smb_add)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                field(address, { address = it }, R.string.smb_address, "smb-address", KeyboardType.Uri)
-                field(share, { share = it }, R.string.smb_share, "smb-share")
-                field(user, { user = it }, R.string.smb_user, "smb-user")
+                Field(address, { address = it }, R.string.smb_address, "smb-address", KeyboardType.Uri)
+                Field(share, { share = it }, R.string.smb_share, "smb-share")
+                Field(user, { user = it }, R.string.smb_user, "smb-user")
                 OutlinedTextField(
                     value = password, onValueChange = { password = it },
                     label = { Text(stringResource(R.string.smb_password)) },
@@ -159,7 +159,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth().testTag("smb-password"),
                 )
-                field(name, { name = it }, R.string.smb_name, "smb-name")
+                Field(name, { name = it }, R.string.smb_name, "smb-name")
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("smb-error")) }
             }
         },
@@ -179,7 +179,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
                         } else {
                             SmbClient.forget(server.id)
                             store.remove(server.id)
-                            error = context.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason())
+                            error = context.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason().orEmpty())
                         }
                     }
                 },
@@ -191,7 +191,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
 }
 
 @Composable
-private fun field(value: String, onChange: (String) -> Unit, label: Int, tag: String, type: KeyboardType = KeyboardType.Text) {
+private fun Field(value: String, onChange: (String) -> Unit, label: Int, tag: String, type: KeyboardType = KeyboardType.Text) {
     OutlinedTextField(
         value = value, onValueChange = onChange,
         label = { Text(stringResource(label)) },
@@ -231,7 +231,7 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
             when {
                 l == null -> LoadingIndicator(Modifier.align(Alignment.Center))
                 l.isFailure -> Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.smb_connect_failed, l.exceptionOrNull()?.reason()), modifier = Modifier.testTag("smb-error"))
+                    Text(stringResource(R.string.smb_connect_failed, l.exceptionOrNull()?.reason().orEmpty()), modifier = Modifier.testTag("smb-error"))
                     TextButton(onClick = { server?.let { SmbClient.forget(it.id) }; attempt++ }) { Text(stringResource(R.string.stream_retry)) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize().testTag("smb-list")) {
@@ -240,7 +240,7 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
                     items(entries, key = { it.path }) { e ->
                         ListItem(
                             headlineContent = { Text(e.name) },
-                            supportingContent = if (e.isFolder) null else ({ Text(formatSize(e.size)) }),
+                            supportingContent = { if (!e.isFolder) Text(formatSize(e.size)) },
                             leadingContent = { Icon(if (e.isFolder) LibraryIcons.Folder else LibraryIcons.AllVideos, contentDescription = null) },
                             modifier = Modifier.clickable {
                                 val s = server ?: return@clickable
