@@ -5,6 +5,7 @@
     <!-- NF-8: no INTERNET permission until a user-started network feature needs it. -->
 
     <application
+        android:name=".PlayerApplication"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@android:drawable/ic_media_play"

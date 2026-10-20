@@ -9,9 +9,12 @@ import dev.jdtech.mpv.MPVLib
 import dev.jdtech.mpv.MPVLib.MpvEvent
 import dev.jdtech.mpv.MPVLib.MpvFormat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -84,24 +87,75 @@ class PlayerEngine(context: Context) {
         post {
             val path = resolve(uri)
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
-            command("loadfile", path, "replace", "-1", opts)
+            mpvCommand("loadfile", path, "replace", "-1", opts)
             setProperty("pause", "no")
         }
     }
 
     fun play() = post { setProperty("pause", "no") }
     fun pause() = post { setProperty("pause", "yes") }
-    fun togglePause() = post { command("cycle", "pause") }
+    fun togglePause() = post { mpvCommand("cycle", "pause") }
 
     /** Exact seek by default; pass [exact] false while scrubbing for keyframe seeks (NF-6). */
     fun seekTo(positionMs: Long, exact: Boolean = true) = post {
-        command("seek", "${positionMs / 1000.0}", if (exact) "absolute+exact" else "absolute+keyframes")
+        mpvCommand("seek", "${positionMs / 1000.0}", if (exact) "absolute+exact" else "absolute+keyframes")
     }
 
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
     fun setDecoder(mode: DecoderMode) {
         _state.update { it.copy(decoderMode = mode) }
         post { setProperty("hwdec", mode.hwdec) }
+    }
+
+    // Generic access. Feature modules wire their own mpv properties, options and filters through
+    // these four, so the engine does not grow a method per feature (03_architecture.md).
+
+    /** Runs an mpv command, for example `command("af", "add", "lavfi=[loudnorm]")`. */
+    fun command(vararg args: String) = post { mpvCommand(*args) }
+
+    /** Sets an mpv property. Values are passed as mpv parses them: "yes", "1.5", "auto". */
+    fun set(name: String, value: String) = post { setProperty(name, value) }
+    fun set(name: String, value: Boolean) = set(name, if (value) "yes" else "no")
+    fun set(name: String, value: Long) = set(name, value.toString())
+    fun set(name: String, value: Double) = set(name, value.toString())
+
+    /** Reads an mpv property once, on the engine thread. Null if unavailable or released. */
+    suspend fun <T : Any> get(name: String, type: PropertyType<T>): T? = suspendCancellableCoroutine { cont ->
+        if (released) {
+            cont.resume(null)
+            return@suspendCancellableCoroutine
+        }
+        post {
+            val lib = mpv
+            @Suppress("UNCHECKED_CAST")
+            val value: T? = when (type) {
+                PropertyType.Text -> lib?.getPropertyString(name)
+                PropertyType.Flag -> lib?.getPropertyBoolean(name)
+                PropertyType.Int64 -> lib?.getPropertyInt(name)?.toLong()
+                PropertyType.Real -> lib?.getPropertyDouble(name)
+            } as T?
+            cont.resume(value)
+        }
+    }
+
+    /**
+     * Follows an mpv property. The flow holds the latest value, null while unavailable.
+     * Observing the same name and type twice shares one mpv observer.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> observe(name: String, type: PropertyType<T>): StateFlow<T?> {
+        val key = "$name#${type.format}"
+        observed[key]?.let { return it.asStateFlow() as StateFlow<T?> }
+        val flow = MutableStateFlow<Any?>(null)
+        val existing = observed.putIfAbsent(key, flow)
+        if (existing == null) post { mpv?.observeProperty(name, type.format) }
+        return (existing ?: flow).asStateFlow() as StateFlow<T?>
+    }
+
+    private val observed = ConcurrentHashMap<String, MutableStateFlow<Any?>>()
+
+    private fun publish(name: String, format: Int, value: Any?) {
+        observed["$name#$format"]?.value = value
     }
 
     fun attachSurface(surface: Surface) = runAndWait {
@@ -177,7 +231,7 @@ class PlayerEngine(context: Context) {
         if (!done.await(SURFACE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) Log.w(TAG, "surface change timed out")
     }
 
-    private fun command(vararg args: String) = mpv?.command(arrayOf(*args))
+    private fun mpvCommand(vararg args: String) = mpv?.command(arrayOf(*args))
     private fun setProperty(name: String, value: String) = mpv?.setPropertyString(name, value)
 
     private fun refreshVideo() {
@@ -195,15 +249,20 @@ class PlayerEngine(context: Context) {
     }
 
     private val observer = object : MPVLib.EventObserver {
-        override fun eventProperty(property: String) {}
+        override fun eventProperty(property: String) {
+            // The property became unavailable: clear every typed observer of it.
+            observed.forEach { (key, flow) -> if (key.substringBefore('#') == property) flow.value = null }
+        }
 
         override fun eventProperty(property: String, value: Long) {
+            publish(property, MpvFormat.MPV_FORMAT_INT64, value)
             when (property) {
                 "frame-drop-count" -> _state.update { it.copy(droppedFrames = value) }
             }
         }
 
         override fun eventProperty(property: String, value: Double) {
+            publish(property, MpvFormat.MPV_FORMAT_DOUBLE, value)
             when (property) {
                 "time-pos" -> _state.update { it.copy(positionMs = (value * 1000).toLong()) }
                 "duration" -> _state.update { it.copy(durationMs = (value * 1000).toLong()) }
@@ -211,6 +270,7 @@ class PlayerEngine(context: Context) {
         }
 
         override fun eventProperty(property: String, value: Boolean) {
+            publish(property, MpvFormat.MPV_FORMAT_FLAG, value)
             when (property) {
                 "pause" -> _state.update { it.copy(paused = value) }
                 "paused-for-cache", "seeking" -> _state.update { it.copy(buffering = value) }
@@ -219,6 +279,7 @@ class PlayerEngine(context: Context) {
         }
 
         override fun eventProperty(property: String, value: String) {
+            publish(property, MpvFormat.MPV_FORMAT_STRING, value)
             when (property) {
                 "hwdec-current" -> _state.update { it.copy(activeDecoder = ActiveDecoder.fromHwdecCurrent(value)) }
             }

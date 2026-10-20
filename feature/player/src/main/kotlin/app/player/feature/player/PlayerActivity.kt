@@ -12,6 +12,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.player.core.designsystem.PlayerTheme
 import app.player.core.engine.PlayerEngine
+import app.player.core.engine.PlayerSessions
+import app.player.core.playerapi.playerExtensions
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
 class PlayerActivity : ComponentActivity() {
@@ -24,10 +26,13 @@ class PlayerActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.systemBars())
         }
-        engine = PlayerEngine(this)
-        intent.data?.let { engine.open(it) }
+        val extensions = playerExtensions
+        engine = PlayerSessions.acquire(this, this) { created ->
+            extensions.forEach { it.onEngineCreated(applicationContext, created) }
+        }
+        if (savedInstanceState == null) intent.data?.let { engine.open(it) }
         setContent {
-            PlayerTheme(darkTheme = true) { PlayerScreen(engine) }
+            PlayerTheme(darkTheme = true) { PlayerScreen(engine, extensions = extensions) }
         }
     }
 
@@ -38,11 +43,12 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        // Background play hands the engine to the playback service instead (P1.7, P1.15).
         engine.pause()
     }
 
     override fun onDestroy() {
-        engine.release()
+        PlayerSessions.release(this)
         super.onDestroy()
     }
 
