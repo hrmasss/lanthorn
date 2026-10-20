@@ -34,7 +34,8 @@ data class SubtitleStyle(
     /** The mpv properties for this style, in the order they are set. */
     fun toMpv(): List<Pair<String, String>> = buildList {
         add("sub-font" to font)
-        add("sub-font-size" to size.toString())
+        // Not plain `size`: inside buildList that is the list's own size.
+        add("sub-font-size" to this@SubtitleStyle.size.toString())
         add("sub-scale" to scale.coerceIn(MIN_SCALE, MAX_SCALE).toString())
         add("sub-color" to hex(color))
         add("sub-bold" to yesNo(bold))

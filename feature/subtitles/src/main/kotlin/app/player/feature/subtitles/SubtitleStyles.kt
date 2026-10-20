@@ -93,11 +93,25 @@ internal class SubtitleStyles(context: Context) {
         GENERIC + (FontNames.families(listOf(File("/system/fonts"), File("/product/fonts"), userFontDir)) - GENERIC.toSet())
     }
 
+    private var appliedTo: PlayerEngine? = null
+    private var applied: Map<String, String> = emptyMap()
+
+    /** Sends only what changed since the last call for this engine: one slider move, one property. */
     private fun apply(engine: PlayerEngine, style: SubtitleStyle) {
-        style.toMpv().forEach { (name, value) -> engine.set(name, value) }
+        if (appliedTo !== engine) {
+            appliedTo = engine
+            applied = emptyMap()
+        }
+        val next = style.toMpv()
+        changed(applied, next).forEach { (name, value) -> engine.set(name, value) }
+        applied = next.toMap()
     }
 
     companion object {
+        /** The properties of [next] whose value differs from [applied], in [next]'s order. */
+        internal fun changed(applied: Map<String, String>, next: List<Pair<String, String>>) =
+            next.filter { (name, value) -> applied[name] != value }
+
         private const val SAVE_DELAY_MS = 500L
         private val FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")
         private val GENERIC = listOf(SubtitleStyle.DEFAULT_FONT, "serif", "monospace")

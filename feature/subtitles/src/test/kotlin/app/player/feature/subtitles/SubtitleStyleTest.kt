@@ -36,6 +36,18 @@ class SubtitleStyleTest {
         assertEquals("360", SubtitleStyle(bottomMarginPercent = 90f).props()["sub-margin-y"])
     }
 
+    @Test fun `font size is the style's size (US-42_1)`() {
+        assertEquals("46", SubtitleStyle().props()["sub-font-size"])
+        assertEquals("80", SubtitleStyle(size = 80).props()["sub-font-size"])
+    }
+
+    @Test fun `an edit sends only the properties it changes (US-42_3)`() {
+        val before = SubtitleStyle().toMpv().toMap()
+        val after = SubtitleStyle(color = 0xFFFFEB3B).toMpv()
+        assertEquals(listOf("sub-color" to "#FFFFEB3B"), SubtitleStyles.changed(before, after))
+        assertEquals(after.size, SubtitleStyles.changed(emptyMap(), after).size)
+    }
+
     @Test fun `scale clamps to 50 to 300 percent`() {
         assertEquals("0.5", SubtitleStyle(scale = 0.1f).props()["sub-scale"])
         assertEquals("3.0", SubtitleStyle(scale = 9f).props()["sub-scale"])

@@ -63,18 +63,25 @@ class StyleOnDeviceTest {
         assertEquals(0.0, engine.get("sub-border-size", PropertyType.Real)!!, 0.0)
         assertEquals(2.0, engine.get("sub-shadow-offset", PropertyType.Real)!!, 0.0)
         shot("us42-defaults")
+        assertEquals(46.0, engine.get("sub-font-size", PropertyType.Real)!!, 0.0)
+        // Event-timed: mpv pushes the change, no polling round trip in the number.
+        // The outline is the last property this edit sends (mpv 0.41 names it sub-outline-size).
+        val outline = engine.observe("sub-outline-size", PropertyType.Real)
+        delay(300)
         val t0 = SystemClock.elapsedRealtime()
         OnDevice.main { styles.update { it.copy(color = 0xFFFFEB3B, outline = true, outlineSize = 4f, font = "serif", size = 60) } }
-        engine.await("sub-color", PropertyType.Text) { it == "#FFFFEB3B" }
-        engine.await("sub-font", PropertyType.Text) { it == "serif" }
+        while (outline.value != 4.0) delay(1)
         val took = SystemClock.elapsedRealtime() - t0
+        assertEquals("#FFFFEB3B", engine.get("sub-color", PropertyType.Text))
+        assertEquals("serif", engine.get("sub-font", PropertyType.Text))
+        assertEquals(60.0, engine.get("sub-font-size", PropertyType.Real)!!, 0.0)
         delay(300)
         shot("us42-yellow-serif-outline")
         OnDevice.main { styles.update { it.copy(outline = false, box = true, boxOpacity = 0.6f, font = "monospace", color = 0xFFFFFFFF) } }
         engine.await("sub-border-style", PropertyType.Text) { it == "background-box" }
         delay(300)
         shot("us42-box-monospace")
-        evidence("US-42.2 defaults: white #FFFFFFFF, bold, border 0, shadow 2")
+        evidence("US-42.2 defaults: white #FFFFFFFF, size 46, bold, border 0, shadow 2")
         evidence("US-42.3 colour, outline, font, size change applied to mpv in $took ms (limit 100); screenshots before/after")
         assertTrue("took $took ms", took < 100)
     }
