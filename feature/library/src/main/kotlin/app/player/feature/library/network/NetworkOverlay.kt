@@ -1,5 +1,6 @@
 package app.player.feature.library.network
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,8 @@ internal fun NetworkOverlay(engine: PlayerEngine) {
             }, Modifier.align(Alignment.Center).padding(top = 160.dp))
             !state.loaded || state.buffering -> {
                 val p = percent
+                // One line per shown value, so a test can read what the viewer saw from logcat.
+                LaunchedEffect(state.loaded, p) { Log.i("LibraryNet", "progress loaded=${state.loaded} buffering=$p%") }
                 Text(
                     if (p == null || !state.loaded) stringResource(R.string.stream_connecting)
                     else stringResource(R.string.stream_buffering, p.coerceIn(0, 100)),
