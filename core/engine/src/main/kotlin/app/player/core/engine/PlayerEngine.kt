@@ -108,7 +108,9 @@ class PlayerEngine(context: Context) {
     fun open(uri: Uri, startMs: Long = 0, decoder: DecoderMode? = null) {
         openedAt = SystemClock.elapsedRealtime()
         val mode = decoder ?: _state.value.decoderMode
-        _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode)
+        // open() starts playback (pause=no below). Say so now: when mpv was already unpaused it
+        // sends no change event, and the default `paused = true` would stick for the whole file.
+        _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode, paused = false)
         post {
             setProperty("hwdec", mode.hwdec)
             val path = resolve(uri)
