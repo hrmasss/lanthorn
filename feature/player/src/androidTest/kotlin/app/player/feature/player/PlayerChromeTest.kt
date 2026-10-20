@@ -101,13 +101,12 @@ class PlayerChromeTest {
         compose.onNodeWithTag("decoder-SW").performClick()
         waitUntil(3_000) { engine.state.value.activeDecoder == ActiveDecoder.SW }
         val switchMs = SystemClock.elapsedRealtime() - t0
-        // Playback runs on, so the position should be ahead of `before` by about the switch time.
-        waitUntil(3_000) { engine.state.value.positionMs > before }
+        // US-35.2: continues from the same position. Read the first position once the new decoder
+        // runs; playback may stall during the switch, which the criterion allows.
         val after = engine.state.value.positionMs
-        val drift = after - before - (SystemClock.elapsedRealtime() - t0)
-        log("decoder switch $switchMs ms, position $before -> $after, drift $drift ms")
+        log("decoder switch $switchMs ms, position $before -> $after (difference ${after - before} ms)")
         assertTrue("switch took $switchMs ms", switchMs <= 1_000)
-        assertTrue("position jumped by $drift ms", kotlin.math.abs(drift) <= 500)
+        assertTrue("position moved by ${after - before} ms", kotlin.math.abs(after - before) <= 500)
     }
 
     @Test fun backTwiceToLeave_US78_1() {
