@@ -48,8 +48,8 @@ printf '1\n00:00:00,000 --> 00:00:10,000\nP\xf8\xedli\x9a \x9elu\x9dou\xe8k\xfd 
 # External audio (US-47.3): 5 minutes, with a 1 kHz click every second on both video and audio
 # tracks, so A/V offset is visible.
 ffmpeg -loglevel error -y \
-  -f lavfi -i "testsrc2=size=192x108:rate=10:duration=300" \
+  -f lavfi -i "testsrc2=size=160x90:rate=25:duration=300" \
   -f lavfi -i "sine=frequency=1000:duration=300:sample_rate=48000:beep_factor=4" \
-  -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 45 -g 20 -pix_fmt yuv420p -c:a aac -b:a 32k "$AUD/long.mp4"
+  -map 0:v -map 1:a -c:v libx264 -preset veryfast -crf 45 -g 50 -pix_fmt yuv420p -c:a aac -b:a 32k "$AUD/long.mp4"
 ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=600:duration=300:sample_rate=48000" -c:a aac -b:a 32k "$AUD/dub.m4a"
 du -h "$SUB"/* "$AUD"/*

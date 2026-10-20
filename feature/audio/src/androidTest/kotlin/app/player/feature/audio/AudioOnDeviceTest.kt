@@ -138,9 +138,31 @@ class AudioOnDeviceTest {
         engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
         controller.addFile(OnDevice.asset("dub.m4a").path, "dub.m4a")
         engine.await("current-tracks/audio/external", PropertyType.Flag) { it == true }
+        val s = measureSync()
+        evidence("US-47.3 external audio: ${s.line()}")
+        assertTrue(s.line(), s.max < 40.0)
+    }
+
+    /** Baseline for US-47.3: the file's own audio track, same file, same seeks, same device. */
+    @Test fun embeddedAudioSyncBaseline() = runBlocking {
+        engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))
+        engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
+        engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }
+        evidence("US-47.3 baseline, embedded audio: ${measureSync().line()}")
+    }
+
+    private class Sync(val ms: List<Double>) {
+        val max get() = ms.maxOrNull() ?: 0.0
+        fun pct(p: Double) = ms.sorted().let { if (it.isEmpty()) 0.0 else it[((it.size - 1) * p).toInt()] }
+        fun line() = "|A-V| over 300 s, 3 seeks, ${ms.size} samples: p50 ${f(pct(0.5))}, p95 ${f(pct(0.95))}, " +
+            "p99 ${f(pct(0.99))}, max ${f(max)} ms, ${ms.count { it > 40 }} over 40 ms"
+        private fun f(d: Double) = "%.1f".format(d)
+    }
+
+    /** Samples mpv's A/V difference twice a second for 5 min, seeking three times, 1 s settle each. */
+    private suspend fun measureSync(): Sync {
         val seeks = mapOf(60 to 150_000L, 150 to 30_000L, 200 to 240_000L)
-        var worst = 0.0
-        var samples = 0
+        val ms = mutableListOf<Double>()
         val t0 = SystemClock.elapsedRealtime()
         var settleUntil = t0 + 1000
         while (SystemClock.elapsedRealtime() - t0 < 300_000) {
@@ -151,15 +173,9 @@ class AudioOnDeviceTest {
                 delay(1000)
             }
             if (engine.get("eof-reached", PropertyType.Flag) == true) engine.seekTo(0)
-            if (SystemClock.elapsedRealtime() > settleUntil) {
-                engine.get("avsync", PropertyType.Real)?.let {
-                    worst = maxOf(worst, abs(it))
-                    samples++
-                }
-            }
+            if (SystemClock.elapsedRealtime() > settleUntil) engine.get("avsync", PropertyType.Real)?.let { ms += abs(it) * 1000 }
             delay(500)
         }
-        evidence("US-47.3 external audio over 300 s with 3 seeks: worst |A-V| ${"%.1f".format(worst * 1000)} ms over $samples samples (limit 40, 1 s settle after each seek)")
-        assertTrue("worst ${worst * 1000} ms", worst < 0.040)
+        return Sync(ms)
     }
 }
