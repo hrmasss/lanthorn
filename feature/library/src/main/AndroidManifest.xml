@@ -7,4 +7,6 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <!-- Declaring it lets Android 14+ offer "select videos" (partial access) in the system prompt. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <!-- Network streams the viewer opens (US-61, NF-8). Nothing in the app connects on its own. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

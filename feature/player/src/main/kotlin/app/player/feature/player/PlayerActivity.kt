@@ -37,7 +37,7 @@ class PlayerActivity : ComponentActivity() {
             PlaybackTools(created).applyDefaults()
             extensions.forEach { it.onEngineCreated(applicationContext, created) }
         }
-        if (savedInstanceState == null) intent.data?.let(::open)
+        if (savedInstanceState == null) open(intent)
         setContent {
             LanthornPlayerTheme {
                 PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this), onDecoderPicked = { mode ->
@@ -50,14 +50,17 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let(::open)
+        open(intent)
     }
 
     /**
-     * Opens with the decoder US-36.1 picks. The lookup overlaps the engine's wait for the surface,
-     * so it does not delay the first frame.
+     * Resume and the queue decide where and what plays (feature/playback), with the decoder US-36.1
+     * picks. Without playback, the uri as is with that decoder. The lookup overlaps the engine's
+     * wait for the surface, so it does not delay the first frame.
      */
-    private fun open(uri: Uri) {
+    private fun open(intent: Intent) {
+        if (playerExtensions.firstNotNullOfOrNull { it.playback }?.open(engine, intent, ::finish) == true) return
+        val uri = intent.data ?: return
         lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
 
