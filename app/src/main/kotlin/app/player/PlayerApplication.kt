@@ -14,6 +14,7 @@ import app.player.feature.library.settings.GeneralSettings
 import app.player.feature.library.settings.LibrarySettings
 import app.player.feature.library.settings.ResumePointsBackup
 import app.player.feature.audio.AudioExtension
+import app.player.feature.audio.AudioSettings
 import app.player.feature.playback.Playback
 import app.player.feature.playback.PlaybackExtension
 import app.player.feature.playback.PlaybackSettingsGroup
@@ -38,6 +39,7 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
     /** Every feature's settings group (core/settings-api). Owners add theirs; order comes from each group. */
     override val settingsGroups: List<SettingsGroup> = listOf(
         SubtitleSettings,
+        AudioSettings,
         LibrarySettings,
         PlaybackSettingsGroup,
         GeneralSettings,
