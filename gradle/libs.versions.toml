@@ -20,6 +20,7 @@ androidx-test-runner = "1.7.0"
 androidx-test-core = "1.7.0"
 junit = "4.13.2"
 json = "20250517"
+smbj = "0.14.0"
 libmpv = "1.0.0"
 robolectric = "4.17"
 
@@ -47,6 +48,8 @@ libmpv = { module = "dev.jdtech.mpv:libmpv", version.ref = "libmpv" }
 junit = { module = "junit:junit", version.ref = "junit" }
 # Real org.json for JVM unit tests; Android's copy is a stub there.
 json = { module = "org.json:json", version.ref = "json" }
+# SMB 2 and 3 client for network shares (US-62). Apache-2.0.
+smbj = { module = "com.hierynomus:smbj", version.ref = "smbj" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-junit" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
