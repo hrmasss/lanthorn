@@ -78,6 +78,17 @@ import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
 import app.player.feature.player.tools.Chapter
+import app.player.feature.player.gesture.GestureController
+import app.player.feature.player.gesture.GestureEffects
+import app.player.feature.player.gesture.GestureReadout
+import app.player.feature.player.gesture.Readout
+import app.player.feature.player.gesture.playerGestures
+import android.media.AudioManager
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import app.player.feature.player.tools.FitMode
 import app.player.feature.player.tools.PlaybackTools
 import app.player.feature.player.tools.SleepTimer
@@ -158,6 +169,72 @@ fun PlayerScreen(
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
     val video = remember(engine) { VideoTools(engine, context) }
     var fitMode by remember { mutableStateOf(FitMode.Fit) }
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
+    val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
+    val currentControls by rememberUpdatedState(controls)
+    val windowBrightness = brightness
+    val gestures = remember(engine) {
+        GestureController(object : GestureEffects {
+            override val positionMs get() = engine.state.value.positionMs
+            override val durationMs get() = engine.state.value.durationMs
+            override val paused get() = engine.state.value.paused
+            override val speed get() = engine.observe("speed", PropertyType.Real).value ?: 1.0
+            override val controlsShown get() = currentControls
+            override fun seek(ms: Long, exact: Boolean) = engine.seekTo(ms, exact)
+            override fun togglePause() = engine.togglePause()
+            override fun pause() = engine.pause()
+            override fun setSpeed(speed: Double) = tools.setSpeed(speed)
+            override fun setControls(shown: Boolean) { controls = shown }
+            override var brightness: Float
+                get() = windowBrightness?.level ?: 0.5f
+                set(v) { windowBrightness?.set(v) }
+            override var volume: Float
+                get() = audio?.let { it.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / it.getStreamMaxVolume(AudioManager.STREAM_MUSIC) } ?: 0f
+                set(v) {
+                    audio?.let { it.setStreamVolume(AudioManager.STREAM_MUSIC, (v * it.getStreamMaxVolume(AudioManager.STREAM_MUSIC)).roundToInt(), 0) }
+                }
+            override val volumeSteps get() = audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+            override fun setZoom(scale: Double) = video.setZoom(scale)
+            override fun setPan(x: Double, y: Double) = video.setPan(x, y)
+            override fun toggleFitCrop() {
+                fitMode = if (fitMode == FitMode.Crop) FitMode.Fit else FitMode.Crop
+                video.setFit(fitMode)
+            }
+        })
+    }
+    gestures.prefs = prefs.gestures
+    // Picture geometry for pan limits and the 100% snap (US-55.2, US-55.3).
+    LaunchedEffect(state.video, viewSize) {
+        val v = state.video ?: return@LaunchedEffect
+        if (viewSize.width == 0 || v.width == 0 || v.height == 0) return@LaunchedEffect
+        val aspect = v.width.toDouble() / v.height
+        val fitW = minOf(1.0, viewSize.height * aspect / viewSize.width)
+        val fitH = minOf(1.0, viewSize.width / aspect / viewSize.height)
+        gestures.fitWidth = fitW
+        gestures.fitHeight = fitH
+        gestures.nativeScale = v.width / (fitW * viewSize.width)
+    }
+    // Readouts from taps go after the skip window (US-19.3).
+    LaunchedEffect(gestures.readout) {
+        val r = gestures.readout
+        if (r is Readout.Skip || r is Readout.PlayPause || (r is Readout.Speed && !r.top)) {
+            delay(GestureController.SKIP_RUN_MS + 300)
+            if (gestures.readout === r) gestures.clearReadout()
+        }
+    }
+    // US-18.3: the window starts at the system brightness unless the viewer asked to remember it;
+    // leaving the player drops the window override, so the system level is back.
+    LaunchedEffect(prefs.gestures.rememberBrightness) {
+        val last = prefs.gestures.lastBrightness
+        if (prefs.gestures.rememberBrightness && last >= 0f) brightness?.set(last)
+    }
+    DisposableEffect(brightness) {
+        onDispose {
+            val b = brightness ?: return@onDispose
+            val level = b.level
+            settings?.update { p -> if (p.gestures.rememberBrightness) p.copy(gestures = p.gestures.copy(lastBrightness = level)) else p }
+        }
+    }
     val fitNames = FitMode.entries.associateWith { stringResource(it.label) }
 
     // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
@@ -316,7 +393,9 @@ fun PlayerScreen(
             Modifier
                 .fillMaxSize()
                 .testTag("video")
-                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked) { controls = !controls }
+                .onSizeChanged { viewSize = it }
+                // While locked, playback's Overlay owns every touch (US-28): no gestures here.
+                .then(if (locked) Modifier else Modifier.playerGestures(gestures))
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions
@@ -325,6 +404,16 @@ fun PlayerScreen(
         )
         // Extension overlays (network state and the like): over the video, under the controls.
         extensions.forEach { it.Overlay(host) }
+        // Gesture readouts linger 300 ms after the finger lifts, then fade (docs/design.md).
+        var lastReadout by remember { mutableStateOf<Readout?>(null) }
+        gestures.readout?.let { lastReadout = it }
+        AnimatedVisibility(
+            gestures.readout != null,
+            enter = fadeIn(snap()),
+            exit = fadeOut(PlayerMotion.readoutOut()),
+        ) {
+            GestureReadout(lastReadout, gestures::resetSpeed)
+        }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
             Text(

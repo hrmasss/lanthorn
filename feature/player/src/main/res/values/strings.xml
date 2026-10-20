@@ -102,4 +102,30 @@
     <string name="video_deint_off">Off</string>
     <string name="video_deint_needs_decoder">Deinterlace runs with %1$s or SW. Now playing with %2$s.</string>
     <string name="video_deint_switch">Switch to %1$s</string>
+
+    <!-- Gestures (US-21) -->
+    <string name="settings_gestures">Gestures</string>
+    <string name="g_seek">Swipe sideways to seek</string>
+    <string name="g_brightness">Swipe on the left for brightness</string>
+    <string name="g_volume">Swipe on the right for volume</string>
+    <string name="g_dt_skip">Double tap the sides to skip</string>
+    <string name="g_dt_pause">Double tap the middle to pause</string>
+    <string name="g_dt_zoom">Double tap to switch fit and crop</string>
+    <string name="g_long_press">Hold for fast play</string>
+    <string name="g_two_finger_speed">Two fingers up or down for speed</string>
+    <string name="g_pinch">Pinch to zoom</string>
+    <string name="g_pan">Two fingers to move a zoomed picture</string>
+    <string name="g_sub_swipe">Swipe on subtitles for the next line</string>
+    <string name="g_sub_drag">Drag subtitles to move them</string>
+    <string name="g_sub_pinch">Pinch subtitles to resize them</string>
+    <string name="g_quick_zoom">Snap zoom to fit and 100%</string>
+    <string name="g_remember_brightness">Remember brightness</string>
+    <string name="g_seek_full_width">Full-width swipe seeks</string>
+    <string name="g_skip_step">Skip step</string>
+    <string name="g_fast_speed">Fast play speed</string>
+    <string name="g_touch_action">Single tap</string>
+    <string name="g_touch_toggle">Show or hide controls</string>
+    <string name="g_touch_pause">Play or pause</string>
+    <string name="g_touch_show_then_pause">Show controls, then play or pause</string>
+    <string name="g_touch_show_and_pause">Show controls and pause</string>
 </resources>
