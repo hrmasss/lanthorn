@@ -45,6 +45,13 @@ import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import app.player.core.data.choice.PerFileChoices
+import app.player.core.engine.PlayerSessions
 import java.nio.charset.Charset
 
 /** Subtitle tracks, external files, sync and ASS options inside the player (P1.3). */
@@ -86,6 +93,33 @@ object SubtitlesExtension : PlayerExtension {
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
+        // A new file starts at its remembered delay (US-41.4), else the default (US-41.3).
+        val controller = SubtitleController(engine.asMpv())
+        val store = SubtitleStyleStore(context)
+        val perFile = choices(context)
+        val job = scope.launch {
+            engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+                val remembered = perFile.get(uri, DELAY_KEY)?.toLongOrNull()
+                controller.setDelayMs(remembered ?: store.defaultDelayMs.first())
+            }
+        }
+        scope.launch {
+            PlayerSessions.current.first { it !== engine }
+            job.cancel()
+        }
+    }
+
+    private val scope = MainScope()
+    private var choices: PerFileChoices? = null
+    private const val DELAY_KEY = "sub.delay"
+
+    private fun choices(context: Context) = choices ?: PerFileChoices(context).also { choices = it }
+
+    /** US-41.4: keep the delay the viewer set for the open file. A no-op while "remember choices" is off. */
+    internal fun rememberDelay(context: Context, engine: PlayerEngine, ms: Long) {
+        val uri = engine.state.value.uri ?: return
+        val store = choices(context)
+        scope.launch { store.put(uri, DELAY_KEY, SubtitleController.snapDelay(ms).toString()) }
     }
 }
 
@@ -200,17 +234,22 @@ private object SyncPanel : PlayerPanel {
         val controller = remember(host.engine) { SubtitleController(host.engine.asMpv()) }
         val delay by controller.delayMs.collectAsState(null)
         val speed by controller.speed.collectAsState(null)
+        val context = LocalContext.current
+        fun setDelay(ms: Long) {
+            controller.setDelayMs(ms)
+            SubtitlesExtension.rememberDelay(context, host.engine, ms)
+        }
         val d = delay ?: 0L
         Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.subs_sync_title), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.subs_delay_value, d / 1000.0), modifier = Modifier.testTag("sub-delay-value"))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(-1000L, -SubtitleController.DELAY_STEP_MS, SubtitleController.DELAY_STEP_MS, 1000L).forEach { step ->
-                    OutlinedButton(onClick = { controller.setDelayMs(d + step) }, modifier = Modifier.testTag("sub-delay-$step")) {
+                    OutlinedButton(onClick = { setDelay(d + step) }, modifier = Modifier.testTag("sub-delay-$step")) {
                         Text("%+.2f".format(step / 1000.0))
                     }
                 }
-                TextButton(onClick = { controller.setDelayMs(0) }) { Text(stringResource(R.string.subs_reset)) }
+                TextButton(onClick = { setDelay(0) }) { Text(stringResource(R.string.subs_reset)) }
             }
             val s = speed ?: 1.0
             Text(stringResource(R.string.subs_speed) + "  " + stringResource(R.string.subs_speed_value, s))

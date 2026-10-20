@@ -43,4 +43,7 @@
     <string name="subs_size">Size</string>
     <string name="subs_margin">Bottom margin</string>
     <string name="subs_preview_text">Subtitles look like this</string>
+    <string name="subs_setting_timing">Timing</string>
+    <string name="subs_setting_default_delay">Default subtitle delay</string>
+    <string name="subs_setting_default_delay_summary">Applied to every new video</string>
 </resources>

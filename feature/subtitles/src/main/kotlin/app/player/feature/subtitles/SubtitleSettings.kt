@@ -5,6 +5,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +47,7 @@ import app.player.core.designsystem.component.SettingsHeader
 import app.player.core.settingsapi.SettingsEntry
 import app.player.core.settingsapi.SettingsGroup
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -52,12 +58,14 @@ object SubtitleSettings : SettingsGroup {
     override val order = 50
     override val title = R.string.subs_settings_title
 
+    private const val DEFAULT_DELAY = "default_delay"
     private val KEYS = listOf("font", "size", "color", "bold", "outline", "shadow", "box", "align", "margin", "fit")
     private val TITLES = listOf(
         R.string.subs_font, R.string.subs_size, R.string.subs_color, R.string.subs_bold, R.string.subs_outline,
         R.string.subs_shadow, R.string.subs_box, R.string.subs_alignment, R.string.subs_margin, R.string.subs_fit_video,
     )
-    override val entries = KEYS.zip(TITLES) { k, t -> SettingsEntry(k, t) }
+    override val entries = KEYS.zip(TITLES) { k, t -> SettingsEntry(k, t) } +
+        SettingsEntry(DEFAULT_DELAY, R.string.subs_setting_default_delay, R.string.subs_setting_default_delay_summary)
 
     @Composable
     override fun Content(highlight: String?) {
@@ -81,24 +89,60 @@ object SubtitleSettings : SettingsGroup {
         val state = rememberLazyListState()
         LaunchedEffect(highlight) {
             val i = KEYS.indexOf(highlight)
-            // +2: the header and the preview sit above the rows.
-            if (i >= 0) state.scrollToItem(i + 2)
+            // Timing sits first; the style header and preview sit above the style rows.
+            if (highlight == DEFAULT_DELAY) state.scrollToItem(1) else if (i >= 0) state.scrollToItem(i + 4)
         }
+        val store = remember { SubtitleStyleStore(context) }
+        val defaultDelay by store.defaultDelayMs.collectAsState(0L)
         LazyColumn(Modifier.fillMaxSize().testTag("settings-page"), state) {
+            item("timing") { SettingsHeader(stringResource(R.string.subs_setting_timing)) }
+            item(DEFAULT_DELAY) {
+                DelayRow(defaultDelay, highlight == DEFAULT_DELAY) { ms -> scope.launch { store.setDefaultDelay(ms) } }
+            }
             item("header") { SettingsHeader(stringResource(R.string.subs_style_title)) }
             item("preview") { SubtitlePreview(style, Modifier.padding(horizontal = 16.dp)) }
             styleEditor(style, styles::update, families, onPickFontFolder = { folder.launch(null) }, highlight = highlight)
         }
     }
 
-    override suspend fun reset(context: Context) = withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).reset() }
+    override suspend fun reset(context: Context) {
+        SubtitleStyleStore(context).resetDelay()
+        withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).reset() }
+    }
 
-    override suspend fun export(context: Context): JSONObject =
-        JSONObject().put("style", JSONObject(encodeStyle(SubtitlesExtension.styles(context).current())))
+    override suspend fun export(context: Context): JSONObject = JSONObject()
+        .put("style", JSONObject(encodeStyle(SubtitlesExtension.styles(context).current())))
+        .put("defaultDelayMs", SubtitleStyleStore(context).defaultDelayMs.first())
 
     override suspend fun import(context: Context, data: JSONObject) {
+        if (data.has("defaultDelayMs")) SubtitleStyleStore(context).setDefaultDelay(data.optLong("defaultDelayMs"))
         val style = data.optJSONObject("style")?.let { decodeStyle(it.toString()) } ?: return
         withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).update { style } }
+    }
+}
+
+/** Default delay: the value, and steps of 50 ms and 1 s either way (US-41.3). */
+@Composable
+private fun DelayRow(ms: Long, highlighted: Boolean, onChange: (Long) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(if (highlighted) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("sub-setting-default-delay"),
+    ) {
+        Text(stringResource(R.string.subs_setting_default_delay), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            stringResource(R.string.subs_setting_default_delay_summary) + "  " + stringResource(R.string.subs_delay_value, ms / 1000.0),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(-1000L, -SubtitleController.DELAY_STEP_MS, SubtitleController.DELAY_STEP_MS, 1000L).forEach { step ->
+                OutlinedButton(onClick = { onChange(ms + step) }, modifier = Modifier.testTag("sub-setting-delay$step")) {
+                    Text("%+.2f".format(step / 1000.0))
+                }
+            }
+        }
     }
 }
 
