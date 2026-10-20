@@ -70,6 +70,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":feature:player"))
     implementation(project(":core:player-api"))
+    implementation(project(":feature:library"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)

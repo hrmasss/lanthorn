@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="library_title">Videos</string>
+    <string name="library_back">Back</string>
+
+    <string name="access_title">See your videos</string>
+    <string name="access_body">To list your videos by folder, the app needs to read them. It reads videos only, not photos or other files, and nothing leaves your phone.</string>
+    <string name="access_allow">Allow access</string>
+    <string name="access_settings">Open app settings</string>
+    <string name="access_denied_body">Access is off. Turn on Photos and videos in the app settings to see your library.</string>
+    <string name="access_open_file">Open a single file</string>
+
+    <string name="partial_banner">Showing only the videos you picked.</string>
+    <string name="partial_more">Choose more</string>
+
+    <string name="library_scanning">Looking for videos</string>
+    <string name="library_empty_in">No videos found in %1$s.</string>
+    <string name="library_empty_nowhere">No videos found.</string>
+    <string name="library_folder_settings">Folder settings</string>
+    <string name="library_storage_root">Storage root</string>
+    <plurals name="library_video_count">
+        <item quantity="one">%d video</item>
+        <item quantity="other">%d videos</item>
+    </plurals>
+
+    <string name="folders_title">Folders</string>
+    <string name="folders_scanned">Scanned storage</string>
+    <string name="folders_all">All folders</string>
+</resources>
