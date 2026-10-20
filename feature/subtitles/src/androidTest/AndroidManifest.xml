@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The real-settings test starts the app (package visibility, Android 11+). -->
+    <queries>
+        <package android:name="app.player" />
+    </queries>
     <application>
         <activity android:name="app.player.feature.subtitles.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
         <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
-        <activity android:name="app.player.feature.subtitles.PanelTestActivity" android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name="app.player.feature.subtitles.PanelTestActivity" android:exported="false" android:screenOrientation="landscape" android:theme="@android:style/Theme.Material.Light.NoActionBar.Fullscreen" />
         <provider
             android:name="app.player.feature.subtitles.TestFontsProvider"
             android:authorities="app.player.feature.subtitles.test.fonts"

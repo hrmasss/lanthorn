@@ -4,11 +4,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import android.provider.DocumentsContract
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.hasTestTag
 import androidx.test.core.app.ActivityScenario
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -29,7 +24,6 @@ import java.io.File
 /** P1.28 gate: font folder import, edits from the real panel, ASS kept under style edits, real Settings. */
 class StyleGateOnDeviceTest {
     @get:Rule val timeout: Timeout = Timeout.seconds(150)
-    @get:Rule val compose = createEmptyComposeRule()
 
     private var engine: PlayerEngine? = null
     private val holder = Any()
@@ -50,6 +44,13 @@ class StyleGateOnDeviceTest {
     }
 
     private val e get() = engine!!
+
+    /** Shows the video on a plain surface, for tests that do not need the panel. */
+    private fun videoScreen() {
+        val s = ActivityScenario.launch(VideoTestActivity::class.java)
+        s.onActivity { it.surface.engine = e }
+        scenario = s
+    }
 
     /** Opens [name], picks the subtitle track titled [title] (or the first), pauses at 1 s. */
     private suspend fun open(name: String, title: String? = null) {
@@ -75,34 +76,40 @@ class StyleGateOnDeviceTest {
         val picked = File(OnDevice.context.cacheDir, "picked-fonts").apply { deleteRecursively(); mkdirs() }
         OnDevice.asset("LiberationMono-Regular.ttf").copyTo(File(picked, "LiberationMono-Regular.ttf"), overwrite = true)
         File(styles.userFontDir, "LiberationMono-Regular.ttf").delete()
-        assertTrue("Liberation Mono" !in styles.families())
+        assertTrue("Liberation Mono listed before the import", "Liberation Mono" !in styles.families())
         val tree = DocumentsContract.buildTreeDocumentUri(TestFontsProvider.AUTHORITY, TestFontsProvider.ROOT)
         val copied = styles.importFonts(tree)
         val families = styles.families()
-        assertEquals(1, copied)
-        assertTrue("Liberation Mono" in families)
-        assertTrue("AndroidClock" !in families)
+        assertEquals("fonts copied", 1, copied)
+        assertTrue("Liberation Mono missing from $families", "Liberation Mono" in families)
+        assertTrue("AndroidClock still listed", "AndroidClock" !in families)
         OnDevice.main { styles.update { it.copy(font = "Liberation Mono", size = 60) } }
+        videoScreen()
         open("tracks.mkv", "English") // imported fonts load with the next file
         shot("us42-imported-font")
         evidence("US-42.1 font folder: $copied font imported through the documents provider path, 'Liberation Mono' in the list (${families.size} text families, AndroidClock filtered out), drawn in a subtitle; screenshot")
     }
 
     @Test fun editFromThePanel_US42_3() = runBlocking {
-        open("tracks.mkv", "English")
+        // The panel's surface first, then the file, so the paused frame is drawn on it.
         scenario = ActivityScenario.launch(PanelTestActivity::class.java)
-        delay(2000)
+        delay(1000)
+        open("tracks.mkv", "English")
         shot("us42-panel-before")
+        val device = UiDevice.getInstance(OnDevice.instrumentation)
+        val yellow = device.wait(Until.findObject(By.res("sub-color-FFEB3B")), 5_000) ?: throw AssertionError("yellow swatch not found")
         val color = e.observe("sub-color", PropertyType.Text)
         delay(200)
         val t0 = SystemClock.elapsedRealtime()
-        compose.onNodeWithTag("sub-color-FFEB3B").performClick()
-        while (color.value != "#FFFFEB3B") delay(1)
+        yellow.click()
+        val deadline = t0 + 5_000
+        while (color.value != "#FFFFEB3B" && SystemClock.elapsedRealtime() < deadline) delay(1)
         val took = SystemClock.elapsedRealtime() - t0
+        assertEquals("#FFFFEB3B", color.value)
         delay(500)
         shot("us42-panel-yellow")
-        compose.onNodeWithTag("sub-style").performScrollToNode(hasTestTag("sub-box"))
-        compose.onNodeWithTag("sub-box").performClick()
+        device.findObject(By.res("sub-style"))?.scroll(androidx.test.uiautomator.Direction.DOWN, 1f)
+        device.wait(Until.findObject(By.res("sub-box")), 5_000)?.click()
         delay(800)
         shot("us42-panel-box")
         evidence("US-42.3 from the player's style panel: tap on yellow to mpv sub-color in $took ms (limit 100); screenshots with the panel open over the line")
@@ -110,6 +117,7 @@ class StyleGateOnDeviceTest {
     }
 
     @Test fun assStylingKeptUnderEdits_US42_4_NF7() = runBlocking {
+        videoScreen()
         open("tracks.mkv", "Karaoke")
         shot("us42-ass-before-edit")
         OnDevice.main { styles.update { it.copy(color = 0xFF80DEEA, font = "serif", size = 80, box = true) } }

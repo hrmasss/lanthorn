@@ -116,13 +116,14 @@ internal class SubtitleStyles(context: Context) {
         .flatMap { it.listFiles()?.toList().orEmpty() }
         .filter { it.extension.lowercase() in FONT_EXTENSIONS && drawsText(it) }
         .mapNotNull { runCatching { FontNames.family(it) }.getOrNull() }
+        .filterNot { family -> NOT_TEXT.any { it in family } }
         .distinct()
         .sorted()
 
     /** A font for subtitles has the Latin letters; clock, emoji and symbol fonts do not. */
     private fun drawsText(file: File): Boolean = runCatching {
         val paint = android.graphics.Paint().apply { typeface = android.graphics.Typeface.createFromFile(file) }
-        "aAzZ".all { paint.hasGlyph(it.toString()) }
+        LATIN.all { paint.hasGlyph(it.toString()) }
     }.getOrDefault(false)
 
     private var appliedTo: PlayerEngine? = null
@@ -145,6 +146,10 @@ internal class SubtitleStyles(context: Context) {
             next.filter { (name, value) -> applied[name] != value }
 
         private const val SAVE_DELAY_MS = 500L
+        private val LATIN = ('a'..'z') + ('A'..'Z')
+
+        /** Families that pass the glyph check but are not for reading: the lock-screen clock, emoji, symbols. */
+        private val NOT_TEXT = listOf("Clock", "Emoji", "Symbols", "Music", "Math")
         private val FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")
         private val GENERIC = listOf(SubtitleStyle.DEFAULT_FONT, "serif", "monospace")
     }

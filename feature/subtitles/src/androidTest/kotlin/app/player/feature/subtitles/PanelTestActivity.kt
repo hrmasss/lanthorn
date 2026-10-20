@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.player.core.engine.PlayerEngine
@@ -22,6 +25,7 @@ import app.player.core.playerapi.PanelHost
  * Video on the left, the real style panel on the right, as the player shows a side sheet in
  * landscape (agreed with player-ui). The engine is the session's live one.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 class PanelTestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +37,8 @@ class PanelTestActivity : ComponentActivity() {
         }
         setContent {
             MaterialTheme {
-                Row(Modifier.fillMaxSize()) {
+                // Test tags as resource ids, so UiAutomator taps the real panel.
+                Row(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
                     AndroidView({ VideoSurfaceView(it).apply { this.engine = engine } }, Modifier.weight(1f).fillMaxHeight())
                     Surface(Modifier.width(380.dp).fillMaxHeight()) { Box { StylePanel.Content(host) } }
                 }
