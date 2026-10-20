@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.player.core.engine.PlayerEngine
+import app.player.core.data.choice.PerFileChoices
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.MenuGroup
 import app.player.core.playerapi.PanelHost
@@ -40,7 +41,11 @@ import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -63,26 +68,73 @@ object AudioExtension : PlayerExtension {
     )
 
     private val scope = MainScope()
-    private var bound: Pair<PlayerEngine, AudioEffects>? = null
+    private var bound: AudioSession? = null
+
+    /** What this feature holds for the live engine. */
+    internal class AudioSession(val engine: PlayerEngine, val effects: AudioEffects, val delay: AudioDelay)
 
     /** The effects of [engine], or null if it is not the live one. Main thread. */
-    internal fun effects(engine: PlayerEngine): AudioEffects? = bound?.takeIf { it.first === engine }?.second
+    internal fun effects(engine: PlayerEngine): AudioEffects? = bound?.takeIf { it.engine === engine }?.effects
+
+    internal fun delay(engine: PlayerEngine): AudioDelay? = bound?.takeIf { it.engine === engine }?.delay
+
+    private var choices: PerFileChoices? = null
+
+    /** US-47.4: the viewer picked [trackId] for the open file. A no-op while "remember choices" is off. */
+    internal fun rememberTrack(context: Context, engine: PlayerEngine, trackId: Long) {
+        val uri = engine.state.value.uri ?: return
+        val store = choices ?: PerFileChoices(context).also { choices = it }
+        scope.launch { store.put(uri, TRACK_KEY, trackId.toString()) }
+    }
+
+    private const val TRACK_KEY = "audio.track"
 
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
-        bound?.second?.release()
+        bound?.effects?.release()
+        val audio = context.getSystemService(AudioManager::class.java)
+        val mpv = engine.asMpv()
         // Our own audio session, so the platform effect touches only our sound.
-        val session = context.getSystemService(AudioManager::class.java).generateAudioSessionId()
+        val session = audio.generateAudioSessionId()
         engine.set("audiotrack-session-id", session.toLong())
-        val channels = OutputChannels(context.getSystemService(AudioManager::class.java), engine.asMpv())
+        val channels = OutputChannels(audio, mpv)
         channels.start()
-        val effects = AudioEffects(PlatformEffects(session), StereoFilter(engine.asMpv()))
-        bound = engine to effects
+        val effects = AudioEffects(PlatformEffects(session), StereoFilter(mpv))
+        val delay = AudioDelay(mpv)
+        bound = AudioSession(engine, effects, delay)
+
+        var prefs = AudioPrefs()
+        val bluetooth = BluetoothOutput(audio) { active -> delay.setBluetooth(prefs.bluetoothDelayMs, active) }
+        val store = AudioPrefsStore(context)
+        val jobs = listOf(
+            scope.launch {
+                store.prefs.collect {
+                    prefs = it
+                    // US-47.2: mpv picks the matching track at open, else the default-flagged one.
+                    engine.set("alang", alangFor(it.preferredLanguage))
+                    delay.setBluetooth(it.bluetoothDelayMs, bluetooth.active())
+                }
+            },
+            // US-47.4: the track the viewer picked for this file, once it has loaded.
+            scope.launch {
+                val store = choices ?: PerFileChoices(context).also { choices = it }
+                engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+                    store.get(uri, TRACK_KEY)?.toLongOrNull()?.let { engine.set("aid", it.toString()) }
+                }
+            },
+            // US-48.3: every new file starts at the default delay.
+            scope.launch {
+                engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { delay.setBase(prefs.defaultDelayMs) }
+            },
+        )
+        bluetooth.start()
         // A new engine starts at 100% boost (US-49.3); the old effect goes with the old engine.
         scope.launch {
             PlayerSessions.current.first { it !== engine }
-            if (bound?.first === engine) bound = null
+            if (bound?.engine === engine) bound = null
+            jobs.forEach { it.cancel() }
             effects.release()
             channels.stop()
+            bluetooth.stop()
         }
     }
 }
@@ -96,7 +148,8 @@ private object TracksPanel : PlayerPanel {
         val controller = remember(host.engine) { AudioController(host.engine.asMpv()) }
         val tracks by controller.tracks.collectAsState(emptyList())
         val selected by controller.selected.collectAsState(null)
-        val delay by controller.delayMs.collectAsState(null)
+        val audioDelay = remember(host.engine) { AudioExtension.delay(host.engine) }
+        val delay by (audioDelay?.baseMs ?: controller.delayMs).collectAsState(null)
         val failed = stringResource(R.string.audio_open_failed)
         val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
@@ -117,7 +170,10 @@ private object TracksPanel : PlayerPanel {
                         headlineContent = { Text(track.title ?: track.lang ?: stringResource(R.string.audio_track_fallback, track.id)) },
                         supportingContent = { Text(track.details()) },
                         leadingContent = { RadioButton(track.id == selected, onClick = null) },
-                        modifier = Modifier.clickable { controller.select(track.id) }.testTag("audio-track-${track.id}"),
+                        modifier = Modifier.clickable {
+                            controller.select(track.id)
+                            AudioExtension.rememberTrack(context, host.engine, track.id)
+                        }.testTag("audio-track-${track.id}"),
                     )
                 }
             }
@@ -132,11 +188,11 @@ private object TracksPanel : PlayerPanel {
             )
             Row(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(-100L, -AudioController.DELAY_STEP_MS, AudioController.DELAY_STEP_MS, 100L).forEach { step ->
-                    OutlinedButton(onClick = { controller.setDelayMs(d + step) }, modifier = Modifier.testTag("audio-delay-$step")) {
+                    OutlinedButton(onClick = { audioDelay?.setBase(d + step) ?: controller.setDelayMs(d + step) }, modifier = Modifier.testTag("audio-delay-$step")) {
                         Text("%+.2f".format(step / 1000.0))
                     }
                 }
-                TextButton(onClick = { controller.setDelayMs(0) }) { Text(stringResource(R.string.audio_reset)) }
+                TextButton(onClick = { audioDelay?.setBase(0) ?: controller.setDelayMs(0) }) { Text(stringResource(R.string.audio_reset)) }
             }
         }
     }

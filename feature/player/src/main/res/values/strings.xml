@@ -62,4 +62,18 @@
     <string name="settings_keep_status">Keep status visible</string>
     <string name="settings_keep_status_summary">Elapsed time, battery and clock stay in the corners when controls hide</string>
     <string name="settings_back_twice">Press back twice to leave</string>
+
+    <!-- Fit modes (US-53.1) -->
+    <string name="fit_fit">Fit</string>
+    <string name="fit_stretch">Stretch</string>
+    <string name="fit_crop">Crop</string>
+    <string name="fit_original">100%</string>
+
+    <!-- Deinterlace (US-38.2, US-35.4) -->
+    <string name="video_deinterlace">Deinterlace</string>
+    <string name="video_deint_auto">Auto, only interlaced videos</string>
+    <string name="video_deint_on">On</string>
+    <string name="video_deint_off">Off</string>
+    <string name="video_deint_needs_decoder">Deinterlace runs with %1$s or SW. Now playing with %2$s.</string>
+    <string name="video_deint_switch">Switch to %1$s</string>
 </resources>

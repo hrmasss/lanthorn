@@ -59,7 +59,7 @@ internal fun NetworkOverlay(engine: PlayerEngine) {
             }, Modifier.align(Alignment.Center).padding(top = 160.dp))
             !state.loaded || state.buffering -> {
                 val p = percent
-                // One line per shown value, so a test can read what the viewer saw from logcat.
+                // One line per shown value, so a test reads what the viewer saw from logcat.
                 LaunchedEffect(state.loaded, p) { Log.i("LibraryNet", "progress loaded=${state.loaded} buffering=$p%") }
                 Text(
                     when {

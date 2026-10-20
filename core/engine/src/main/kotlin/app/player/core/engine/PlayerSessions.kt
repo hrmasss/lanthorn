@@ -22,6 +22,13 @@ object PlayerSessions {
     val current: StateFlow<PlayerEngine?> = _current.asStateFlow()
 
     /**
+     * Keep playing when the player leaves the screen (US-59.1): the activity hands the engine to
+     * [PlaybackService] instead of pausing. Set from the background-play setting and the player
+     * menu toggle (P1.15).
+     */
+    @Volatile var keepPlayingInBackground: Boolean = false
+
+    /**
      * Joins as a holder and returns the engine, creating it if needed. [onCreated] runs once,
      * right after creation, before any file opens: feature extensions apply saved settings there.
      */
