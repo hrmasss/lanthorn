@@ -6,6 +6,6 @@
             android:name="app.player.bench.BenchActivity"
             android:exported="true"
             android:screenOrientation="sensorLandscape"
-            android:theme="@style/Theme.Player" />
+            android:theme="@android:style/Theme.Material.NoActionBar" />
     </application>
 </manifest>

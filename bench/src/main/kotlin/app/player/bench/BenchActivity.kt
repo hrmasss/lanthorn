@@ -10,9 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
-import app.player.core.designsystem.PlayerTheme
+import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
+import app.player.core.engine.PlayerSessions
 import app.player.feature.player.PlayerScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -42,9 +43,9 @@ class BenchActivity : ComponentActivity() {
         val scenario = intent.getStringExtra("scenario") ?: "playback"
         val file = intent.getStringExtra("file") ?: return finishWith(JSONObject().put("error", "no file"))
         val decoder = DecoderMode.valueOf(intent.getStringExtra("decoder") ?: "AUTO")
-        engine = PlayerEngine(this)
+        engine = PlayerSessions.acquire(this, this)
         engine.setDecoder(decoder)
-        setContent { PlayerTheme(darkTheme = true) { PlayerScreen(engine, controlsState = controls) } }
+        setContent { LanthornPlayerTheme { PlayerScreen(engine, controlsState = controls) } }
 
         lifecycleScope.launch {
             engine.open(Uri.fromFile(File(file)))
@@ -146,7 +147,7 @@ class BenchActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (::engine.isInitialized) engine.release()
+        if (::engine.isInitialized) PlayerSessions.release(this)
         super.onDestroy()
     }
 }

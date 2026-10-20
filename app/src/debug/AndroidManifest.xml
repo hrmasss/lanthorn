@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug only: design system catalog for screenshots. adb shell am start -n app.player/.catalog.CatalogActivity -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".catalog.CatalogActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Player" />
+    </application>
+</manifest>

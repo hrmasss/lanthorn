@@ -13,6 +13,7 @@ class FeatureConventionPlugin : Plugin<Project> {
         dependencies {
             add("implementation", project(":core:designsystem"))
             add("implementation", project(":core:engine"))
+            add("implementation", project(":core:player-api"))
             add("implementation", project(":core:data"))
             add("implementation", catalog.findLibrary("androidx-lifecycle-runtime-compose").get())
             add("implementation", catalog.findLibrary("androidx-lifecycle-viewmodel-compose").get())

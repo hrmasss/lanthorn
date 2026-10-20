@@ -15,6 +15,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -33,6 +35,10 @@ import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.VideoSurfaceView
+import app.player.core.playerapi.PanelHost
+import app.player.core.playerapi.PlayerExtension
+import app.player.core.playerapi.PlayerMenuEntry
+import app.player.core.playerapi.PlayerPanel
 
 /** Bare player: video, tap to show controls, play/pause, seek bar, decoder picker, info line. */
 @Composable
@@ -41,9 +47,15 @@ fun PlayerScreen(
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
+    extensions: List<PlayerExtension> = emptyList(),
 ) {
     val state by engine.state.collectAsStateWithLifecycle()
     var controls by controlsState
+    val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
+    val entries = remember(extensions) {
+        extensions.flatMap { it.menuEntries }.sortedWith(compareBy({ it.group }, { it.order }))
+    }
+    var openPanel by remember { mutableStateOf<String?>(null) }
     Box(
         modifier
             .fillMaxSize()
@@ -55,15 +67,40 @@ fun PlayerScreen(
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
-        if (controls) Controls(state, engine, Modifier.align(Alignment.BottomCenter))
+        if (controls) Controls(state, engine, entries, { openPanel = it }, Modifier.align(Alignment.BottomCenter))
         state.error?.let {
             Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
+        }
+        openPanel?.let { id -> panels[id] }?.let { panel ->
+            PanelSheet(panel, engine, onOpen = { openPanel = it }, onClose = { openPanel = null })
         }
     }
 }
 
+/** Hosts a feature's panel. A bottom sheet for now; player-ui owns the final look. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Controls(state: PlaybackState, engine: PlayerEngine, modifier: Modifier) {
+private fun PanelSheet(panel: PlayerPanel, engine: PlayerEngine, onOpen: (String) -> Unit, onClose: () -> Unit) {
+    val host = remember(panel, engine) {
+        object : PanelHost {
+            override val engine = engine
+            override fun close() = onClose()
+            override fun open(panelId: String) = onOpen(panelId)
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onClose, modifier = Modifier.testTag("panel-${panel.id}")) {
+        panel.Content(host)
+    }
+}
+
+@Composable
+private fun Controls(
+    state: PlaybackState,
+    engine: PlayerEngine,
+    entries: List<PlayerMenuEntry>,
+    onOpenPanel: (String) -> Unit,
+    modifier: Modifier,
+) {
     var scrubbing by remember { mutableStateOf(false) }
     var scrubTo by remember { mutableFloatStateOf(0f) }
     Column(
@@ -98,6 +135,11 @@ private fun Controls(state: PlaybackState, engine: PlayerEngine, modifier: Modif
                     enabled = mode != state.decoderMode,
                     modifier = Modifier.testTag("decoder-${mode.name}"),
                 ) { Text(mode.label) }
+            }
+            entries.forEach { entry ->
+                FilledTonalButton(onClick = { onOpenPanel(entry.opensPanel) }, modifier = Modifier.testTag("menu-${entry.id}")) {
+                    Text(entry.label())
+                }
             }
         }
     }

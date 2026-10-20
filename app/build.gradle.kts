@@ -54,12 +54,6 @@ android {
         }
     }
 
-    // Bench mode ships in debug and bench builds, never in release.
-    sourceSets.getByName("debug") {
-        kotlin.directories.add("src/bench/kotlin")
-        manifest.srcFile("src/bench/AndroidManifest.xml")
-    }
-
     splits {
         abi {
             isEnable = true
@@ -83,10 +77,14 @@ dependencies {
     implementation(project(":core:engine"))
     implementation(project(":core:data"))
     implementation(project(":feature:player"))
+    implementation(project(":core:player-api"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.profileinstaller)
     baselineProfile(project(":baselineprofile"))
+    // Bench mode ships in debug and bench builds, never in release.
+    debugImplementation(project(":bench"))
+    "benchImplementation"(project(":bench"))
     testImplementation(libs.junit)
 }

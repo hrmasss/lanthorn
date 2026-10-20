@@ -19,7 +19,9 @@ rootProject.name = "player"
 
 include(":app")
 include(":baselineprofile")
+include(":bench")
 include(":core:engine")
 include(":core:data")
 include(":core:designsystem")
+include(":core:player-api")
 include(":feature:player")
