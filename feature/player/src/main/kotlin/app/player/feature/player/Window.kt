@@ -27,8 +27,11 @@ import java.util.Date
 internal fun SystemBarsEffect(activity: Activity?, visible: Boolean) {
     LaunchedEffect(activity, visible) {
         val window = activity?.window ?: return@LaunchedEffect
-        val bars = WindowCompat.getInsetsController(window, window.decorView)
-        if (visible) bars.show(WindowInsetsCompat.Type.systemBars()) else bars.hide(WindowInsetsCompat.Type.systemBars())
+        // Posted: window calls must run on the view's own thread, which effects do not promise.
+        window.decorView.post {
+            val bars = WindowCompat.getInsetsController(window, window.decorView)
+            if (visible) bars.show(WindowInsetsCompat.Type.systemBars()) else bars.hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 }
 
@@ -37,9 +40,11 @@ internal fun SystemBarsEffect(activity: Activity?, visible: Boolean) {
 internal fun KeepScreenOnEffect(activity: Activity?, on: Boolean) {
     DisposableEffect(activity, on) {
         val window = activity?.window
-        if (on) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        else window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+        window?.decorView?.post {
+            if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { window?.decorView?.post { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } }
     }
 }
 
