@@ -73,6 +73,10 @@ data class ControlsUi(
     /** A-B points as fractions, drawn while set (US-25.2). */
     val abA: Float? = null,
     val abB: Float? = null,
+    /** False hides previous and next (US-29.3, playback's setting). */
+    val showPreviousNext: Boolean = true,
+    /** Back and forward step buttons beside play/pause (US-29.2, playback's setting). */
+    val stepButtons: Boolean = false,
 )
 
 @Immutable
@@ -94,6 +98,8 @@ class ControlsActions(
     val next: () -> Unit,
     val rotate: () -> Unit,
     val fit: () -> Unit,
+    val stepBack: () -> Unit = {},
+    val stepForward: () -> Unit = {},
 )
 
 /**
@@ -148,12 +154,14 @@ private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier)
             )
         }
         val decoderDesc = stringResource(R.string.player_decoder_badge, ui.decoder)
-        OverlayChip(
+        // No badge until a decoder runs ("-"), so the chip never shows an empty circle.
+        if (ui.decoder != "-") OverlayChip(
             ui.decoder,
             selected = false,
             onClick = actions.openDecoder,
             modifier = Modifier
                 .minimumInteractiveComponentSize()
+                .widthIn(min = 64.dp)
                 .semantics { contentDescription = decoderDesc }
                 .testTag("decoder-badge"),
         )
@@ -234,12 +242,18 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
         )
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            OverlayIconButton(
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipPrevious,
                 stringResource(R.string.player_previous),
                 actions.previous,
                 Modifier.testTag("previous"),
                 enabled = ui.hasPrevious,
+            )
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Back10,
+                stringResource(R.string.a11y_seek_back),
+                actions.stepBack,
+                Modifier.testTag("step-back"),
             )
             PlayPauseButton(
                 playing = ui.playing,
@@ -248,7 +262,13 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
                 size = 56.dp,
                 modifier = Modifier.testTag("play-pause"),
             )
-            OverlayIconButton(
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Forward10,
+                stringResource(R.string.a11y_seek_forward),
+                actions.stepForward,
+                Modifier.testTag("step-forward"),
+            )
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipNext,
                 stringResource(R.string.player_next),
                 actions.next,

@@ -128,7 +128,14 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
-    val state by engine.state.collectAsStateWithLifecycle()
+    val engineState by engine.state.collectAsStateWithLifecycle()
+    // mpv's own pause flag: PlaybackState.paused resets to true on open and mpv sends no event when
+    // pause was already off, so it can read paused while playing (reported to engine).
+    val pauseFlag by remember(engine) { engine.observe("pause", PropertyType.Flag) }.collectAsStateWithLifecycle()
+    // Until the first pause event arrives, read the value once per load.
+    var pauseRead by remember(engine) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(engine, engineState.uri, engineState.loaded) { pauseRead = engine.get("pause", PropertyType.Flag) }
+    val state = engineState.copy(paused = pauseFlag ?: pauseRead ?: engineState.paused)
     val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
     val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
         .collectAsStateWithLifecycle()
@@ -150,6 +157,17 @@ fun PlayerScreen(
     var fitMode by remember { mutableStateOf(FitMode.Fit) }
     val fitNames = FitMode.entries.associateWith { stringResource(it.label) }
 
+    // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
+    val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
+    val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
+    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
+    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
+    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle()
+    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle()
+    // While locked, playback's Overlay owns every touch and the controls stay hidden (US-28).
+    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle()
+    LaunchedEffect(locked) { if (locked) { controls = false; openPanel = null } }
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
@@ -233,10 +251,12 @@ fun PlayerScreen(
             openSubtitles = { subtitleEntry?.let { openPanel = it.opensPanel } },
             openAudio = { audioEntry?.let { openPanel = it.opensPanel } },
             openMenu = { openPanel = OwnPanel.MENU },
-            lock = {},
-            previous = {},
-            next = {},
-            rotate = { activity?.let(::toggleOrientation) },
+            lock = { playback?.lock() },
+            previous = { playback?.previous() },
+            next = { playback?.next() },
+            rotate = { playback?.rotate() ?: activity?.let(::toggleOrientation) },
+            stepBack = { engine.seekTo((currentState.positionMs - SEEK_STEP_MS).coerceAtLeast(0)) },
+            stepForward = { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
             fit = {
                 // US-53.1: cycle and name the mode for 1 s.
                 fitMode = fitMode.next()
@@ -285,7 +305,7 @@ fun PlayerScreen(
             Modifier
                 .fillMaxSize()
                 .testTag("video")
-                .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls }
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked) { controls = !controls }
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions
@@ -296,7 +316,16 @@ fun PlayerScreen(
         extensions.forEach { it.Overlay(host) }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
-            Text(it, color = PlayerColors.Content, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
+            Text(
+                it.replaceFirstChar(Char::uppercaseChar),
+                color = PlayerColors.Content,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(PlayerColors.Scrim, CircleShape)
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .testTag("player-error"),
+            )
         }
 
         val status = rememberStatus(active = (controls && prefs.statusInTopBar) || (!controls && prefs.keepStatusVisible))
@@ -308,7 +337,7 @@ fun PlayerScreen(
             Controls(
                 ControlsUi(
                     title = title,
-                    playing = !state.paused,
+                    playing = !state.paused && state.error == null,
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
                     decoder = state.activeDecoder.label,
@@ -318,9 +347,11 @@ fun PlayerScreen(
                     status = if (prefs.statusInTopBar) status else null,
                     subtitleButton = subtitleEntry?.label?.invoke(),
                     audioButton = audioEntry?.label?.invoke(),
-                    hasPrevious = false,
-                    hasNext = false,
-                    canLock = false,
+                    hasPrevious = hasPrevious,
+                    hasNext = hasNext,
+                    canLock = playback != null,
+                    showPreviousNext = showPreviousNext,
+                    stepButtons = stepButtons,
                     marks = chapters.drop(1).map { it.startMs.toFloat() / state.durationMs.coerceAtLeast(1) },
                     abA = abMs(abA)?.let { it.toFloat() / state.durationMs.coerceAtLeast(1) },
                     abB = abMs(abB)?.let { it.toFloat() / state.durationMs.coerceAtLeast(1) },
@@ -336,9 +367,8 @@ fun PlayerScreen(
         note?.let { n ->
             Row(
                 Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.displayCutout)
-                    .padding(top = 72.dp)
+                    .align(Alignment.Center)
+                    .padding(bottom = 160.dp)
                     .background(PlayerColors.Scrim, CircleShape)
                     .padding(horizontal = 20.dp, vertical = 4.dp)
                     .testTag("note"),

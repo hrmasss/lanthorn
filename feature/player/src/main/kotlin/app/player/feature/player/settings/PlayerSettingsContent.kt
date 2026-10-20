@@ -1,6 +1,8 @@
 package app.player.feature.player.settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -17,7 +19,8 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun PlayerSettingsContent(prefs: PlayerPrefs, update: ((PlayerPrefs) -> PlayerPrefs) -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.verticalScroll(rememberScrollState()).testTag("player-settings")) {
+    // Bottom padding so the last row scrolls clear of the sheet's edge and the navigation bar.
+    Column(modifier.verticalScroll(rememberScrollState()).padding(bottom = 32.dp).testTag("player-settings")) {
         SectionHeader(stringResource(R.string.settings_player))
         SwitchRow(
             stringResource(R.string.settings_auto_hide),
