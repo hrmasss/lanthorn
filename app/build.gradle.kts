@@ -83,6 +83,7 @@ dependencies {
     implementation(project(":core:engine"))
     implementation(project(":core:data"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:info"))
     implementation(project(":feature:subtitles"))
     implementation(project(":feature:audio"))
     // After feature:player: its aliases target PlayerActivity, which must come first in the merged manifest.

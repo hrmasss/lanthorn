@@ -54,6 +54,9 @@ interface PanelHost {
 
     /** Open another panel by id, for example a style panel from a track panel. */
     fun open(panelId: String)
+
+    /** A one-line note over the video for about 2 s, for example "Subtitle loaded". */
+    fun notify(message: String) {}
 }
 
 enum class MenuGroup { Video, Audio, Subtitle, Tools }
@@ -65,7 +68,16 @@ class PlayerMenuEntry(
     val order: Int,
     val opensPanel: String,
     val label: @Composable () -> String,
-)
+) {
+    companion object {
+        /**
+         * Entries with these ids also become the top bar's subtitle and audio buttons (US-16.1).
+         * Their label is the button's content description.
+         */
+        const val SUBTITLE_TRACKS = "subtitle-tracks"
+        const val AUDIO_TRACKS = "audio-tracks"
+    }
+}
 
 /** Implemented by the Application in `app`, which lists every feature's extension. */
 interface PlayerExtensionHost {

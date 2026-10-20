@@ -6,8 +6,10 @@ import android.net.Uri
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
+import app.player.core.data.choice.DecoderChoices
 import app.player.core.data.history.HistoryPrefs
 import app.player.core.data.history.ResumePoints
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.EngineMessage
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerEngine
@@ -30,7 +32,7 @@ import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 /** A resume choice waiting for the viewer (US-22.3). */
-internal data class AskResume(val engine: PlayerEngine, val uri: Uri, val positionMs: Long)
+internal data class AskResume(val engine: PlayerEngine, val uri: Uri, val positionMs: Long, val decoder: DecoderMode)
 
 /** "Start over" offered after resuming (US-22.2). */
 internal data class StartOver(val engine: PlayerEngine, val uri: Uri)
@@ -64,6 +66,7 @@ object Playback : PlaybackControls {
     private val prefs by lazy { PlaybackPrefs(context) }
     private val resumePoints by lazy { ResumePoints(context) }
     private val history by lazy { HistoryPrefs(context) }
+    private val decoders by lazy { DecoderChoices(context) }
 
     private val _hasPrevious = MutableStateFlow(false)
     override val hasPrevious: StateFlow<Boolean> = _hasPrevious.asStateFlow()
@@ -158,7 +161,7 @@ object Playback : PlaybackControls {
     internal fun answer(resume: Boolean) {
         val a = _ask.value ?: return
         _ask.value = null
-        a.engine.open(a.uri, if (resume) a.positionMs else 0)
+        a.engine.open(a.uri, if (resume) a.positionMs else 0, a.decoder)
     }
 
     internal fun startOver() {
@@ -207,16 +210,18 @@ object Playback : PlaybackControls {
         opening = scope.launch {
             val settings = prefs.settings.first()
             val saved = resumePoints.get(uri.toString())
+            // US-36.1: the decoder remembered for the file, its extension's, or Auto.
+            val decoder = decoders.choose(uri.toString())
             val start = Resume.startAt(saved, settings.resume, laterInQueue, settings.resumeFirstOnly)
             Log.i(TAG, "open $uri item ${queue.index + 1}/${queue.size} start $start")
             lines.clear()
             when (start) {
-                StartAt.Beginning -> e.open(uri)
+                StartAt.Beginning -> e.open(uri, decoder = decoder)
                 is StartAt.Resume -> {
-                    e.open(uri, start.positionMs)
+                    e.open(uri, start.positionMs, decoder)
                     _startOver.value = StartOver(e, uri)
                 }
-                is StartAt.Ask -> _ask.value = AskResume(e, uri, start.positionMs)
+                is StartAt.Ask -> _ask.value = AskResume(e, uri, start.positionMs, decoder)
             }
         }
     }
