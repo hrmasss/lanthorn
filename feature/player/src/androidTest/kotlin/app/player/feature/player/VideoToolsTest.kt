@@ -137,15 +137,17 @@ class VideoToolsTest {
     @Test fun pictureAdjustZeroIsIdentical_US57_3() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
-        SystemClock.sleep(500)
+        SystemClock.sleep(1_000)
         val plain = grab("adjust-plain")
+        // Baseline: two captures of the same paused frame, so capture noise is known.
+        val baseline = maxDiff(plain, grab("adjust-plain-2"))
         tools.setPicture(PictureAdjust(brightness = 40, contrast = -20, saturation = 60, gamma = 10))
         val adjusted = grab("adjust-on")
         tools.setPicture(PictureAdjust())
         val reset = grab("adjust-reset")
         val changed = maxDiff(plain, adjusted)
         val back = maxDiff(plain, reset)
-        log("picture adjust: max channel difference with adjust $changed, after reset to zeros $back")
+        log("picture adjust: capture baseline $baseline, max channel difference with adjust $changed, after reset to zeros $back")
         assertTrue("adjust changed the frame", changed > 10)
         assertEquals("zeros give back the frame", 0, back)
     }
@@ -211,7 +213,7 @@ class VideoToolsTest {
         SystemClock.sleep(400)
         val small = drawn()
         grabScreen("p15-zoom-25")
-        log("US-55.1 picture width: fit ${fit.first}, 400% ${big.first} (x%.2f), 25% ${small.first} (x%.2f)"
+        log("US-55.1 picture width: fit ${fit.first}, 400 percent ${big.first} (x%.2f), 25 percent ${small.first} (x%.2f)"
             .format(big.first.toDouble() / fit.first, small.first.toDouble() / fit.first))
         assertEquals(4.0, big.first.toDouble() / fit.first, 0.05)
         assertEquals(0.25, small.first.toDouble() / fit.first, 0.02)
@@ -232,9 +234,10 @@ class VideoToolsTest {
         tools.setNightMode(true)
         val night = grabScreen("p15-full-night")
         tools.setNightMode(false)
-        // Subtitle: the white text pixels sit in the same place with mirror on (not mirrored).
-        val (sx, sy, sw, sh) = subtitleBox()
-        val textSame = overlap(white(plain, sx, sy, sw, sh), white(mirror, sx, sy, sw, sh))
+        // Subtitle: mpv draws text subtitles in the black band under the picture, near the bottom of
+        // the screen. Its white pixels sit in the same place with mirror on (not mirrored).
+        val sy = plain.height - 520
+        val textSame = overlap(white(plain, 0, sy, plain.width, 420), white(mirror, 0, sy, plain.width, 420))
         // Controls: the bottom bar is pixel-identical under night mode (video only).
         val bar = maxDiffRegion(plain, night, 0, plain.height - 260, plain.width, 200)
         log("US-57 full screen: subtitle white-pixel overlap plain vs mirror %.2f; bottom bar max difference plain vs night $bar".format(textSame))
@@ -264,15 +267,6 @@ class VideoToolsTest {
     private suspend fun drawn(): Pair<Int, Int> {
         val m = listOf("w", "h", "ml", "mr", "mt", "mb").associateWith { engine.get("osd-dimensions/$it", PropertyType.Int64)!!.toInt() }
         return (m.getValue("w") - m.getValue("ml") - m.getValue("mr")) to (m.getValue("h") - m.getValue("mt") - m.getValue("mb"))
-    }
-
-    /** Where the subtitle sits: bottom fifth of the drawn picture, full width. */
-    private suspend fun subtitleBox(): List<Int> {
-        val mt = engine.get("osd-dimensions/mt", PropertyType.Int64)!!.toInt()
-        val (w, h) = drawn()
-        val at = IntArray(2)
-        scenario.onActivity { a -> findSurface(a.window.decorView)?.getLocationOnScreen(at) }
-        return listOf(0, at[1] + mt + h * 4 / 5, w.coerceAtMost(1080), h / 5)
     }
 
     private fun white(b: Bitmap, x: Int, y: Int, w: Int, h: Int): Set<Int> {
