@@ -12,22 +12,40 @@ import android.util.Log
 internal class PlatformEffects(private val sessionId: Int) : EffectsSink {
     private var dp: DynamicsProcessing? = null
     private var failed = false
+    private var last: EffectsState? = null
+
+    /** For instrumented tests: the live platform effect, if created. */
+    internal val effect: DynamicsProcessing? get() = dp
 
     override fun apply(state: EffectsState) {
+        last = state
         if (!state.processing) {
-            dp?.enabled = false
+            guarded { dp?.enabled = false }
             return
         }
         val effect = effect() ?: return
-        val channels = effect.channelCount
-        for (ch in 0 until channels) effect.setInputGainbyChannel(ch, state.inputGainDb)
-        for (i in 0 until Eq.BANDS) effect.setPreEqBandAllChannelsTo(i, band(i, state.bandGainDb(i)))
-        effect.setLimiterAllChannelsTo(limiter())
-        effect.enabled = true
+        guarded {
+            for (ch in 0 until effect.channelCount) effect.setInputGainbyChannel(ch, state.inputGainDb)
+            for (i in 0 until Eq.BANDS) effect.setPreEqBandAllChannelsTo(i, band(i, state.bandGainDb(i)))
+            effect.setLimiterAllChannelsTo(limiter())
+            effect.enabled = true
+        }
     }
 
     override fun setBand(index: Int, gainDb: Float) {
-        dp?.setPreEqBandAllChannelsTo(index, band(index, gainDb))
+        guarded { dp?.setPreEqBandAllChannelsTo(index, band(index, gainDb)) }
+    }
+
+    /**
+     * Another app can take control of effects on our session (a system EQ app does). Setters then
+     * throw; we keep the state and push it again when control comes back.
+     */
+    private inline fun guarded(block: () -> Unit) {
+        try {
+            block()
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "effect setting refused, will reapply on control", e)
+        }
     }
 
     override fun release() {
@@ -47,7 +65,10 @@ internal class PlatformEffects(private val sessionId: Int) : EffectsSink {
                 false, 0, // no post-EQ
                 true, // limiter
             ).setPreferredFrameDuration(FRAME_MS).build()
-            DynamicsProcessing(0, sessionId, config).also { dp = it }
+            DynamicsProcessing(0, sessionId, config).also { created ->
+                dp = created
+                created.setControlStatusListener { _, controlGranted -> if (controlGranted) last?.let(::apply) }
+            }
         } catch (e: RuntimeException) {
             // No effect engine on this device: the player still plays, without EQ and boost.
             Log.w(TAG, "DynamicsProcessing unavailable", e)
@@ -64,6 +85,6 @@ internal class PlatformEffects(private val sessionId: Int) : EffectsSink {
         fun band(i: Int, gainDb: Float) = DynamicsProcessing.EqBand(true, Eq.CUTOFFS_HZ[i], gainDb)
 
         /** Fast attack, brick-wall ratio, ceiling just under 0 dBFS (US-49.2). */
-        fun limiter() = DynamicsProcessing.Limiter(true, true, 0, 1f, 60f, 10f, Eq.LIMITER_THRESHOLD_DB, 0f)
+        fun limiter() = DynamicsProcessing.Limiter(true, true, 0, 1f, 60f, Eq.LIMITER_RATIO, Eq.LIMITER_THRESHOLD_DB, 0f)
     }
 }

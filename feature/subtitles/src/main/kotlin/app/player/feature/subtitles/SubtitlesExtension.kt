@@ -71,6 +71,7 @@ object SubtitlesExtension : PlayerExtension {
         files ?: SubtitleFiles(context).also { files = it }
 
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
+        SubtitleFonts.install(context)
         // We find and decode subtitle files ourselves (UTF-8 for mpv, which has no iconv here).
         engine.set("sub-auto", "no")
         engine.set("sub-ass-override", "scale")

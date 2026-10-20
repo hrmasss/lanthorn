@@ -56,8 +56,10 @@ class AudioTest {
         assertFalse(sink.applied.last().processing)
     }
 
-    @Test fun `limiter ceiling is below 0 dBFS (US-49_2)`() {
-        assertTrue(Eq.LIMITER_THRESHOLD_DB < 0f)
+    @Test fun `worst-case gain stays under 0 dBFS after the limiter (US-49_2)`() {
+        // Full-scale input, preamp +12, boost +6, a band +12: output peak is threshold + over/ratio.
+        val peak = Eq.LIMITER_THRESHOLD_DB + Eq.WORST_CASE_OVER_DB / Eq.LIMITER_RATIO
+        assertTrue("peak $peak dBFS", peak < 0f)
     }
 
     @Test fun `reset puts boost back to 100 percent (US-49_3)`() {
@@ -106,5 +108,11 @@ class AudioTest {
         effects.setStereo(StereoMode.Reverse)
         assertTrue(mpv.calls.isEmpty())
         assertEquals(StereoMode.Stereo, effects.state.value.stereo)
+    }
+
+    @Test fun `surround goes to stereo unless a multichannel output is attached (US-51_2)`() {
+        assertEquals("stereo", OutputChannels.mpvChannels(emptyList()))
+        assertEquals("stereo", OutputChannels.mpvChannels(listOf(1, 2)))
+        assertEquals("auto-safe", OutputChannels.mpvChannels(listOf(2, 6, 8)))
     }
 }

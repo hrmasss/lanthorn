@@ -52,6 +52,12 @@ internal object Eq {
 
     /** Limiter ceiling. Just under 0 dBFS so boosted audio never clips (US-49.2). */
     const val LIMITER_THRESHOLD_DB = -1f
+
+    /** Steep enough that the worst case (all gains at maximum) stays under 0 dBFS. */
+    const val LIMITER_RATIO = 50f
+
+    /** Most a full-scale input can be pushed over the limiter threshold: preamp, boost, one band. */
+    val WORST_CASE_OVER_DB: Float get() = MAX_DB + 20f * kotlin.math.log10(AudioEffects.MAX_BOOST) + MAX_DB - LIMITER_THRESHOLD_DB
 }
 
 /** Where effect settings go. The real one is [PlatformEffects]; tests use a fake. */
@@ -78,7 +84,7 @@ internal class StereoFilter(private val mpv: Mpv) {
 }
 
 /** Holds the effects state and pushes each change to the sink and mpv (P1.4). */
-internal class AudioEffects(private val sink: EffectsSink, private val stereo: StereoFilter) {
+internal class AudioEffects(internal val sink: EffectsSink, private val stereo: StereoFilter) {
     private val _state = MutableStateFlow(EffectsState())
     val state: StateFlow<EffectsState> = _state.asStateFlow()
 

@@ -47,3 +47,12 @@ class SubtitleTextTest {
         SubtitleText.CHOICES.forEach { Charset.forName(it) }
     }
 }
+
+class SubtitleFontsTest {
+    @Test fun `fonts conf names the dirs, a cache and the generic families`() {
+        val conf = SubtitleFonts.config(listOf("/system/fonts"), "/c/fc")
+        assertTrue(conf.contains("<dir>/system/fonts</dir>"))
+        assertTrue(conf.contains("<cachedir>/c/fc</cachedir>"))
+        assertTrue(conf.contains("<family>sans-serif</family><prefer><family>Roboto</family>"))
+    }
+}

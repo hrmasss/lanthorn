@@ -73,8 +73,8 @@ object AudioExtension : PlayerExtension {
         // Our own audio session, so the platform effect touches only our sound.
         val session = context.getSystemService(AudioManager::class.java).generateAudioSessionId()
         engine.set("audiotrack-session-id", session.toLong())
-        // US-51.2: mpv downmixes to what the output takes.
-        engine.set("audio-channels", "auto-safe")
+        val channels = OutputChannels(context.getSystemService(AudioManager::class.java), engine.asMpv())
+        channels.start()
         val effects = AudioEffects(PlatformEffects(session), StereoFilter(engine.asMpv()))
         bound = engine to effects
         // A new engine starts at 100% boost (US-49.3); the old effect goes with the old engine.
@@ -82,6 +82,7 @@ object AudioExtension : PlayerExtension {
             PlayerSessions.current.first { it !== engine }
             if (bound?.first === engine) bound = null
             effects.release()
+            channels.stop()
         }
     }
 }
