@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APK=""; QUICK=0; ONLY="startup,first-frame,playback,seek,scrub"
+APK=""; QUICK=0; ONLY="startup,first-frame,playback,seek,scrub,preview"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apk) APK=$2; shift 2 ;;
@@ -167,16 +167,24 @@ if want seek && [ -f media/h264-long-1080p30.mp4 ]; then
   } >> "$OUT"
 fi
 
-if want scrub && [ -f media/h264-long-1080p30.mp4 ]; then
-  echo "scrub (NF-6)"
-  bench scrub h264-long-1080p30.mp4 $SCRUB_SECS 60
-  r="$RAW/scrub-h264-long-1080p30.mp4.json"
+for sc in scrub preview; do
+  want $sc && [ -f media/h264-long-1080p30.mp4 ] || continue
+  echo "$sc (NF-6, US-30.1)"
+  bench $sc h264-long-1080p30.mp4 $SCRUB_SECS 60
+done
+if (want scrub || want preview) && [ -f media/h264-long-1080p30.mp4 ]; then
   {
-    echo "## Preview updates while scrubbing (NF-6: >= 10 per second)"
+    echo "## Frames while dragging (NF-6: >= 10 per second; US-30.1: preview within 2 s of the target)"
     echo
-    echo "| File | Seeks sent | Frames shown | Per second |"
-    echo "|---|---|---|---|"
-    echo "| h264-long-1080p30.mp4 | $(j "$r" seeksIssued) | $(j "$r" previewUpdates) | $(j "$r" updatesPerSecond) |"
+    echo "30 targets a second across 10 to 90% of a 1-hour file with an 8 s GOP. Distance is from each shown frame to the newest target."
+    echo
+    echo "| Path | Targets | Frames shown | Per second | Distance p50 ms | p90 ms |"
+    echo "|---|---|---|---|---|---|"
+    for sc in scrub preview; do
+      r="$RAW/$sc-h264-long-1080p30.mp4.json"
+      [ -f "$r" ] || continue
+      echo "| $sc | $(j "$r" targetsSent) | $(j "$r" framesShown) | $(j "$r" framesPerSecond) | $(j "$r" distanceP50Ms) | $(j "$r" distanceP90Ms) |"
+    done
     echo
   } >> "$OUT"
 fi
