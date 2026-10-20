@@ -25,6 +25,10 @@ jobs:
       # the runner's persisted home, then reused.
       - uses: android-actions/setup-android@v3
         if: runner.environment == 'self-hosted'
+        with:
+          # The default list still names 'tools', which Google no longer ships. Gradle fetches the
+          # platform and build-tools it needs on its own once the licences are accepted.
+          packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v6
 
