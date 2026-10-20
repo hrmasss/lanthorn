@@ -31,6 +31,10 @@ jobs:
           packages: platform-tools
 
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          # Self-hosted runners keep ~/.gradle in a persisted volume; uploading it to GitHub's cache
+          # after every job only adds minutes (seen 8+ min on a 2-core runner).
+          cache-disabled: ${{ runner.environment == 'self-hosted' }}
 
       - name: Release key
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -150,6 +154,13 @@ jobs:
         with:
           name: test-bench
           path: bench/build/outputs/apk/androidTest/debug/bench-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-app
+          path: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: ignore
           retention-days: 7
 

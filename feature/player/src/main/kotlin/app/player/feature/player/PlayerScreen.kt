@@ -86,6 +86,8 @@ import app.player.feature.player.overlay.SleepContent
 import app.player.feature.player.overlay.SpeedContent
 import app.player.feature.player.overlay.rememberLeft
 import androidx.compose.material3.TextButton
+import app.player.feature.player.tools.Deinterlace
+import app.player.feature.player.overlay.DeinterlaceContent
 import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -100,6 +102,7 @@ internal object OwnPanel {
     const val AB = "player-ab"
     const val SLEEP = "player-sleep"
     const val CHAPTERS = "player-chapters"
+    const val DEINTERLACE = "player-deinterlace"
 }
 
 /** A one-line note over the video, optionally with one action (US-33.2's share). */
@@ -172,9 +175,11 @@ fun PlayerScreen(
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
+    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle()
     val hasChapters = chapters.isNotEmpty()
     val items = remember(entries, hasChapters) {
         val own = listOfNotNull(
+            MenuItem("deinterlace", MenuGroup.Video, 120, { stringResource(R.string.video_deinterlace) }) { openPanel = OwnPanel.DEINTERLACE },
             MenuItem("speed", MenuGroup.Tools, 100, { stringResource(R.string.tool_speed) }) { openPanel = OwnPanel.SPEED },
             MenuItem("ab-repeat", MenuGroup.Tools, 110, { stringResource(R.string.tool_ab) }) { openPanel = OwnPanel.AB },
             MenuItem("sleep-timer", MenuGroup.Tools, 120, { sleepLabel() }) { openPanel = OwnPanel.SLEEP },
@@ -404,6 +409,15 @@ fun PlayerScreen(
                 )
                 OwnPanel.SLEEP -> SleepContent(sleep, { m, finish -> SleepTimer.start(m, finish) }, SleepTimer::cancel)
                 OwnPanel.CHAPTERS -> ChaptersContent(chapters, state.positionMs) { tools.goToChapter(it.index) }
+                OwnPanel.DEINTERLACE -> DeinterlaceContent(
+                    Deinterlace.fromMpv(deinterlaceMode),
+                    state.activeDecoder,
+                    pick = video::setDeinterlace,
+                    switchDecoder = { mode ->
+                        engine.setDecoder(mode)
+                        onDecoderPicked(mode)
+                    },
+                )
                 null -> Unit
                 else -> panels[id]?.Content(host)
             }

@@ -95,4 +95,11 @@
     <string name="tool_screenshot_failed">Could not take a screenshot</string>
     <string name="tool_share">Share</string>
     <string name="settings_default_speed">Default speed</string>
+    <!-- Deinterlace (US-38.2, US-35.4) -->
+    <string name="video_deinterlace">Deinterlace</string>
+    <string name="video_deint_auto">Auto, only interlaced videos</string>
+    <string name="video_deint_on">On</string>
+    <string name="video_deint_off">Off</string>
+    <string name="video_deint_needs_decoder">Deinterlace runs with %1$s or SW. Now playing with %2$s.</string>
+    <string name="video_deint_switch">Switch to %1$s</string>
 </resources>

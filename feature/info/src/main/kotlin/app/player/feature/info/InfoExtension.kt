@@ -55,12 +55,13 @@ object InfoExtension : PlayerExtension {
                 Modifier.padding(horizontal = 24.dp, vertical = 8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // Live values first, so they are on screen without scrolling (US-37.3).
                 Section("Decoder", i.decoder)
+                Section("Playback", i.live)
                 Section("File", i.file)
                 if (i.video.isNotEmpty()) Section("Video", i.video)
                 i.audio.forEachIndexed { n, rows -> Section(if (i.audio.size > 1) "Audio ${n + 1}" else "Audio", rows) }
                 i.subtitles.forEachIndexed { n, rows -> Section(if (i.subtitles.size > 1) "Subtitle ${n + 1}" else "Subtitle", rows) }
-                Section("Playback", i.live)
             }
         }
     }

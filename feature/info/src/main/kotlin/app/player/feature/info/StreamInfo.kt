@@ -30,11 +30,12 @@ internal object StreamInfoReader {
         val uri = engine.state.value.uri
         val path = text("path")
         val file = buildList {
-            add("Name" to (text("filename") ?: "-"))
+            val name = text("filename")
+            add("Name" to (name ?: "-"))
             add("Path" to (path ?: "-"))
             add("Size" to (long("file-size")?.let(::bytes) ?: "-"))
             add("Date" to (uri?.let { modified(context, it) } ?: "-"))
-            add("Container" to (text("file-format") ?: "-"))
+            add("Container" to Names.container(text("file-format"), name))
         }
 
         val tracks = (0 until (long("track-list/count") ?: 0).toInt()).map { i ->
@@ -56,7 +57,7 @@ internal object StreamInfoReader {
         val hwPixel = text("video-params/hw-pixelformat")
         val videoTrack = tracks.firstOrNull { it.type == "video" }
         val video = if (videoTrack == null) emptyList() else buildList {
-            add("Codec" to (text("video-codec") ?: videoTrack.codec))
+            add("Codec" to Names.codec(videoTrack.codec))
             add("Profile" to (videoTrack.profile ?: "-"))
             add("Resolution" to "${long("video-params/w") ?: 0} x ${long("video-params/h") ?: 0}")
             add("Frame rate" to (real("container-fps")?.let { "%.3f fps".format(it) } ?: "-"))
@@ -66,15 +67,15 @@ internal object StreamInfoReader {
 
         val audio = tracks.filter { it.type == "audio" }.map { t ->
             listOf(
-                "Codec" to t.codec,
-                "Channels" to (t.channels?.toString() ?: "-"),
+                "Codec" to Names.codec(t.codec),
+                "Channels" to Names.channels(t.channels),
                 "Sample rate" to (t.sampleRate?.let { "$it Hz" } ?: "-"),
                 "Language" to (t.lang ?: "-"),
             )
         }
         val subtitles = tracks.filter { it.type == "sub" }.map { t ->
             listOf(
-                "Format" to t.codec,
+                "Format" to Names.codec(t.codec),
                 "Language" to (t.lang ?: "-"),
                 "Source" to if (t.external) "External" else "Embedded",
             )
@@ -89,6 +90,7 @@ internal object StreamInfoReader {
 
         val dropped = (long("frame-drop-count") ?: 0) + (long("decoder-frame-drop-count") ?: 0)
         val live = listOf(
+            "Position" to "%.1f s".format((real("time-pos") ?: 0.0)),
             "Dropped frames" to dropped.toString(),
             "Current bit rate" to bitrate(((real("video-bitrate") ?: 0.0) + (real("audio-bitrate") ?: 0.0)).toLong()),
         )

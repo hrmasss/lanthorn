@@ -51,12 +51,12 @@ class VideoTools(private val engine: PlayerEngine, context: Context) {
     /** US-57.2: brightness -30%, blue a further -20%, video only. */
     fun setNightMode(on: Boolean) = shader(NIGHT, on)
 
-    /** US-57.3: each -100..100, 0 is the untouched picture. */
+    /** US-57.3: each -100..100 in steps of 1, 0 is the untouched picture. */
     fun setPicture(adjust: PictureAdjust) {
-        engine.set("brightness", adjust.brightness.coerceIn(-100, 100).toLong())
-        engine.set("contrast", adjust.contrast.coerceIn(-100, 100).toLong())
-        engine.set("saturation", adjust.saturation.coerceIn(-100, 100).toLong())
-        engine.set("gamma", adjust.gamma.coerceIn(-100, 100).toLong())
+        engine.set("brightness", clampAdjust(adjust.brightness))
+        engine.set("contrast", clampAdjust(adjust.contrast))
+        engine.set("saturation", clampAdjust(adjust.saturation))
+        engine.set("gamma", clampAdjust(adjust.gamma))
     }
 
     /** US-38: auto deinterlaces only frames flagged interlaced. Needs HW+ or SW (CPU frames). */
@@ -90,6 +90,9 @@ class VideoTools(private val engine: PlayerEngine, context: Context) {
         const val MAX_ZOOM = 4.0
 
         fun clampZoom(scale: Double) = scale.coerceIn(MIN_ZOOM, MAX_ZOOM)
+
+        /** US-57.3: whole steps from -100 to +100. */
+        fun clampAdjust(value: Int): Long = value.coerceIn(-100, 100).toLong()
 
         /** mpv `video-zoom` is log2 of the scale: 0 = 100%, 1 = 200%, -2 = 25%. */
         fun zoomToMpv(scale: Double): Double = ln(scale) / ln(2.0)
@@ -158,4 +161,15 @@ enum class FitMode {
 
 data class PictureAdjust(val brightness: Int = 0, val contrast: Int = 0, val saturation: Int = 0, val gamma: Int = 0)
 
-enum class Deinterlace { Auto, On, Off }
+enum class Deinterlace {
+    Auto, On, Off;
+
+    companion object {
+        /** mpv's `deinterlace` text: "auto", "yes", "no". Unknown reads as Auto, mpv's default. */
+        fun fromMpv(value: String?): Deinterlace = when (value) {
+            "yes" -> On
+            "no" -> Off
+            else -> Auto
+        }
+    }
+}
