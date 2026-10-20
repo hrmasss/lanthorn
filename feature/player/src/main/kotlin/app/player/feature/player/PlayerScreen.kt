@@ -131,12 +131,7 @@ fun PlayerScreen(
     // Auto-hide (US-16.3, US-79): restarts on every touch; the delay is read when it starts, so a
     // changed delay applies from the next time the controls show (US-79.2).
     val hideAfter = autoHideDelay(prefs.autoHide, prefs.autoHideDelayMs, state.paused, talkBack, openPanel != null || scrubbing)
-    LaunchedEffect(controls, touches, hideAfter) {
-        if (controls && hideAfter != null) {
-            delay(hideAfter)
-            controls = false
-        }
-    }
+    AutoHideEffect(controls, touches, hideAfter) { controls = false }
     SystemBarsEffect(activity, controls)
     KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
     LaunchedEffect(note) {

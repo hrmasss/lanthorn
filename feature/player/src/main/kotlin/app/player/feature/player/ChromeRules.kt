@@ -1,6 +1,11 @@
 package app.player.feature.player
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.getValue
 import app.player.core.engine.PlaybackState
+import kotlinx.coroutines.delay
 
 /**
  * When the overlay hides by itself (US-16.3, US-69.2, US-79). Returns the delay in ms, or null when
@@ -20,6 +25,21 @@ internal fun autoHideDelay(
     // A panel or the decoder picker is open, or the viewer is dragging the seek bar.
     busy -> null
     else -> delayMs
+}
+
+/**
+ * Hides the controls [hideAfter] ms after they show or after the last touch ([touches] counts
+ * presses and releases). Null [hideAfter] keeps them up.
+ */
+@Composable
+internal fun AutoHideEffect(shown: Boolean, touches: Int, hideAfter: Long?, hide: () -> Unit) {
+    val onHide by rememberUpdatedState(hide)
+    LaunchedEffect(shown, touches, hideAfter) {
+        if (shown && hideAfter != null) {
+            delay(hideAfter)
+            onHide()
+        }
+    }
 }
 
 /**
