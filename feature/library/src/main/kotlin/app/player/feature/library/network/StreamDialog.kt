@@ -59,7 +59,8 @@ internal fun StreamDialog(onPlay: (String) -> Unit, onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { focus.requestFocus() }
     val play = {
         url?.let { u ->
-            scope.launch { prefs.addToHistory(u, HistoryPrefs(context).isPaused()) }
+            // Not the dialog's scope: the dialog closes at once and would cancel the write.
+            NetworkPrefs.writes.launch { prefs.addToHistory(u, HistoryPrefs(context).isPaused()) }
             onPlay(u)
             onDismiss()
         }

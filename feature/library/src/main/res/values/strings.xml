@@ -81,6 +81,7 @@
     <string name="stream_play">Play</string>
     <string name="stream_connecting">Connecting</string>
     <string name="stream_buffering">Buffering %1$d%%</string>
+    <string name="stream_buffering_plain">Buffering</string>
     <string name="stream_fail_not_found">The server says this stream does not exist.</string>
     <string name="stream_fail_timeout">The server did not answer in time. Check the address and your connection.</string>
     <string name="stream_fail_unsupported">This stream\'s format is not supported.</string>

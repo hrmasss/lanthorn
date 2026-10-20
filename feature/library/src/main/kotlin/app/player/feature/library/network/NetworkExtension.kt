@@ -10,6 +10,9 @@ import androidx.compose.runtime.Composable
 import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.feature.library.settings.generalStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -51,6 +54,9 @@ class NetworkPrefs(context: Context) {
     suspend fun clearHistory() = store.edit { it.remove(HISTORY) }
 
     internal companion object {
+        /** For writes that must outlive the screen that starts them (a dialog that closes on Play). */
+        val writes = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
         val USER_AGENT = stringPreferencesKey("user_agent")
         val KEEP_HISTORY = booleanPreferencesKey("keep_url_history")
         /** History, not a setting: backups put it under history, resets leave it. */
