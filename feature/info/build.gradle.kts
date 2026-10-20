@@ -6,3 +6,7 @@ plugins {
 android {
     namespace = "app.player.feature.info"
 }
+
+dependencies {
+    implementation(project(":core:settings-api"))
+}

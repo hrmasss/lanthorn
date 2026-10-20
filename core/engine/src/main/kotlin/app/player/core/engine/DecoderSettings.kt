@@ -2,12 +2,14 @@ package app.player.core.engine
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** The Decoder settings group (US-36). Per-file choices live in core/data's per_file_choice table. */
@@ -67,6 +69,14 @@ class DecoderSettings(context: Context) {
 
     suspend fun reset() {
         store.edit { it.clear() }
+    }
+
+    /** The raw preferences, for a backup file. */
+    suspend fun snapshot(): Preferences = store.data.first()
+
+    /** Writes a restored backup into the store. */
+    suspend fun restore(block: (MutablePreferences) -> Unit) {
+        store.edit { block(it) }
     }
 
     private companion object {

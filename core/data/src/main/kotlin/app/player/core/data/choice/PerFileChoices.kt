@@ -113,6 +113,16 @@ class PerFileChoices(context: Context) {
 
     suspend fun clear() = dao.clear()
 
+    /** Every stored choice, for a backup file (US-66.1). */
+    suspend fun all(): List<PerFileChoice> = dao.all()
+
+    /** Restores choices from a backup, keeping the cap. Returns how many were written. */
+    suspend fun restore(choices: List<PerFileChoice>): Int {
+        dao.putAll(choices)
+        dao.keepNewest(CAP)
+        return choices.size
+    }
+
     companion object {
         /** Files remembered at most; the least recently changed go first. */
         const val CAP = 2000

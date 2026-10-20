@@ -4,6 +4,8 @@ import android.app.Application
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerExtensionHost
 import app.player.feature.info.InfoExtension
+import app.player.feature.info.settings.DecoderSettingsGroup
+import app.player.feature.info.settings.PerFileChoicesBackup
 import app.player.core.settingsapi.BackupPart
 import app.player.core.settingsapi.SettingsGroup
 import app.player.core.settingsapi.SettingsHost
@@ -25,10 +27,12 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
     override val settingsGroups: List<SettingsGroup> = listOf(
         LibrarySettings,
         GeneralSettings,
+        DecoderSettingsGroup,
     )
 
     /** Everything besides settings that goes into a backup file. */
     override val backupParts: List<BackupPart> = listOf(
         ResumePointsBackup,
+        PerFileChoicesBackup,
     )
 }
