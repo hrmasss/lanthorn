@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -40,7 +41,11 @@ class AutoHideTest {
     @Test fun `US-16_3 a touch restarts the 3 s`() {
         start()
         rule.mainClock.advanceTimeBy(2_000)
-        touches++
+        rule.runOnUiThread {
+            touches++
+            Snapshot.sendApplyNotifications()
+        }
+        rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeBy(2_500)
         assertTrue("2.5 s after the last touch", shown)
