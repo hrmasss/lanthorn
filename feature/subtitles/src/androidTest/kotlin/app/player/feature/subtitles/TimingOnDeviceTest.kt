@@ -27,6 +27,7 @@ class TimingOnDeviceTest {
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         scenario.onActivity { it.surface.engine = engine }
+        Unit
     }
 
     @After fun close() = runBlocking {
