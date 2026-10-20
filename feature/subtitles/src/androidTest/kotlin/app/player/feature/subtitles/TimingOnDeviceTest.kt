@@ -50,4 +50,22 @@ class TimingOnDeviceTest {
         near(0.3)
         evidence("US-41.3 default 320 ms snapped to 300 ms, applied on open; changed to -1 s; the next file started at 300 ms again")
     }
+
+    @Test fun perFileDelayRemembered_US41_4() = runBlocking {
+        store.setDefaultDelay(300)
+        val tracks = Uri.fromFile(OnDevice.asset("tracks.mkv"))
+        engine.open(tracks)
+        near(0.3)
+        OnDevice.main {
+            SubtitleController(engine.asMpv()).setDelayMs(1250)
+            SubtitlesExtension.rememberDelay(OnDevice.context, engine, 1250)
+        }
+        near(1.25)
+        engine.open(Uri.fromFile(OnDevice.asset("wide.mkv")))
+        near(0.3)
+        engine.open(tracks)
+        near(1.25)
+        app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(tracks.toString())
+        evidence("US-41.4 set 1.25 s on one file; another file got the 300 ms default; reopening the first restored 1.25 s")
+    }
 }
