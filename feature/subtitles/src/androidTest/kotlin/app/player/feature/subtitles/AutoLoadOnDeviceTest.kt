@@ -24,6 +24,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /** P1.25: subtitles beside the video load by themselves; the right one turns on. */
+@org.junit.FixMethodOrder(org.junit.runners.MethodSorters.NAME_ASCENDING)
 class AutoLoadOnDeviceTest {
     @get:Rule val timeout: Timeout = Timeout.seconds(150)
 
@@ -115,8 +116,10 @@ class AutoLoadOnDeviceTest {
      * Shared storage under scoped storage: the video's folder is not listable until the viewer
      * allows it once in the system folder picker. Drives the real picker.
      */
-    @Test fun folderGrantFindsSubtitles_US39_1() = runBlocking {
+    @Test fun zzFolderGrantFindsSubtitles_US39_1() = runBlocking {
+        fun step(s: String) = android.util.Log.i("evidence", "grant step: $s")
         OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.READ_MEDIA_VIDEO)
+        step("permission")
         val resolver = OnDevice.context.contentResolver
         val dir = "Movies/LanthornGrant"
         val video = resolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), ContentValues().apply {
@@ -130,12 +133,15 @@ class AutoLoadOnDeviceTest {
             put(MediaStore.MediaColumns.RELATIVE_PATH, dir)
         })!!
         resolver.openOutputStream(srt)!!.use { it.write("1\n00:00:00,000 --> 00:00:10,000\nFound through the folder grant\n".toByteArray()) }
+        step("files written: $video $srt")
         try {
             val loader = SubtitlesExtension.autoLoad(OnDevice.context)
             engine.open(video)
             engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
             delay(1500)
-            val before = loader.lastResult!!
+            step("opened")
+            val before = loader.lastResult ?: throw AssertionError("no scan result")
+            step("scan: granted=${before.folderGranted} found=${before.found.size} place=${before.place}")
             assertFalse(before.folderGranted)
             assertTrue(before.found.isEmpty())
             // The panel's offer: the system picker, opened at the video's folder.
@@ -144,13 +150,18 @@ class AutoLoadOnDeviceTest {
             val picker = ActivityScenario.launch(GrantTestActivity::class.java)
             val device = UiDevice.getInstance(OnDevice.instrumentation)
             device.wait(Until.findObject(By.textContains("LanthornGrant")), 10_000)
+            step("picker up")
+            shotTo("grant-picker")
             device.wait(Until.findObject(By.text("USE THIS FOLDER").clazz("android.widget.Button")), 5_000)?.click()
                 ?: device.wait(Until.findObject(By.text("Use this folder")), 5_000)?.click()
             (device.wait(Until.findObject(By.text("ALLOW")), 5_000) ?: device.wait(Until.findObject(By.text("Allow")), 5_000))?.click()
-            val tree = GrantTestActivity.result.get(10, TimeUnit.SECONDS)
+            shotTo("grant-after-allow")
+            val tree = runCatching { GrantTestActivity.result.get(10, TimeUnit.SECONDS) }.getOrNull()
+            step("tree: $tree")
             picker.close()
             assertTrue("no grant", tree != null)
             loader.onFileLoaded(engine, video.toString())
+            step("rescanned")
             val after = loader.lastResult!!
             assertTrue(after.folderGranted)
             assertEquals(listOf("Grant.srt"), after.found.map { it.name })
@@ -161,5 +172,11 @@ class AutoLoadOnDeviceTest {
             resolver.delete(srt, null, null)
             resolver.persistedUriPermissions.forEach { resolver.releasePersistableUriPermission(it.uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
         }
+    }
+
+    private fun shotTo(name: String) {
+        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
+        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
 }
