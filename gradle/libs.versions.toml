@@ -21,7 +21,7 @@ androidx-test-core = "1.7.0"
 junit = "4.13.2"
 json = "20250517"
 smbj = "0.14.0"
-libmpv = "1.0.0"
+libmpv = "v1.0.0-player.3"
 robolectric = "4.17"
 
 [libraries]
@@ -44,7 +44,7 @@ compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
-libmpv = { module = "dev.jdtech.mpv:libmpv", version.ref = "libmpv" }
+libmpv = { module = "hrmasss:libmpv", version.ref = "libmpv" }
 junit = { module = "junit:junit", version.ref = "junit" }
 # Real org.json for JVM unit tests; Android's copy is a stub there.
 json = { module = "org.json:json", version.ref = "json" }

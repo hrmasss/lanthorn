@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.LibraryExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
@@ -14,6 +15,15 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
         }
         dependencies {
             add("testImplementation", catalog.findLibrary("junit").get())
+        }
+        // Instrumented-test APKs only run on the x86_64 emulator. Without this each one carries
+        // libmpv for four ABIs (about 140 MB) and the CI artifact grows past 400 MB.
+        extensions.configure<LibraryAndroidComponentsExtension> {
+            onVariants { variant ->
+                variant.deviceTests.values.forEach { test ->
+                    test.packaging.jniLibs.excludes.addAll("lib/arm64-v8a/**", "lib/armeabi-v7a/**", "lib/x86/**")
+                }
+            }
         }
     }
 }
