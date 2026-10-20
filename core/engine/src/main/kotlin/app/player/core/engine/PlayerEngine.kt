@@ -8,7 +8,11 @@ import android.view.Surface
 import dev.jdtech.mpv.MPVLib
 import dev.jdtech.mpv.MPVLib.MpvEvent
 import dev.jdtech.mpv.MPVLib.MpvFormat
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +20,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -31,14 +36,27 @@ import java.util.concurrent.TimeUnit
  */
 class PlayerEngine(context: Context) {
     private val appContext = context.applicationContext
-    private val thread: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "engine") }
+    private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine") }
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
+
+    private val _messages = MutableSharedFlow<EngineMessage>(extraBufferCapacity = 32, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /**
+     * mpv's warning and error lines, live (no replay). For classifying failures, for example
+     * "HTTP error 404" or "Failed to recognize file format" (US-61.4).
+     */
+    val messages: SharedFlow<EngineMessage> = _messages.asSharedFlow()
 
     private var mpv: MPVLib? = null
     @Volatile private var openedAt = 0L
     @Volatile private var starting = false
-    private var released = false
+
+    // Engine thread only. A load waits for the surface: MediaCodec's zero-copy path needs the
+    // video output's surface at decoder init, so loading first would cost HW for the whole file.
+    private var hasSurface = false
+    private var pendingLoad: (() -> Unit)? = null
+    @Volatile private var released = false
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -61,7 +79,9 @@ class PlayerEngine(context: Context) {
         lib.setOptionString("idle", "yes")
         lib.setOptionString("keep-open", "yes")
         lib.setOptionString("force-window", "no")
-        lib.setOptionString("vo", "gpu-next,gpu")
+        // No video output until a surface attaches: a vo that starts without a surface fails and
+        // mpv drops the video track for the whole file. attachSurface switches to the GPU output.
+        lib.setOptionString("vo", "null")
         lib.setOptionString("gpu-context", "android")
         lib.setOptionString("opengl-es", "yes")
         lib.setOptionString("ao", "audiotrack,opensles")
@@ -93,8 +113,28 @@ class PlayerEngine(context: Context) {
             setProperty("hwdec", mode.hwdec)
             val path = resolve(uri)
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
-            mpvCommand("loadfile", path, "replace", "-1", opts)
-            setProperty("pause", "no")
+            val load: () -> Unit = {
+                mpvCommand("loadfile", path, "replace", "-1", opts)
+                setProperty("pause", "no")
+            }
+            if (hasSurface) {
+                load()
+            } else {
+                // No surface yet: load when it attaches, or after a short wait (audio-only, background).
+                pendingLoad = load
+                thread.schedule({ runPendingLoad() }, SURFACE_WAIT_MS, TimeUnit.MILLISECONDS)
+            }
+        }
+    }
+
+    private fun runPendingLoad() {
+        val load = pendingLoad ?: return
+        pendingLoad = null
+        try {
+            load()
+        } catch (e: Exception) {
+            Log.e(TAG, "load failed", e)
+            _state.update { it.copy(error = e.message) }
         }
     }
 
@@ -168,6 +208,8 @@ class PlayerEngine(context: Context) {
         mpv?.attachSurface(surface)
         mpv?.setOptionString("force-window", "yes")
         setProperty("vo", "gpu-next,gpu")
+        hasSurface = true
+        runPendingLoad()
     }
 
     fun setSurfaceSize(width: Int, height: Int) = post {
@@ -179,6 +221,27 @@ class PlayerEngine(context: Context) {
         setProperty("vo", "null")
         mpv?.setOptionString("force-window", "no")
         mpv?.detachSurface()
+        hasSurface = false
+    }
+
+    /** Reads mpv's frame counters on the engine thread. Null once released. */
+    suspend fun stats(): EngineStats? = suspendCancellableCoroutine { cont ->
+        if (released) cont.resume(null)
+        else post {
+            val lib = mpv
+            cont.resume(
+                lib?.let {
+                    EngineStats(
+                        voDropped = it.getPropertyInt("frame-drop-count")?.toLong() ?: 0,
+                        decoderDropped = it.getPropertyInt("decoder-frame-drop-count")?.toLong() ?: 0,
+                        delayed = it.getPropertyInt("vo-delayed-frame-count")?.toLong() ?: 0,
+                        mistimed = it.getPropertyInt("mistimed-frame-count")?.toLong() ?: 0,
+                        frameNumber = it.getPropertyInt("estimated-frame-number")?.toLong() ?: 0,
+                        displayFps = it.getPropertyDouble("display-fps") ?: 0.0,
+                    )
+                },
+            )
+        }
     }
 
     fun release() {
@@ -214,7 +277,7 @@ class PlayerEngine(context: Context) {
 
     private fun post(block: () -> Unit) {
         if (released) return
-        thread.execute {
+        execute {
             try {
                 block()
             } catch (e: Exception) {
@@ -224,10 +287,18 @@ class PlayerEngine(context: Context) {
         }
     }
 
+    /** mpv's event thread can deliver after [release] shut the executor down: drop, don't crash. */
+    private fun execute(task: () -> Unit): Boolean = try {
+        thread.execute(task)
+        true
+    } catch (_: RejectedExecutionException) {
+        false
+    }
+
     private fun runAndWait(block: () -> Unit) {
         if (released) return
         val done = CountDownLatch(1)
-        thread.execute {
+        execute {
             try {
                 block()
             } finally {
@@ -307,10 +378,10 @@ class PlayerEngine(context: Context) {
                     starting = false
                     _state.update { it.copy(loaded = true, error = null) }
                 }
-                MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> thread.execute { refreshVideo() }
+                MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
-                    if (it.firstFrameMs != null) it
-                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt).also { s ->
+                    if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
+                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
                         Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
                     }
                 }
@@ -327,12 +398,14 @@ class PlayerEngine(context: Context) {
     private val logObserver = object : MPVLib.LogObserver {
         override fun logMessage(prefix: String, level: Int, text: String) {
             Log.println(if (level <= 20) Log.ERROR else Log.WARN, "mpv", "[$prefix] ${text.trimEnd()}")
+            _messages.tryEmit(EngineMessage(prefix, if (level <= 20) EngineMessage.Level.Error else EngineMessage.Level.Warn, text.trimEnd()))
         }
     }
 
     companion object {
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
+        private const val SURFACE_WAIT_MS = 1000L
         private val OBSERVED = listOf(
             "time-pos" to MpvFormat.MPV_FORMAT_DOUBLE,
             "duration" to MpvFormat.MPV_FORMAT_DOUBLE,

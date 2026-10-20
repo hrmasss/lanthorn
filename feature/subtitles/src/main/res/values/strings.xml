@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="subs_menu_tracks">Subtitles</string>
+    <string name="subs_menu_sync">Subtitle sync</string>
+    <string name="subs_tracks_title">Subtitles</string>
+    <string name="subs_off">Off</string>
+    <string name="subs_open_file">Open subtitle file</string>
+    <string name="subs_track_fallback">Track %1$d</string>
+    <string name="subs_external">external</string>
+    <string name="subs_second">second</string>
+    <string name="subs_encoding">Encoding</string>
+    <string name="subs_encoding_auto">Auto</string>
+    <string name="subs_override_styles">Override styles</string>
+    <string name="subs_ignore_fonts">Ignore embedded fonts</string>
+    <string name="subs_ignore_fonts_note">Applies when the file opens again</string>
+    <string name="subs_sync_title">Subtitle sync</string>
+    <string name="subs_delay">Delay</string>
+    <string name="subs_delay_value">%1$+.2f s</string>
+    <string name="subs_speed">Speed</string>
+    <string name="subs_speed_value">%1$.2fx</string>
+    <string name="subs_reset">Reset</string>
+    <string name="subs_open_failed">Could not open that subtitle file</string>
+</resources>

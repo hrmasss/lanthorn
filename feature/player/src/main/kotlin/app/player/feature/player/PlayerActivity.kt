@@ -16,6 +16,8 @@ import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.playerExtensions
+import app.player.feature.player.settings.PlayerSettings
+import app.player.feature.player.tools.PlaybackTools
 import kotlinx.coroutines.launch
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
@@ -32,12 +34,13 @@ class PlayerActivity : ComponentActivity() {
         }
         val extensions = playerExtensions
         engine = PlayerSessions.acquire(this, this) { created ->
+            PlaybackTools(created).applyDefaults()
             extensions.forEach { it.onEngineCreated(applicationContext, created) }
         }
         if (savedInstanceState == null) intent.data?.let(::open)
         setContent {
             LanthornPlayerTheme {
-                PlayerScreen(engine, extensions = extensions, onDecoderPicked = { mode ->
+                PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this), onDecoderPicked = { mode ->
                     val uri = engine.state.value.uri ?: return@PlayerScreen
                     lifecycleScope.launch { decoders.rememberManualChoice(uri, mode) }
                 })

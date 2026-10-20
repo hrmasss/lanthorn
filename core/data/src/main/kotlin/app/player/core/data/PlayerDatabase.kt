@@ -32,6 +32,17 @@ interface PlaybackPositionDao {
 
     @Upsert
     suspend fun put(position: PlaybackPosition)
+
+    /** Every resume point, for backup (US-66.1) and library progress marks. */
+    @Query("SELECT * FROM playback_position")
+    suspend fun all(): List<PlaybackPosition>
+
+    @Upsert
+    suspend fun putAll(positions: List<PlaybackPosition>)
+
+    /** Clear history (US-73.1). */
+    @Query("DELETE FROM playback_position")
+    suspend fun clear()
 }
 
 @Database(

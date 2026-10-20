@@ -14,3 +14,4 @@ keystore.properties
 .claude/
 perf/media/
 perf/results/raw/
+perf/results/*sdk-gphone*

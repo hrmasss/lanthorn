@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import app.player.core.designsystem.theme.LanthornTheme
 import app.player.feature.library.LibraryRoute
+import app.player.feature.library.settings.rememberAppearance
 import app.player.feature.player.PlayerActivity
 
 class MainActivity : ComponentActivity() {
@@ -13,7 +14,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            LanthornTheme {
+            // Null for the first frames while the theme choice is read, so a dark choice never flashes light.
+            val appearance = rememberAppearance() ?: return@setContent
+            LanthornTheme(appearance.mode, appearance.dynamicColor, appearance.pureBlack) {
                 LibraryRoute(onPlay = { uri -> startActivity(PlayerActivity.intent(this, uri)) })
             }
         }

@@ -87,6 +87,8 @@ import app.player.core.data.library.childrenOf
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.BrandPolygon
+import app.player.feature.library.settings.SettingsGroupScreen
+import app.player.feature.library.settings.SettingsHome
 
 private const val PERF_TAG = "LibraryPerf"
 
@@ -131,6 +133,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
                 onAccessResult = { permanentlyDenied = it },
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
+                onSettings = { nav.navigate("settings") },
                 onSearch = { nav.navigate("search") },
             )
         }
@@ -150,6 +153,25 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
                 onBack = { nav.popBackStack() },
             )
         }
+        composable("settings") {
+            SettingsHome(
+                onGroup = { id, key -> nav.navigate("settings/$id" + (key?.let { "?highlight=$it" } ?: "")) },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(
+            "settings/{group}?highlight={highlight}",
+            listOf(
+                navArgument("group") { type = NavType.StringType },
+                navArgument("highlight") { type = NavType.StringType; nullable = true },
+            ),
+        ) { entry ->
+            SettingsGroupScreen(
+                entry.arguments?.getString("group").orEmpty(),
+                entry.arguments?.getString("highlight"),
+                onBack = { nav.popBackStack() },
+            )
+        }
         composable("folder-settings") {
             FolderSettingsScreen(content, vm, onBack = { nav.popBackStack() })
         }
@@ -166,6 +188,7 @@ private fun LibraryHome(
     onAccessResult: (permanentlyDenied: Boolean) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
+    onSettings: () -> Unit,
     onSearch: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -192,7 +215,7 @@ private fun LibraryHome(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
-                actions = { if (state is LibraryUiState.Content) OverflowMenu(onFolderSettings) },
+                actions = { OverflowMenu(onFolderSettings.takeIf { state is LibraryUiState.Content }, onSettings) },
                 scrollBehavior = scroll,
             )
         },
@@ -414,19 +437,29 @@ private val Field.label
 
 /** Top bar overflow menu. */
 @Composable
-private fun OverflowMenu(onFolderSettings: () -> Unit) {
+private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("library-overflow")) {
             Icon(LanthornIcons.More, contentDescription = stringResource(R.string.more_options))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (onFolderSettings != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.library_folder_settings)) },
+                    onClick = {
+                        open = false
+                        onFolderSettings()
+                    },
+                )
+            }
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.library_folder_settings)) },
+                text = { Text(stringResource(R.string.settings_title)) },
                 onClick = {
                     open = false
-                    onFolderSettings()
+                    onSettings()
                 },
+                modifier = Modifier.testTag("open-settings"),
             )
         }
     }
@@ -529,6 +562,14 @@ private fun PerfLog(state: LibraryUiState, vm: LibraryViewModel) {
     LaunchedEffect(state is LibraryUiState.Loading) {
         if (state !is LibraryUiState.Loading) {
             Log.i(PERF_TAG, "first-content state=${state::class.simpleName} sinceStart=${sinceProcessStart()}ms")
+        }
+    }
+    val scans by vm.scanCount.collectAsStateWithLifecycle()
+    val unavailable = content?.indexed?.count { !it.available }
+    LaunchedEffect(scans, unavailable) {
+        // Wall-clock time, so a test can compare it with the moment storage was mounted or removed.
+        if (scans > 0) {
+            Log.i(PERF_TAG, "scan-done #$scans at=${System.currentTimeMillis()} unavailable=$unavailable scan=${vm.lastScan}")
         }
     }
     LaunchedEffect(content?.videoCount, content?.scanned) {
