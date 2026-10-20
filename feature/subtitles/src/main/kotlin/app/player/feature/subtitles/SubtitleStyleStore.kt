@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
-private val Context.subtitleStore by preferencesDataStore("subtitles")
+internal val Context.subtitleStore by preferencesDataStore("subtitles")
 
 /**
  * Saved Subtitle settings: the style (US-42, US-43) as one JSON value, so a style is read and

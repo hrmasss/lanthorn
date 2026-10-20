@@ -4,6 +4,8 @@
     <queries>
         <package android:name="app.player" />
     </queries>
+    <!-- Test only: puts a video in shared storage through MediaStore, as the library finds them. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <application>
         <activity android:name="app.player.feature.subtitles.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
@@ -19,5 +21,7 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" />
+        <activity android:name="app.player.feature.subtitles.GrantTestActivity" android:exported="false" />
     </application>
 </manifest>

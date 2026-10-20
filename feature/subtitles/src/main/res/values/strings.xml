@@ -46,4 +46,15 @@
     <string name="subs_setting_timing">Timing</string>
     <string name="subs_setting_default_delay">Default subtitle delay</string>
     <string name="subs_setting_default_delay_summary">Applied to every new video</string>
+    <string name="subs_allow_folder">Find subtitles in this folder</string>
+    <string name="subs_setting_loading">Loading</string>
+    <string name="subs_setting_auto">Show subtitles automatically</string>
+    <string name="subs_setting_auto_summary">Turns on a subtitle in your language, else the first file beside the video, else the file\'s default track</string>
+    <string name="subs_setting_language">Preferred subtitle language</string>
+    <string name="subs_setting_language_none">None</string>
+    <string name="subs_setting_folder">Subtitle folder</string>
+    <string name="subs_setting_folder_none">Not set. Subtitles are looked for beside each video.</string>
+    <string name="subs_setting_folder_clear">Stop using the subtitle folder</string>
+    <string name="subs_setting_allowed">Folders allowed for subtitles</string>
+    <string name="subs_setting_allowed_summary">%1$d folders. Videos in them and below find their subtitles by themselves.</string>
 </resources>
