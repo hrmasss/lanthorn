@@ -2,6 +2,7 @@ package app.player.feature.library
 
 import android.graphics.Bitmap
 import android.text.format.DateUtils
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +25,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,8 +53,12 @@ import androidx.compose.ui.unit.dp
 import app.player.core.data.library.LibraryFolder
 import app.player.core.data.library.LibraryVideo
 import app.player.core.designsystem.component.VideoThumbnail
+import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.PlayerColors
 import app.player.core.designsystem.theme.tabular
+
+/** One entry in a row's menu. */
+internal class RowAction<T>(@param:StringRes val label: Int, val onClick: (T) -> Unit)
 
 /** Everything a row needs besides its item. One instance per screen. */
 internal class RowContext(
@@ -60,7 +68,32 @@ internal class RowContext(
     val volumeLabel: (String) -> String?,
     val onFolder: (LibraryFolder) -> Unit,
     val onVideo: (LibraryVideo) -> Unit,
+    val folderActions: List<RowAction<LibraryFolder>> = emptyList(),
+    val videoActions: List<RowAction<LibraryVideo>> = emptyList(),
 )
+
+/** The per-row menu button. */
+@Composable
+private fun <T> RowMenu(item: T, actions: List<RowAction<T>>, name: String) {
+    if (actions.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.testTag("row-menu")) {
+            Icon(LanthornIcons.More, contentDescription = stringResource(R.string.row_menu, name))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (action in actions) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(action.label)) },
+                    onClick = {
+                        open = false
+                        action.onClick(item)
+                    },
+                )
+            }
+        }
+    }
+}
 
 /**
  * Folders first, then videos, as a list or a grid. Rows have fixed heights and thumbnails fixed
@@ -122,6 +155,7 @@ private fun FolderRow(folder: LibraryFolder, ctx: RowContext) {
                 maxLines = 1,
             )
         }
+        RowMenu(folder, ctx.folderActions, folder.name)
     }
 }
 
@@ -132,20 +166,23 @@ private fun FolderCell(folder: LibraryFolder, ctx: RowContext) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         FolderThumb(folder, ctx, Modifier.fillMaxWidth())
-        Text(
-            folder.name.ifEmpty { stringResource(R.string.library_storage_root) },
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Text(
-            folderSubtitle(folder, ctx),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                Text(
+                    folder.name.ifEmpty { stringResource(R.string.library_storage_root) },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    folderSubtitle(folder, ctx),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+            RowMenu(folder, ctx.folderActions, folder.name)
+        }
     }
 }
 
@@ -177,6 +214,7 @@ private fun VideoRow(video: LibraryVideo, ctx: RowContext) {
             )
             VideoDetails(video, ctx)
         }
+        RowMenu(video, ctx.videoActions, video.name)
     }
 }
 
@@ -191,15 +229,19 @@ private fun VideoCell(video: LibraryVideo, ctx: RowContext) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         VideoThumb(video, ctx, Modifier.fillMaxWidth())
-        Text(
-            displayName(video.name),
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
-            minLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        Box(Modifier.padding(horizontal = 4.dp)) { VideoDetails(video, ctx) }
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                Text(
+                    displayName(video.name),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                VideoDetails(video, ctx)
+            }
+            RowMenu(video, ctx.videoActions, video.name)
+        }
     }
 }
 

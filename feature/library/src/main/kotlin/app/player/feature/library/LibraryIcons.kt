@@ -49,6 +49,45 @@ internal object LibraryIcons {
         }
     }
 
+    /** Three bars, shorter going down: sort. */
+    val Sort: ImageVector by lazy {
+        shapes("Sort") {
+            roundRect(3f, 5f, 21f, 7.5f, 1.25f)
+            roundRect(3f, 10.75f, 15f, 13.25f, 1.25f)
+            roundRect(3f, 16.5f, 9f, 19f, 1.25f)
+        }
+    }
+
+    /** A ring with a handle: search. */
+    val Search: ImageVector by lazy {
+        shapes("Search", PathFillType.EvenOdd) {
+            circle(10f, 10f, 7f)
+            circle(10f, 10f, 4.75f)
+            // Handle from the ring's lower right, 45 degrees.
+            moveTo(14.2f, 15.8f)
+            lineTo(15.8f, 14.2f)
+            lineTo(21.2f, 19.6f)
+            quadTo(21.7f, 20.4f, 21.2f, 21.2f)
+            quadTo(20.4f, 21.7f, 19.6f, 21.2f)
+            close()
+        }
+    }
+
+    /** Two crossed bars: remove. */
+    val Close: ImageVector by lazy {
+        shapes("Close") {
+            for ((a, b) in listOf(Pair(1f, 1f), Pair(1f, -1f))) {
+                // A 2 wide bar from corner to corner of a 14 dp box centred on 12,12.
+                val d = 0.71f
+                moveTo(12f - 7f * a - d * b, 12f - 7f * b + d * a)
+                lineTo(12f - 7f * a + d * b, 12f - 7f * b - d * a)
+                lineTo(12f + 7f * a + d * b, 12f + 7f * b - d * a)
+                lineTo(12f + 7f * a - d * b, 12f + 7f * b + d * a)
+                close()
+            }
+        }
+    }
+
     /** Three sliders: choose the fields shown. */
     val Fields: ImageVector by lazy {
         shapes("Fields") {
@@ -70,6 +109,13 @@ private fun PathBuilder.roundRect(l: Float, t: Float, r: Float, b: Float, radius
     quadTo(l, b, l, b - radius)
     lineTo(l, t + radius)
     quadTo(l, t, l + radius, t)
+    close()
+}
+
+private fun PathBuilder.circle(cx: Float, cy: Float, r: Float) {
+    moveTo(cx - r, cy)
+    arcTo(r, r, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = cx + r, y1 = cy)
+    arcTo(r, r, 0f, isMoreThanHalf = true, isPositiveArc = true, x1 = cx - r, y1 = cy)
     close()
 }
 

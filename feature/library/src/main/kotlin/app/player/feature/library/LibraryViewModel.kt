@@ -43,10 +43,12 @@ sealed interface LibraryUiState {
     data class NeedsAccess(val permanentlyDenied: Boolean) : LibraryUiState
 
     data class Content(
-        /** Every folder holding videos, sorted by name. */
+        /** Every folder holding shown videos, in the viewer's sort order. */
         val folders: List<LibraryFolder>,
-        /** Every indexed video, sorted by name. */
+        /** Every indexed video not filtered out (excluded, hidden, extension off), in sort order. */
         val videos: List<LibraryVideo>,
+        /** Every indexed video, filtered or not. Folder settings name hidden items from it. */
+        val indexed: List<LibraryVideo>,
         val prefs: LibraryPrefs,
         val partial: Boolean,
         val scanning: Boolean,
@@ -63,7 +65,6 @@ sealed interface LibraryUiState {
     }
 }
 
-private val byName = compareBy<String, String>(String.CASE_INSENSITIVE_ORDER) { it }
 
 class LibraryViewModel(
     private val index: LibraryIndex,
@@ -86,10 +87,12 @@ class LibraryViewModel(
         when {
             a == null -> flowOf(LibraryUiState.Loading)
             a.access == MediaAccess.None -> flowOf(LibraryUiState.NeedsAccess(a.permanentlyDenied))
-            else -> combine(index.videos, prefs, index.scanning, scanned, mounted) { videos, p, scanning, done, vols ->
+            else -> combine(index.videos, prefs, index.scanning, scanned, mounted) { indexed, p, scanning, done, vols ->
+                val shown = indexed.filter(p.filter::accepts)
                 LibraryUiState.Content(
-                    folders = videos.toFolders().sortedWith(compareBy(byName) { it.name }),
-                    videos = videos.sortedWith(compareBy(byName) { it.name }),
+                    folders = shown.toFolders().sortedFor(p.sort, shown),
+                    videos = shown.sortedFor(p.sort),
+                    indexed = indexed,
                     prefs = p,
                     partial = a.access == MediaAccess.Partial,
                     scanning = scanning,
@@ -134,6 +137,12 @@ class LibraryViewModel(
     fun setViewMode(mode: ViewMode) = edit { setViewMode(mode) }
     fun setLayout(layout: Layout) = edit { setLayout(layout) }
     fun toggleField(field: Field) = edit { toggleField(field) }
+    fun setSort(sort: Sort) = edit { setSort(sort) }
+    fun setExcluded(folderKey: String, excluded: Boolean) = edit { setExcluded(folderKey, excluded) }
+    fun setHidden(id: String, hidden: Boolean) = edit { setHidden(id, hidden) }
+    fun setExtension(extension: String, on: Boolean) = edit { setExtension(extension, on) }
+    fun addSearch(query: String) = edit { addSearch(query) }
+    fun removeSearch(query: String) = edit { removeSearch(query) }
 
     private fun edit(block: suspend LibraryPrefsStore.() -> Unit) {
         val store = prefsStore ?: return

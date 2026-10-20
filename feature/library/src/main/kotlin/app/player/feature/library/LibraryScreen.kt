@@ -39,7 +39,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -127,6 +130,14 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
                 onAccessResult = { permanentlyDenied = it },
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
+                onSearch = { nav.navigate("search") },
+            )
+        }
+        composable("search") {
+            SearchScreen(
+                content, vm, loaders, onPlay,
+                onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
+                onBack = { nav.popBackStack() },
             )
         }
         composable("folder?key={key}", listOf(navArgument("key") { type = NavType.StringType })) { entry ->
@@ -134,11 +145,12 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
             FolderScreen(
                 key, state, vm, loaders, onPlay,
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
+                onSearch = { nav.navigate("search") },
                 onBack = { nav.popBackStack() },
             )
         }
         composable("folder-settings") {
-            FolderSettingsScreen(content?.volumes.orEmpty(), onBack = { nav.popBackStack() })
+            FolderSettingsScreen(content, vm, onBack = { nav.popBackStack() })
         }
     }
 }
@@ -153,6 +165,7 @@ private fun LibraryHome(
     onAccessResult: (permanentlyDenied: Boolean) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
+    onSearch: () -> Unit,
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -192,13 +205,13 @@ private fun LibraryHome(
                         if (state.scanning) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("library-scanning"))
                         if (state.partial) PartialBanner(onChooseMore = { request.launch(mediaPermissions()) })
                         when {
-                            state.videos.isNotEmpty() -> {
+                            state.videos.isNotEmpty() -> PullToRefreshBox(state.scanning, vm::refresh) {
                                 val allVideos = state.prefs.viewMode == ViewMode.AllVideos
                                 LibraryItems(
                                     folders = if (allVideos) emptyList() else state.folders,
                                     videos = if (allVideos) state.videos else emptyList(),
                                     layout = state.prefs.layout,
-                                    ctx = rowContext(state, loaders, onFolder, onPlay),
+                                    ctx = rowContext(state, vm, loaders, onFolder, onPlay),
                                     listState = listState,
                                     gridState = gridState,
                                 )
@@ -208,7 +221,7 @@ private fun LibraryHome(
                         }
                     }
                     if (state.videos.isNotEmpty()) {
-                        ViewToolbar(state.prefs, vm, showViewMode = true, Modifier.align(Alignment.BottomCenter))
+                        ViewToolbar(state.prefs, vm, showViewMode = true, onSearch, Modifier.align(Alignment.BottomCenter))
                     }
                 }
             }
@@ -226,6 +239,7 @@ private fun FolderScreen(
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
+    onSearch: () -> Unit,
     onBack: () -> Unit,
 ) {
     val content = state as? LibraryUiState.Content
@@ -248,23 +262,26 @@ private fun FolderScreen(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             if (content != null) {
-                LibraryItems(
-                    folders = subfolders,
-                    videos = videos,
-                    layout = content.prefs.layout,
-                    ctx = rowContext(content, loaders, onFolder, onPlay),
-                    listState = listState,
-                    gridState = gridState,
-                )
-                ViewToolbar(content.prefs, vm, showViewMode = false, Modifier.align(Alignment.BottomCenter))
+                PullToRefreshBox(content.scanning, vm::refresh) {
+                    LibraryItems(
+                        folders = subfolders,
+                        videos = videos,
+                        layout = content.prefs.layout,
+                        ctx = rowContext(content, vm, loaders, onFolder, onPlay),
+                        listState = listState,
+                        gridState = gridState,
+                    )
+                }
+                ViewToolbar(content.prefs, vm, showViewMode = false, onSearch, Modifier.align(Alignment.BottomCenter))
             }
         }
     }
 }
 
 @Composable
-private fun rowContext(
+internal fun rowContext(
     state: LibraryUiState.Content,
+    vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onFolder: (LibraryFolder) -> Unit,
     onPlay: (Uri) -> Unit,
@@ -276,14 +293,28 @@ private fun rowContext(
         volumeLabel = state::volumeLabel,
         onFolder = onFolder,
         onVideo = { v: LibraryVideo -> onPlay(Uri.parse(v.uri)) },
+        folderActions = listOf(
+            RowAction(R.string.action_hide) { f -> vm.setHidden(f.key, true) },
+            RowAction(R.string.action_exclude) { f -> vm.setExcluded(f.key, true) },
+        ),
+        videoActions = listOf(
+            RowAction(R.string.action_hide) { v -> vm.setHidden(v.uri, true) },
+        ),
     )
 }
 
 /** Floating toolbar for view choices (design.md: sort, view and search live here on phones). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ViewToolbar(prefs: LibraryPrefs, vm: LibraryViewModel, showViewMode: Boolean, modifier: Modifier) {
+private fun ViewToolbar(
+    prefs: LibraryPrefs,
+    vm: LibraryViewModel,
+    showViewMode: Boolean,
+    onSearch: () -> Unit,
+    modifier: Modifier,
+) {
     var fieldsOpen by remember { mutableStateOf(false) }
+    var sortOpen by remember { mutableStateOf(false) }
     HorizontalFloatingToolbar(
         expanded = true,
         modifier = modifier
@@ -291,6 +322,31 @@ private fun ViewToolbar(prefs: LibraryPrefs, vm: LibraryViewModel, showViewMode:
             .offset(y = -FloatingToolbarDefaults.ScreenOffset)
             .testTag("library-toolbar"),
     ) {
+        IconButton(onClick = onSearch, modifier = Modifier.testTag("open-search")) {
+            Icon(LibraryIcons.Search, contentDescription = stringResource(R.string.search))
+        }
+        Box {
+            IconButton(onClick = { sortOpen = true }, modifier = Modifier.testTag("open-sort")) {
+                Icon(LibraryIcons.Sort, contentDescription = stringResource(R.string.sort))
+            }
+            DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                for (key in SortKey.entries) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(key.label)) },
+                        leadingIcon = { RadioButton(selected = prefs.sort.key == key, onClick = null) },
+                        onClick = { vm.setSort(prefs.sort.copy(key = key)) },
+                        modifier = Modifier.testTag("sort-${key.name}"),
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sort_descending)) },
+                    leadingIcon = { Checkbox(checked = prefs.sort.descending, onCheckedChange = null) },
+                    onClick = { vm.setSort(prefs.sort.copy(descending = !prefs.sort.descending)) },
+                    modifier = Modifier.testTag("sort-descending"),
+                )
+            }
+        }
         if (showViewMode) {
             val all = prefs.viewMode == ViewMode.AllVideos
             IconButton(
@@ -331,6 +387,15 @@ private fun ViewToolbar(prefs: LibraryPrefs, vm: LibraryViewModel, showViewMode:
     }
 }
 
+private val SortKey.label
+    get() = when (this) {
+        SortKey.Name -> R.string.sort_name
+        SortKey.Date -> R.string.sort_date
+        SortKey.Size -> R.string.sort_size
+        SortKey.Length -> R.string.sort_length
+        SortKey.Resolution -> R.string.sort_resolution
+    }
+
 private val Field.label
     get() = when (this) {
         Field.Size -> R.string.field_size
@@ -341,7 +406,7 @@ private val Field.label
     }
 
 @Composable
-private fun BackButton(onBack: () -> Unit) {
+internal fun BackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack) {
         Icon(LanthornIcons.Back, contentDescription = stringResource(R.string.library_back))
     }
@@ -427,33 +492,6 @@ private fun Centered(modifier: Modifier = Modifier, content: @Composable () -> U
     ) {
         Box(Modifier.size(96.dp).background(MaterialTheme.colorScheme.primaryContainer, BrandPolygon.toShape()))
         content()
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FolderSettingsScreen(volumes: List<Volume>, onBack: () -> Unit) {
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.folders_title)) }, navigationIcon = { BackButton(onBack) })
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("folder-settings")) {
-            item {
-                Text(
-                    stringResource(R.string.folders_scanned),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            }
-            items(volumes) { volume ->
-                ListItem(
-                    headlineContent = { Text(volume.label) },
-                    supportingContent = { Text(stringResource(R.string.folders_all)) },
-                )
-            }
-        }
     }
 }
 
