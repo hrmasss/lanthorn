@@ -61,7 +61,9 @@ class PlayerEngine(context: Context) {
         lib.setOptionString("idle", "yes")
         lib.setOptionString("keep-open", "yes")
         lib.setOptionString("force-window", "no")
-        lib.setOptionString("vo", "gpu-next,gpu")
+        // No video output until a surface attaches: a vo that starts without a surface fails and
+        // mpv drops the video track for the whole file. attachSurface switches to the GPU output.
+        lib.setOptionString("vo", "null")
         lib.setOptionString("gpu-context", "android")
         lib.setOptionString("opengl-es", "yes")
         lib.setOptionString("ao", "audiotrack,opensles")
