@@ -51,6 +51,16 @@ internal class SubtitleStyles(context: Context) {
         }
     }
 
+    fun current(): SubtitleStyle = _style.value
+
+    /** For screens that show the style before any player opened (settings). */
+    suspend fun ensureLoaded() {
+        if (loaded) return
+        loaded = true
+        val saved = store.load()
+        if (saved != _style.value) _style.value = saved
+    }
+
     fun update(block: (SubtitleStyle) -> SubtitleStyle) {
         val next = block(_style.value)
         if (next == _style.value) return

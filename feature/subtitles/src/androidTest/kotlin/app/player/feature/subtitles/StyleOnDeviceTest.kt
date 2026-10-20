@@ -12,11 +12,16 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
+import org.junit.rules.Timeout
 import org.junit.Test
 import java.io.File
 
 /** P1.28 style and placement on the real libmpv: property read-back plus screenshots. */
 class StyleOnDeviceTest {
+    /** A stuck wait fails the test instead of holding the shared emulator. */
+    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
     private lateinit var styles: SubtitleStyles
@@ -47,7 +52,7 @@ class StyleOnDeviceTest {
     @After fun close() {
         if (!::scenario.isInitialized) return
         OnDevice.main { styles.reset() }
-        scenario.onActivity { it.surface.engine = null }
+        runCatching { scenario.onActivity { it.surface.engine = null } }
         OnDevice.release(holder)
         scenario.close()
     }
@@ -98,6 +103,42 @@ class StyleOnDeviceTest {
         val saved = SubtitleStyleStore(OnDevice.context).load()
         assertEquals(70, saved.size)
         evidence("Style saved to DataStore and read back (size 70)")
+    }
+
+    @Test fun settingsPreviewFollowsStyle_P1_28() = runBlocking {
+        val page = ActivityScenario.launch(SettingsTestActivity::class.java)
+        delay(1500)
+        shot("settings-preview-default")
+        OnDevice.main { styles.update { it.copy(color = 0xFFFFEB3B, box = true, align = SubAlign.Left, bottomMarginPercent = 20f) } }
+        delay(800)
+        shot("settings-preview-edited")
+        page.close()
+        evidence("Subtitle settings page shows a live preview that follows edits; screenshots")
+    }
+
+    @Test fun fontNamesAndFamilies_US42_1() = runBlocking {
+        assertEquals("Roboto", FontNames.family(File("/system/fonts/Roboto-Regular.ttf")))
+        val families = styles.families()
+        assertTrue(families.take(3) == listOf("sans-serif", "serif", "monospace"))
+        assertTrue("families $families", families.size > 10)
+        evidence("US-42.1 font picker lists ${families.size} families from /system/fonts, e.g. ${families.drop(3).take(6)}")
+    }
+
+    /** Why text on the wide clip drew tiny: dump what mpv thinks, compare with the 16:9 clip. */
+    @Test fun sizeDiagnostic() = runBlocking {
+        for (name in listOf("osd-dimensions", "sub-font-size", "sub-scale", "sub-use-margins", "sub-scale-by-window", "video-params", "sub-ass-override")) {
+            evidence("diag wide $name = ${engine.get(name, PropertyType.Text)}")
+        }
+        shot("diag-wide-default")
+        engine.set("sub-use-margins", "yes")
+        delay(500)
+        shot("diag-wide-use-margins")
+        engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
+        engine.set("sid", "2")
+        delay(1500)
+        evidence("diag tracks osd-dimensions = ${engine.get("osd-dimensions", PropertyType.Text)}")
+        shot("diag-tracks-english")
     }
 
     private fun shot(name: String) {

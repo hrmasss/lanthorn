@@ -7,6 +7,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:settings-api"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.datastore.preferences)

@@ -25,7 +25,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.player.core.designsystem.component.SettingsSwitch
 import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.launch
@@ -85,6 +85,7 @@ internal fun LazyListScope.styleEditor(
     update: ((SubtitleStyle) -> SubtitleStyle) -> Unit,
     families: List<String>,
     onPickFontFolder: () -> Unit,
+    highlight: String? = null,
 ) {
     item(key = "font") {
         Label(stringResource(R.string.subs_font))
@@ -115,18 +116,18 @@ internal fun LazyListScope.styleEditor(
         Label(stringResource(R.string.subs_color))
         Swatches(style.color, "sub-color") { c -> update { it.copy(color = c) } }
     }
-    item(key = "bold") { Toggle(stringResource(R.string.subs_bold), style.bold, "sub-bold") { b -> update { it.copy(bold = b) } } }
+    item(key = "bold") { Toggle(stringResource(R.string.subs_bold), style.bold, "sub-bold", highlight == "bold") { b -> update { it.copy(bold = b) } } }
     item(key = "outline") {
-        Toggle(stringResource(R.string.subs_outline), style.outline, "sub-outline") { b -> update { it.copy(outline = b) } }
+        Toggle(stringResource(R.string.subs_outline), style.outline, "sub-outline", highlight == "outline") { b -> update { it.copy(outline = b) } }
         if (style.outline) {
             Swatches(style.outlineColor, "sub-outline-color") { c -> update { it.copy(outlineColor = c) } }
             Label(stringResource(R.string.subs_thickness_value, style.outlineSize))
             SliderRow(style.outlineSize, 0.5f..8f, "sub-outline-size") { v -> update { it.copy(outlineSize = (v * 2).roundToInt() / 2f) } }
         }
     }
-    item(key = "shadow") { Toggle(stringResource(R.string.subs_shadow), style.shadow, "sub-shadow") { b -> update { it.copy(shadow = b) } } }
+    item(key = "shadow") { Toggle(stringResource(R.string.subs_shadow), style.shadow, "sub-shadow", highlight == "shadow") { b -> update { it.copy(shadow = b) } } }
     item(key = "box") {
-        Toggle(stringResource(R.string.subs_box), style.box, "sub-box") { b -> update { it.copy(box = b) } }
+        Toggle(stringResource(R.string.subs_box), style.box, "sub-box", highlight == "box") { b -> update { it.copy(box = b) } }
         if (style.box) {
             Swatches(style.boxColor, "sub-box-color") { c -> update { it.copy(boxColor = c) } }
             Label(stringResource(R.string.subs_opacity_value, (style.boxOpacity * 100).roundToInt()))
@@ -153,7 +154,7 @@ internal fun LazyListScope.styleEditor(
         }
     }
     item(key = "fit") {
-        Toggle(stringResource(R.string.subs_fit_video), style.fitToVideo, "sub-fit") { b -> update { it.copy(fitToVideo = b) } }
+        Toggle(stringResource(R.string.subs_fit_video), style.fitToVideo, "sub-fit", highlight == "fit") { b -> update { it.copy(fitToVideo = b) } }
     }
 }
 
@@ -199,10 +200,6 @@ private fun SliderRow(value: Float, range: ClosedFloatingPointRange<Float>, tag:
 }
 
 @Composable
-private fun Toggle(label: String, checked: Boolean, tag: String, onChange: (Boolean) -> Unit) {
-    ListItem(
-        headlineContent = { Text(label) },
-        trailingContent = { Switch(checked, onCheckedChange = null) },
-        modifier = Modifier.clickable { onChange(!checked) }.testTag(tag),
-    )
+private fun Toggle(label: String, checked: Boolean, tag: String, highlighted: Boolean = false, onChange: (Boolean) -> Unit) {
+    SettingsSwitch(label, checked, onChange, modifier = Modifier.testTag(tag), highlighted = highlighted)
 }

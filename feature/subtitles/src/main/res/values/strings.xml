@@ -39,4 +39,8 @@
     <string name="subs_align_right">Right</string>
     <string name="subs_margin_value">Bottom margin %1$d%%</string>
     <string name="subs_fit_video">Keep inside the picture</string>
+    <string name="subs_settings_title">Subtitle</string>
+    <string name="subs_size">Size</string>
+    <string name="subs_margin">Bottom margin</string>
+    <string name="subs_preview_text">Subtitles look like this</string>
 </resources>
