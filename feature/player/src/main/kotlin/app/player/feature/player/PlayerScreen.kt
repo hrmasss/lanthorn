@@ -105,7 +105,11 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
-    val state by engine.state.collectAsStateWithLifecycle()
+    val engineState by engine.state.collectAsStateWithLifecycle()
+    // mpv's own pause flag: PlaybackState.paused resets to true on open and mpv sends no event when
+    // pause was already off, so it can read paused while playing (reported to engine).
+    val pauseFlag by remember(engine) { engine.observe("pause", PropertyType.Flag) }.collectAsStateWithLifecycle()
+    val state = engineState.copy(paused = pauseFlag ?: engineState.paused)
     val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
     val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
         .collectAsStateWithLifecycle()
