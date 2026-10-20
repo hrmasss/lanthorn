@@ -74,6 +74,8 @@ object Playback : PlaybackControls {
     override val showPreviousNext: StateFlow<Boolean> = _showPreviousNext.asStateFlow()
     private val _stepButtons = MutableStateFlow(false)
     override val stepButtons: StateFlow<Boolean> = _stepButtons.asStateFlow()
+    private val _loop = MutableStateFlow(false)
+    override val loop: StateFlow<Boolean> = _loop.asStateFlow()
     private val _shuffle = MutableStateFlow(false)
     override val shuffle: StateFlow<Boolean> = _shuffle.asStateFlow()
 
@@ -145,6 +147,10 @@ object Playback : PlaybackControls {
 
     internal fun setShuffle(on: Boolean) = scope.launch { prefs.setShuffle(on) }
 
+    override fun toggleLoop() {
+        setLoop(if (_settings.value.loop == LoopMode.One) LoopMode.Off else LoopMode.One)
+    }
+
     override fun toggleShuffle() {
         setShuffle(!_settings.value.shuffle)
     }
@@ -187,6 +193,7 @@ object Playback : PlaybackControls {
         _showPreviousNext.value = s.showPreviousNext
         _stepButtons.value = s.stepButtons
         _shuffle.value = s.shuffle
+        _loop.value = s.loop == LoopMode.One
     }
 
     private fun play(laterInQueue: Boolean) {

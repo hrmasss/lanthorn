@@ -40,6 +40,10 @@ interface PlaybackControls {
     /** Enters picture-in-picture. False when not available. */
     fun pip(): Boolean = false
 
+    /** True while the current video loops (US-24.2). [toggleLoop] switches between that and no loop. */
+    val loop: StateFlow<Boolean> get() = OFF
+    fun toggleLoop() {}
+
     val shuffle: StateFlow<Boolean> get() = OFF
     fun toggleShuffle() {}
     val backgroundPlay: StateFlow<Boolean> get() = OFF
