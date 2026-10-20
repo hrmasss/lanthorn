@@ -34,7 +34,7 @@ class PlaybackToolsTest {
 
     @After fun close() = scenario.close()
 
-    @Test fun speedAppliesWithPitchKept_US23_1() = runBlocking {
+    @Test fun speedAppliesWithPitchKept_US23_1() = runBlocking<Unit> {
         open("clip.mp4")
         val speed = tools.speed
         val t0 = SystemClock.elapsedRealtime()
@@ -93,7 +93,7 @@ class PlaybackToolsTest {
         assertTrue("cleared", engine.state.value.positionMs > 4_300)
     }
 
-    @Test fun chaptersListAndJump_US27_2() = runBlocking {
+    @Test fun chaptersListAndJump_US27_2() = runBlocking<Unit> {
         open("chapters.mkv")
         val chapters = tools.chapters()
         log("chapters: $chapters")
@@ -104,7 +104,7 @@ class PlaybackToolsTest {
         log("jumped to chapter 3 at ${engine.state.value.positionMs} ms")
     }
 
-    @Test fun screenshotSavesVideoFrameAsPng_US33_1() = runBlocking {
+    @Test fun screenshotSavesVideoFrameAsPng_US33_1() = runBlocking<Unit> {
         open("clip.mp4")
         val t0 = SystemClock.elapsedRealtime()
         val uri = tools.screenshot(context)
