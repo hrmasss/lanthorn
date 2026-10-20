@@ -50,6 +50,8 @@ fun PlayerScreen(
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
     extensions: List<PlayerExtension> = emptyList(),
+    /** Seek preview on the seek bar (US-30.1, default on). Off: the video itself follows the finger. */
+    seekPreview: Boolean = true,
 ) {
     val state by engine.state.collectAsStateWithLifecycle()
     var controls by controlsState
@@ -58,6 +60,8 @@ fun PlayerScreen(
         extensions.flatMap { it.menuEntries }.sortedWith(compareBy({ it.group }, { it.order }))
     }
     var openPanel by remember { mutableStateOf<String?>(null) }
+    // US-30.1: the seek preview loads with the file, so the first drag shows frames at once.
+    val preview = if (seekPreview) rememberSeekPreview(state.uri) else null
     Box(
         modifier
             .fillMaxSize()
@@ -70,7 +74,7 @@ fun PlayerScreen(
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
-        if (controls) Controls(state, engine, entries, { openPanel = it }, Modifier.align(Alignment.BottomCenter))
+        if (controls) Controls(state, engine, entries, { openPanel = it }, preview, Modifier.align(Alignment.BottomCenter))
         state.error?.let {
             Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
         }
@@ -102,6 +106,7 @@ private fun Controls(
     engine: PlayerEngine,
     entries: List<PlayerMenuEntry>,
     onOpenPanel: (String) -> Unit,
+    preview: SeekPreviewState?,
     modifier: Modifier,
 ) {
     var scrubbing by remember { mutableStateOf(false) }
@@ -115,15 +120,19 @@ private fun Controls(
     ) {
         Text(infoLine(state), color = Color.White, style = MaterialTheme.typography.labelMedium, modifier = Modifier.testTag("player-info"))
         val duration = state.durationMs.coerceAtLeast(1)
+        if (scrubbing && preview != null) {
+            SeekPreview(preview, (scrubTo * duration).toLong(), Modifier.align(Alignment.CenterHorizontally))
+        }
         Slider(
             value = if (scrubbing) scrubTo else state.positionMs.toFloat() / duration,
             onValueChange = {
                 scrubbing = true
                 scrubTo = it
-                engine.seekTo((it * duration).toLong(), exact = false)
+                // With a preview the video holds still until release; without, it follows the finger.
+                if (preview == null) engine.scrub((it * duration).toLong())
             },
             onValueChangeFinished = {
-                engine.seekTo((scrubTo * duration).toLong(), exact = true)
+                engine.endScrub((scrubTo * duration).toLong())
                 scrubbing = false
             },
         )

@@ -29,7 +29,9 @@ import java.util.concurrent.TimeUnit
  * - [attachSurface] and [detachSurface] block the caller until mpv has let go of the old surface,
  *   because Android destroys the surface as soon as `surfaceDestroyed` returns.
  */
-class PlayerEngine(context: Context) {
+class PlayerEngine private constructor(context: Context, private val preview: Boolean) {
+    constructor(context: Context) : this(context, preview = false)
+
     private val appContext = context.applicationContext
     private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine") }
     private val _state = MutableStateFlow(PlaybackState())
@@ -44,6 +46,11 @@ class PlayerEngine(context: Context) {
     private var hasSurface = false
     private var pendingLoad: (() -> Unit)? = null
     private var released = false
+
+    // Engine thread only. Latest-wins scrubbing: one keyframe seek in flight, the newest target waits.
+    private var scrubInFlight = false
+    private var scrubNext: Long? = null
+    private var scrubSentAt = 0L
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -79,6 +86,21 @@ class PlayerEngine(context: Context) {
         lib.setOptionString("demuxer-max-back-bytes", "${32 * 1024 * 1024}")
         lib.setOptionString("save-position-on-quit", "no")
         lib.setOptionString("msg-level", "all=warn")
+        if (preview) {
+            // Seek preview (US-30.1): video only, paused, keyframe seeks, cheapest decode.
+            lib.setOptionString("aid", "no")
+            lib.setOptionString("sid", "no")
+            lib.setOptionString("ao", "null")
+            lib.setOptionString("hr-seek", "no")
+            lib.setOptionString("pause", "yes")
+            lib.setOptionString("vd-lavc-skiploopfilter", "all")
+            lib.setOptionString("vd-lavc-fast", "yes")
+            // Copy-back decoding: the preview surface comes and goes with the finger, and the
+            // zero-copy path would lose HW whenever the file loads before the surface exists.
+            lib.setOptionString("hwdec", DecoderMode.HW_PLUS.hwdec)
+            lib.setOptionString("demuxer-max-bytes", "${8 * 1024 * 1024}")
+            lib.setOptionString("demuxer-max-back-bytes", "0")
+        }
         lib.init()
         lib.addObserver(observer)
         lib.addLogObserver(logObserver)
@@ -96,7 +118,7 @@ class PlayerEngine(context: Context) {
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
             val load: () -> Unit = {
                 mpvCommand("loadfile", path, "replace", "-1", opts)
-                setProperty("pause", "no")
+                setProperty("pause", if (preview) "yes" else "no")
             }
             if (hasSurface) {
                 load()
@@ -126,6 +148,40 @@ class PlayerEngine(context: Context) {
     /** Exact seek by default; pass [exact] false while scrubbing for keyframe seeks (NF-6). */
     fun seekTo(positionMs: Long, exact: Boolean = true) = post {
         mpvCommand("seek", "${positionMs / 1000.0}", if (exact) "absolute+exact" else "absolute+keyframes")
+    }
+
+    /**
+     * Seek while a finger drags (US-17.3, NF-6): keyframe seeks, at most one in flight, and the
+     * newest target replaces any waiting one. Each finished seek shows a frame, so the picture
+     * updates as fast as the decoder can deliver keyframes.
+     */
+    fun scrub(positionMs: Long) = post {
+        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < SCRUB_STALL_MS) {
+            scrubNext = positionMs
+        } else {
+            sendScrub(positionMs)
+        }
+    }
+
+    /** The finger lifted: exact seek to where it stopped (US-17.2). */
+    fun endScrub(positionMs: Long) = post {
+        scrubNext = null
+        scrubInFlight = false
+        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+exact")
+    }
+
+    private fun sendScrub(positionMs: Long) {
+        scrubInFlight = true
+        scrubSentAt = SystemClock.elapsedRealtime()
+        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
+    }
+
+    private fun scrubLanded() = post {
+        scrubInFlight = false
+        scrubNext?.let {
+            scrubNext = null
+            sendScrub(it)
+        }
     }
 
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
@@ -323,10 +379,13 @@ class PlayerEngine(context: Context) {
                     _state.update { it.copy(loaded = true, error = null) }
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> thread.execute { refreshVideo() }
-                MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
-                    if (it.firstFrameMs != null) it
-                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt).also { s ->
-                        Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
+                MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
+                    scrubLanded()
+                    _state.update {
+                        if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
+                        else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
+                            Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
+                        }
                     }
                 }
                 // An end before the file loaded means mpv could not open it. The end of the
@@ -349,6 +408,13 @@ class PlayerEngine(context: Context) {
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
         private const val SURFACE_WAIT_MS = 1000L
+        private const val SCRUB_STALL_MS = 250L
+
+        /**
+         * A second, video-only engine for seek preview frames (US-30.1). Not shared: the caller
+         * owns it, gives it a small [VideoSurfaceView] and releases it.
+         */
+        fun preview(context: Context): PlayerEngine = PlayerEngine(context, preview = true)
         private val OBSERVED = listOf(
             "time-pos" to MpvFormat.MPV_FORMAT_DOUBLE,
             "duration" to MpvFormat.MPV_FORMAT_DOUBLE,

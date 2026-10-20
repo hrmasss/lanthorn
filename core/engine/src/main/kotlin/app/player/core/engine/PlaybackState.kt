@@ -15,6 +15,8 @@ data class PlaybackState(
     val droppedFrames: Long = 0,
     /** Time from [PlayerEngine.open] to the first frame after load, in ms. Null until shown. */
     val firstFrameMs: Long? = null,
+    /** Goes up each time playback restarts after a load or a seek: the new frame is ready. */
+    val restarts: Int = 0,
     val error: String? = null,
 )
 
