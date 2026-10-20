@@ -61,7 +61,7 @@ object Playback : PlaybackControls {
     private const val TAG = "Playback"
 
     /** How long after load a decoder failure is still this file's (US-75.1). */
-    private const val DECODER_CHECK_MS = 1_500L
+    private const val DECODER_CHECK_MS = 2_000L
 
     private val NETWORK_SCHEMES = setOf("http", "https", "rtsp", "rtmp", "smb")
 
@@ -291,7 +291,8 @@ object Playback : PlaybackControls {
         delay(DECODER_CHECK_MS)
         val s = engine.state.value
         if (s.uri != uri || s.error != null || s.video != null || s.ended) return
-        if (lines.any(Failures::isDecoderFailure)) failed(engine, s)
+        // Loaded, yet no video and not even an audio frame: nothing here can decode it.
+        if (lines.any(Failures::isDecoderFailure) || s.firstFrameMs == null) failed(engine, s)
     }
 
     /** End of a file: next, back to the first with loop all, or stop (US-24.1, US-24.3, US-24.5). */
