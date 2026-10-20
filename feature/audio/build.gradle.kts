@@ -7,7 +7,9 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:settings-api"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.activity.compose)
     testImplementation(libs.json)
     testImplementation(libs.kotlinx.coroutines.test)
