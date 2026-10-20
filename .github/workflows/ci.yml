@@ -47,7 +47,7 @@ jobs:
           PLAYER_KEYSTORE_PASSWORD: ${{ secrets.PLAYER_KEYSTORE_PASSWORD }}
           PLAYER_KEY_ALIAS: ${{ secrets.PLAYER_KEY_ALIAS }}
           PLAYER_KEY_PASSWORD: ${{ secrets.PLAYER_KEY_PASSWORD }}
-        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest lint --console=plain
+        run: ./gradlew assembleDebug assembleRelease assembleBench assembleDebugAndroidTest testDebugUnitTest lint --console=plain
 
       - name: APK sizes
         run: find app/build/outputs/apk -name '*.apk' -printf '%s\t%p\n' | sort -n | tee -a "$GITHUB_STEP_SUMMARY"
@@ -57,6 +57,14 @@ jobs:
           name: apks
           path: app/build/outputs/apk/**/*.apk
           retention-days: 14
+
+      # Instrumented-test APKs of every module, so emulator runs install them without a local build:
+      # gh run download <id> -R hrmasss/player-app -n test-apks
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-apks
+          path: '**/build/outputs/apk/androidTest/**/*.apk'
+          retention-days: 3
 
       - uses: actions/upload-artifact@v7
         if: always()
