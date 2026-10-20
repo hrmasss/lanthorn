@@ -40,3 +40,8 @@ data class VideoInfo(
     val fps: Double,
     val pixelFormat: String?,
 )
+
+/** One mpv log line at warning level or worse. [prefix] is mpv's module, for example "stream". */
+data class EngineMessage(val prefix: String, val level: Level, val text: String) {
+    enum class Level { Warn, Error }
+}

@@ -70,6 +70,15 @@ fun PlayerScreen(
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
+        // Extension overlays (network state and the like): over the video, under the controls.
+        val overlayHost = remember(engine) {
+            object : PanelHost {
+                override val engine = engine
+                override fun close() = Unit
+                override fun open(panelId: String) { openPanel = panelId }
+            }
+        }
+        extensions.forEach { it.Overlay(overlayHost) }
         if (controls) Controls(state, engine, entries, { openPanel = it }, Modifier.align(Alignment.BottomCenter))
         state.error?.let {
             Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
