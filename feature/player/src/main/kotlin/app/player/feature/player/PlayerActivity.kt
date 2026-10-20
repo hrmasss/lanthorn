@@ -10,7 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import app.player.core.designsystem.PlayerTheme
+import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.playerapi.playerExtensions
@@ -32,7 +32,7 @@ class PlayerActivity : ComponentActivity() {
         }
         if (savedInstanceState == null) intent.data?.let { engine.open(it) }
         setContent {
-            PlayerTheme(darkTheme = true) { PlayerScreen(engine, extensions = extensions) }
+            LanthornPlayerTheme { PlayerScreen(engine, extensions = extensions) }
         }
     }
 

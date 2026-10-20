@@ -16,3 +16,5 @@ This app bundles or links the following third-party software:
 
 - AndroidX and Jetpack Compose, Apache-2.0.
 - Kotlin and kotlinx.coroutines, Apache-2.0.
+- Material Symbols (a few glyphs, as Compose vectors in core/designsystem), Apache-2.0.
+  https://github.com/google/material-design-icons

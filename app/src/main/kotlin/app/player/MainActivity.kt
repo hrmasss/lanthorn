@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import app.player.core.designsystem.PlayerTheme
+import app.player.core.designsystem.theme.LanthornTheme
 import app.player.feature.player.PlayerActivity
 
 class MainActivity : ComponentActivity() {
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
             val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri != null) startActivity(PlayerActivity.intent(this, uri))
             }
-            PlayerTheme {
+            LanthornTheme {
                 Scaffold { padding ->
                     Column(
                         Modifier.fillMaxSize().padding(padding),
