@@ -8,7 +8,11 @@ import android.view.Surface
 import dev.jdtech.mpv.MPVLib
 import dev.jdtech.mpv.MPVLib.MpvEvent
 import dev.jdtech.mpv.MPVLib.MpvFormat
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -35,6 +40,14 @@ class PlayerEngine(context: Context) {
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    private val _messages = MutableSharedFlow<EngineMessage>(extraBufferCapacity = 32, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /**
+     * mpv's warning and error lines, live (no replay). For classifying failures, for example
+     * "HTTP error 404" or "Failed to recognize file format" (US-61.4).
+     */
+    val messages: SharedFlow<EngineMessage> = _messages.asSharedFlow()
+
     private var mpv: MPVLib? = null
     @Volatile private var openedAt = 0L
     @Volatile private var starting = false
@@ -43,7 +56,7 @@ class PlayerEngine(context: Context) {
     // video output's surface at decoder init, so loading first would cost HW for the whole file.
     private var hasSurface = false
     private var pendingLoad: (() -> Unit)? = null
-    private var released = false
+    @Volatile private var released = false
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -258,7 +271,7 @@ class PlayerEngine(context: Context) {
 
     private fun post(block: () -> Unit) {
         if (released) return
-        thread.execute {
+        execute {
             try {
                 block()
             } catch (e: Exception) {
@@ -268,10 +281,18 @@ class PlayerEngine(context: Context) {
         }
     }
 
+    /** mpv's event thread can deliver after [release] shut the executor down: drop, don't crash. */
+    private fun execute(task: () -> Unit): Boolean = try {
+        thread.execute(task)
+        true
+    } catch (_: RejectedExecutionException) {
+        false
+    }
+
     private fun runAndWait(block: () -> Unit) {
         if (released) return
         val done = CountDownLatch(1)
-        thread.execute {
+        execute {
             try {
                 block()
             } finally {
@@ -342,7 +363,7 @@ class PlayerEngine(context: Context) {
                     starting = false
                     _state.update { it.copy(loaded = true, error = null) }
                 }
-                MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> thread.execute { refreshVideo() }
+                MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
                     if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
                     else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
@@ -362,6 +383,7 @@ class PlayerEngine(context: Context) {
     private val logObserver = object : MPVLib.LogObserver {
         override fun logMessage(prefix: String, level: Int, text: String) {
             Log.println(if (level <= 20) Log.ERROR else Log.WARN, "mpv", "[$prefix] ${text.trimEnd()}")
+            _messages.tryEmit(EngineMessage(prefix, if (level <= 20) EngineMessage.Level.Error else EngineMessage.Level.Warn, text.trimEnd()))
         }
     }
 
