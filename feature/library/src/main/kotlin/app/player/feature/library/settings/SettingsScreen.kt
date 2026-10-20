@@ -1,6 +1,6 @@
 package app.player.feature.library.settings
 
-import android.content.Context
+import android.content.res.Resources
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -40,10 +41,10 @@ import app.player.feature.library.fold
 data class SettingHit(val groupId: String, val group: String, val key: String, val title: String, val summary: String?)
 
 /** Every setting of every group, with titles in the current language. */
-internal fun settingIndex(context: Context, groups: List<SettingsGroup>): List<SettingHit> =
+internal fun settingIndex(resources: Resources, groups: List<SettingsGroup>): List<SettingHit> =
     groups.flatMap { g ->
-        val groupTitle = context.getString(g.title)
-        g.entries.map { e -> SettingHit(g.id, groupTitle, e.key, context.getString(e.title), e.summary?.let(context::getString)) }
+        val groupTitle = resources.getString(g.title)
+        g.entries.map { e -> SettingHit(g.id, groupTitle, e.key, resources.getString(e.title), e.summary?.let(resources::getString)) }
     }
 
 /** US-65.1: every setting whose title or summary holds all typed words, ignoring case and accents. */
@@ -61,8 +62,9 @@ fun searchSettings(query: String, index: List<SettingHit>): List<SettingHit> {
 @Composable
 internal fun SettingsHome(onGroup: (groupId: String, highlight: String?) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val groups = remember { context.settingsGroups }
-    val index = remember(groups) { settingIndex(context, groups) }
+    val index = remember(groups, resources) { settingIndex(resources, groups) }
     var query by rememberSaveable { mutableStateOf("") }
     val hits = remember(query, index) { searchSettings(query, index) }
     Scaffold(

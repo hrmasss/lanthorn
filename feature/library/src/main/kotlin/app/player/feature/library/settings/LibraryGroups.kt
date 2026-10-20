@@ -27,7 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.datastore.preferences.core.edit
@@ -56,7 +58,6 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
 /** A settings page whose rows are LazyColumn items keyed by entry key, so search can scroll to one. */
 @Composable
@@ -143,6 +144,8 @@ object GeneralSettings : SettingsGroup {
     @Composable
     override fun Content(highlight: String?) {
         val context = LocalContext.current
+        val resources = LocalResources.current
+        val locale = LocalConfiguration.current.locales[0]
         val scope = rememberCoroutineScope()
         val appearancePrefs = remember { AppearancePrefs(context) }
         val history = remember { HistoryPrefs(context) }
@@ -203,7 +206,7 @@ object GeneralSettings : SettingsGroup {
                 SettingsAction(
                     stringResource(R.string.setting_language),
                     { context.openLanguageSettings() },
-                    summary = Locale.getDefault().getDisplayName(Locale.getDefault()),
+                    summary = locale.getDisplayName(locale),
                     enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
                     highlighted = highlight == LANGUAGE,
                 )
@@ -247,7 +250,7 @@ object GeneralSettings : SettingsGroup {
                     {
                         scope.launch {
                             val freed = withContext(Dispatchers.IO) { LibraryViewModel.loaders(context).first.clear() }
-                            report = context.getString(R.string.thumbnails_cleared, Formatter.formatShortFileSize(context, freed))
+                            report = resources.getString(R.string.thumbnails_cleared, Formatter.formatShortFileSize(context, freed))
                         }
                     },
                     summary = stringResource(R.string.setting_clear_thumbnails_summary),
@@ -321,6 +324,7 @@ internal suspend fun clearHistory(context: Context) {
 @Composable
 private fun ImportDialog(backup: JSONObject, onDone: (report: String?) -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val hasSettings = (backup.optJSONObject("settings")?.length() ?: 0) > 0
     val hasHistory = (backup.optJSONObject("history")?.length() ?: 0) > 0
@@ -350,10 +354,10 @@ private fun ImportDialog(backup: JSONObject, onDone: (report: String?) -> Unit) 
                     scope.launch {
                         val r = Backup.restore(context, backup, settings, history)
                         val parts = buildList {
-                            if (settings) add(context.resources.getQuantityString(R.plurals.restored_groups, r.groups, r.groups))
-                            r.history.forEach { (label, n) -> add("${context.getString(label)}: $n") }
+                            if (settings) add(resources.getQuantityString(R.plurals.restored_groups, r.groups, r.groups))
+                            r.history.forEach { (label, n) -> add("${resources.getString(label)}: $n") }
                         }
-                        onDone(context.getString(R.string.import_report, parts.joinToString("\n")))
+                        onDone(resources.getString(R.string.import_report, parts.joinToString("\n")))
                     }
                 },
             ) { Text(stringResource(R.string.action_restore)) }
