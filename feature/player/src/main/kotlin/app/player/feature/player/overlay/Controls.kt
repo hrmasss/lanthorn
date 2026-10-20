@@ -96,8 +96,8 @@ class ControlsActions(
 )
 
 /**
- * The player overlay (US-16.1): top bar, seek row, bottom bar, placed where MX users expect them
- * (recon/ux-map.md, Player) with the look from docs/design.md. Stateless.
+ * The player overlay (US-16.1): top bar, seek row, bottom bar, in the layout users of other Android
+ * players already know, with the look from docs/design.md. Stateless.
  */
 @Composable
 fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modifier) {

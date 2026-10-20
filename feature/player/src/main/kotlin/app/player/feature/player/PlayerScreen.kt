@@ -106,7 +106,7 @@ fun PlayerScreen(
     engine: PlayerEngine,
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
-    /** Hidden on open, as MX users expect (recon/ux-map.md, defaults). */
+    /** Hidden on open, the familiar default for players of this kind (US-16.3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
     settings: PlayerSettings? = null,
