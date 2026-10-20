@@ -17,7 +17,7 @@ QUICK=0; [ "${1:-}" = "--quick" ] && QUICK=1
 FONT=${FONT:-/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf}
 [ -f "$FONT" ] || { echo "set FONT to a .ttf file (DejaVuSans.ttf expected)"; exit 1; }
 
-dur() { [ $QUICK = 1 ] && echo 10 || echo "$1"; }
+dur() { [ $QUICK = 1 ] && echo "${2:-10}" || echo "$1"; }  # $2: quick length, default 10 s
 
 # Source: moving test pattern, grain, timecode and frame number. $1 size, $2 fps.
 src() {
@@ -58,8 +58,8 @@ enc vp9-1080p60.webm 1920x1080 60 "$(dur 120)" yuv420p \
 enc h264-444-1080p30.mp4 1920x1080 30 "$(dur 30)" yuv444p \
   -c:v libx264 -preset fast -profile:v high444 -b:v 8M -g 60
 
-# NF-6: long file for seeking, typical long GOP (about 8 s at 30 fps).
-enc h264-long-1080p30.mp4 1920x1080 30 "$(dur 3600)" yuv420p \
+# NF-6: long file for seeking, typical long GOP (about 8 s at 30 fps). Quick: 2 min, so seeks span many GOPs.
+enc h264-long-1080p30.mp4 1920x1080 30 "$(dur 3600 120)" yuv420p \
   -c:v libx264 -preset veryfast -profile:v high -b:v 3M -g 250
 
 # NF-7: ASS with styling, positioning, fades, rotation and karaoke, muxed with the font attached.
