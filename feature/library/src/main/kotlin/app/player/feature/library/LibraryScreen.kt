@@ -27,11 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,6 +62,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import app.player.core.data.library.LibraryFolder
+import app.player.core.designsystem.component.EmptyState
+import app.player.core.designsystem.icon.LanthornIcons
+import app.player.core.designsystem.theme.BrandPolygon
 
 private const val PERF_TAG = "LibraryPerf"
 
@@ -216,13 +218,12 @@ private fun EmptyLibrary(volumes: List<String>, onFolderSettings: () -> Unit) {
     } else {
         stringResource(R.string.library_empty_in, volumes.joinToString())
     }
-    Centered(Modifier.testTag("library-empty")) {
-        Text(message, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FilledTonalButton(onClick = onFolderSettings, modifier = Modifier.testTag("library-folder-settings")) {
-            Text(stringResource(R.string.library_folder_settings))
-        }
-    }
+    EmptyState(
+        message = message,
+        actionLabel = stringResource(R.string.library_folder_settings),
+        onAction = onFolderSettings,
+        modifier = Modifier.testTag("library-empty"),
+    )
 }
 
 /** US-71.1: one screen that says why, then the system prompt. */
@@ -245,7 +246,8 @@ private fun AccessScreen(permanentlyDenied: Boolean, onAllow: () -> Unit, onOpen
     }
 }
 
-/** Centered column with the brand's empty-state mark on top. Moves to the design system's EmptyState when it lands. */
+/** Like the design system's EmptyState, with a title and a second action. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Centered(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
@@ -253,7 +255,7 @@ private fun Centered(modifier: Modifier = Modifier, content: @Composable () -> U
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(96.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape))
+        Box(Modifier.size(96.dp).background(MaterialTheme.colorScheme.primaryContainer, BrandPolygon.toShape()))
         content()
     }
 }
@@ -269,7 +271,7 @@ private fun FolderSettingsScreen(vm: LibraryViewModel, onBack: () -> Unit) {
                 title = { Text(stringResource(R.string.folders_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(LibraryIcons.Back, contentDescription = stringResource(R.string.library_back))
+                        Icon(LanthornIcons.Back, contentDescription = stringResource(R.string.library_back))
                     }
                 },
             )
