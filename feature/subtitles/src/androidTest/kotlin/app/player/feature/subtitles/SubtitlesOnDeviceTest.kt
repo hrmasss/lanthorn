@@ -12,12 +12,17 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
+import org.junit.rules.Timeout
 import org.junit.Test
 import java.io.File
 import java.nio.charset.Charset
 
 /** P1.3 subtitle wiring against the real libmpv, on the emulator. */
 class SubtitlesOnDeviceTest {
+    /** A stuck wait fails the test instead of holding the shared emulator. */
+    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
     private lateinit var controller: SubtitleController
@@ -143,19 +148,25 @@ class SubtitlesOnDeviceTest {
     }
 
     @Test fun ignoreEmbeddedFonts_US42_4() = runBlocking {
-        engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
-        engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
+        openFonts()
         delay(1500)
         shot("us42-embedded-font-used")
         controller.setIgnoreEmbeddedFonts(true)
         engine.await("embeddedfonts", PropertyType.Flag) { it == false }
         // mpv reads fonts when a file loads: open it again, as the switch's note says.
-        engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
-        engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
+        openFonts()
         delay(1500)
         shot("us42-embedded-font-ignored")
         controller.setIgnoreEmbeddedFonts(false)
         evidence("US-42.4 embedded DejaVu Sans Mono used by default, ignored after the switch and a reopen; screenshots")
+    }
+
+    /** The ASS track has no default flag, so mpv does not pick it by itself. */
+    private suspend fun openFonts() {
+        engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.set("sid", "1")
+        engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
     }
 
     private suspend fun selectEnglish() {

@@ -28,6 +28,7 @@ internal class SubtitleController(private val mpv: Mpv) {
     private val trackList: StateFlow<String?> = mpv.observe("track-list", PropertyType.Text)
     private val sid: StateFlow<String?> = mpv.observe("sid", PropertyType.Text)
     private val secondarySid: StateFlow<String?> = mpv.observe("secondary-sid", PropertyType.Text)
+    private val paused: StateFlow<Boolean?> = mpv.observe("pause", PropertyType.Flag)
 
     /** Subtitle tracks only, embedded first then external, in mpv's order. */
     val tracks: Flow<List<Track>> = trackList.map { json -> parseTracks(json).filter { it.type == "sub" } }
@@ -47,15 +48,28 @@ internal class SubtitleController(private val mpv: Mpv) {
         mpv.set("secondary-sid", "no")
         mpv.set("sid", selection.primary?.toString() ?: "no")
         mpv.set("secondary-sid", selection.secondary?.toString() ?: "no")
+        redrawIfPaused()
     }
 
     /** Adds a subtitle file mpv can read by path and turns it on. */
     fun addFile(path: String, title: String?) {
         if (title != null) mpv.command("sub-add", path, "select", title) else mpv.command("sub-add", path, "select")
+        redrawIfPaused()
     }
 
     /** Re-reads an external track from disk, after its file was rewritten in a new encoding. */
-    fun reload(trackId: Long) = mpv.command("sub-reload", trackId.toString())
+    fun reload(trackId: Long) {
+        mpv.command("sub-reload", trackId.toString())
+        redrawIfPaused()
+    }
+
+    /**
+     * mpv redraws a paused frame when a subtitle option changes, but not when the track itself
+     * changes (add, reload, select): the screen kept the old line. A zero seek redraws the frame.
+     */
+    private fun redrawIfPaused() {
+        if (paused.value == true) mpv.command("seek", "0", "relative+exact")
+    }
 
     /** US-41.1: 50 ms steps, ±600 s. */
     fun setDelayMs(ms: Long) {
