@@ -157,7 +157,11 @@ class PlayerEngine(context: Context) {
         // Judge the pick against the decoder running now. HW and Auto share one hwdec list, so a
         // pick of HW over a file already on SW changes nothing in mpv and sends no event; if mpv
         // does switch, the hwdec-current event corrects this.
-        _state.update { it.copy(decoderMode = mode, decoderNotice = if (it.video != null) fallbackNotice(mode, it.activeDecoder) else null) }
+        _state.update {
+            val mpvSeesNoChange = mode.hwdec == it.decoderMode.hwdec
+            val notice = if (mpvSeesNoChange && it.video != null) fallbackNotice(mode, it.activeDecoder) else null
+            it.copy(decoderMode = mode, decoderNotice = notice)
+        }
         post { setProperty("hwdec", mode.hwdec) }
     }
 
