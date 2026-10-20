@@ -189,7 +189,13 @@ private fun LibraryHome(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.library_title)) }, scrollBehavior = scroll) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.library_title)) },
+                actions = { if (state is LibraryUiState.Content) OverflowMenu(onFolderSettings) },
+                scrollBehavior = scroll,
+            )
+        },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (state) {
@@ -405,6 +411,26 @@ private val Field.label
         Field.Date -> R.string.field_date
         Field.Extension -> R.string.field_extension
     }
+
+/** Top bar overflow menu. */
+@Composable
+private fun OverflowMenu(onFolderSettings: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.testTag("library-overflow")) {
+            Icon(LanthornIcons.More, contentDescription = stringResource(R.string.more_options))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.library_folder_settings)) },
+                onClick = {
+                    open = false
+                    onFolderSettings()
+                },
+            )
+        }
+    }
+}
 
 @Composable
 internal fun BackButton(onBack: () -> Unit) {

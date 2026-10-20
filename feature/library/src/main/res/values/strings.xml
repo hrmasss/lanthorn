@@ -36,6 +36,7 @@
     <string name="field_date">Date</string>
     <string name="field_extension">Extension</string>
 
+    <string name="more_options">More options</string>
     <string name="row_menu">More options for %1$s</string>
     <string name="action_hide">Hide</string>
     <string name="action_unhide">Show again</string>
