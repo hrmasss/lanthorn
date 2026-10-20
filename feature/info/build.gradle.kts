@@ -10,3 +10,8 @@ android {
 dependencies {
     implementation(project(":core:settings-api"))
 }
+
+dependencies {
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+}

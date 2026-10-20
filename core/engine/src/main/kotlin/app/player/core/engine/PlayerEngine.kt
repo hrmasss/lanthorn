@@ -18,6 +18,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.RejectedExecutionException
@@ -153,7 +154,14 @@ class PlayerEngine(context: Context) {
 
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
     fun setDecoder(mode: DecoderMode) {
-        _state.update { it.copy(decoderMode = mode, decoderNotice = null) }
+        // Judge the pick against the decoder running now. HW and Auto share one hwdec list, so a
+        // pick of HW over a file already on SW changes nothing in mpv and sends no event; if mpv
+        // does switch, the hwdec-current event corrects this.
+        _state.update {
+            val mpvSeesNoChange = mode.hwdec == it.decoderMode.hwdec
+            val notice = if (mpvSeesNoChange && it.video != null) fallbackNotice(mode, it.activeDecoder) else null
+            it.copy(decoderMode = mode, decoderNotice = notice)
+        }
         post { setProperty("hwdec", mode.hwdec) }
     }
 
@@ -345,10 +353,12 @@ class PlayerEngine(context: Context) {
                 ?: lib.getPropertyString("video-params/pixelformat"),
         )
         // The decoder is settled once video is reconfigured: compare it with what was chosen.
-        val running = ActiveDecoder.fromHwdecCurrent(lib.getPropertyString("hwdec-current"))
-        _state.update {
+        val hwdec = lib.getPropertyString("hwdec-current")
+        val running = ActiveDecoder.fromHwdecCurrent(hwdec)
+        val s = _state.updateAndGet {
             it.copy(video = info, activeDecoder = running, decoderNotice = fallbackNotice(it.decoderMode, running))
         }
+        Log.i(TAG, "video ${info.codec} ${info.width}x${info.height}, decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
     }
 
     private val observer = object : MPVLib.EventObserver {
@@ -384,11 +394,15 @@ class PlayerEngine(context: Context) {
         override fun eventProperty(property: String, value: String) {
             publish(property, MpvFormat.MPV_FORMAT_STRING, value)
             when (property) {
-                "hwdec-current" -> _state.update {
-                    val running = ActiveDecoder.fromHwdecCurrent(value)
-                    // An empty value is mpv between decoders; judge only settled values on loaded video.
-                    val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
-                    it.copy(activeDecoder = running, decoderNotice = notice)
+                "hwdec-current" -> {
+                    val before = _state.value.activeDecoder
+                    val s = _state.updateAndGet {
+                        val running = ActiveDecoder.fromHwdecCurrent(value)
+                        // An empty value is mpv between decoders; judge only settled values on loaded video.
+                        val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
+                        it.copy(activeDecoder = running, decoderNotice = notice)
+                    }
+                    if (s.activeDecoder != before) Log.i(TAG, "decoder ${before.label} -> ${s.activeDecoder.label} ($value) at ${s.positionMs} ms, notice ${s.decoderNotice}")
                 }
             }
         }
@@ -404,7 +418,8 @@ class PlayerEngine(context: Context) {
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
                     if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
                     else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
-                        Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
+                        // The decoder line comes with VIDEO_RECONFIG; it may not be known yet here.
+                        Log.i(TAG, "first frame ${s.firstFrameMs} ms")
                     }
                 }
                 // An end before the file loaded means mpv could not open it. The end of the

@@ -18,7 +18,8 @@ import java.io.File
  * P1.1 against the real libmpv: the one-line notice when the chosen decoder cannot play the file
  * (US-35.3). Emulator MediaCodec refuses H.264 4:4:4, which stands in for a phone's hardware
  * refusing a stream. A hardware failure in the middle of playback cannot be produced on the
- * emulator; it is a phone check (work/evidence/P1.1).
+ * emulator: a 4:2:0 to 4:4:4 stream is refused from its first frame, and a jump to 7680x4320
+ * crashes the emulator's host-side decoder. It is a phone check (work/evidence/P1.1).
  */
 @RunWith(AndroidJUnit4::class)
 class DecoderFallbackTest {
