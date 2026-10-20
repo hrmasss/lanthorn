@@ -61,6 +61,8 @@ object Playback : PlaybackControls {
     /** How long after load a decoder failure is still this file's (US-75.1). */
     private const val DECODER_CHECK_MS = 1_500L
 
+    private val NETWORK_SCHEMES = setOf("http", "https", "rtsp", "rtmp", "smb")
+
     private val scope = MainScope()
     private lateinit var context: Context
     private val prefs by lazy { PlaybackPrefs(context) }
@@ -297,6 +299,8 @@ object Playback : PlaybackControls {
     private fun failed(engine: PlayerEngine, s: PlaybackState) {
         if (_failure.value != null) return
         val uri = queue.current
+        // Network streams fail through library's overlay (P1.8), with retry; one card, not two.
+        if (uri.scheme in NETWORK_SCHEMES) return
         queue.markFailed()
         val reason = Failures.classify(s.error, lines.toList())
         val details = listOfNotNull(s.error) + lines.filter { it.level == EngineMessage.Level.Error }.map { "[${it.prefix}] ${it.text}" }
