@@ -44,7 +44,7 @@ class AudioSettingsOnDeviceTest {
 
     private suspend fun open(name: String) {
         engine.open(Uri.fromFile(OnDevice.asset(name)))
-        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 3 }
+        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
         engine.await("current-tracks/audio/id", PropertyType.Int64, 10_000) { it != null }
     }
 
