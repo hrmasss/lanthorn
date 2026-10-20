@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audio_menu_tracks">Audio</string>
+    <string name="audio_menu_effects">Equalizer and effects</string>
+    <string name="audio_tracks_title">Audio</string>
+    <string name="audio_off">Off</string>
+    <string name="audio_track_fallback">Track %1$d</string>
+    <string name="audio_channels">%1$d ch</string>
+    <string name="audio_external">external</string>
+    <string name="audio_open_file">Open audio file</string>
+    <string name="audio_open_failed">Could not open that audio file</string>
+    <string name="audio_delay">Audio delay %1$+.2f s</string>
+    <string name="audio_reset">Reset</string>
+    <string name="audio_effects_title">Equalizer and effects</string>
+    <string name="audio_eq">Equalizer</string>
+    <string name="audio_preamp">Preamp %1$+.1f dB</string>
+    <string name="audio_band">%1$s  %2$+.1f dB</string>
+    <string name="audio_boost">Volume boost %1$d%%</string>
+    <string name="audio_stereo_mode">Channels</string>
+    <string name="audio_stereo">Stereo</string>
+    <string name="audio_mono">Mono</string>
+    <string name="audio_reverse">Reverse</string>
+</resources>
