@@ -75,6 +75,8 @@ dependencies {
     implementation(project(":core:engine"))
     implementation(project(":core:data"))
     implementation(project(":feature:player"))
+    implementation(project(":feature:subtitles"))
+    implementation(project(":feature:audio"))
     implementation(project(":core:player-api"))
     implementation(project(":core:settings-api"))
     implementation(project(":feature:library"))
