@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -97,7 +98,11 @@ private const val PERF_TAG = "LibraryPerf"
 
 /** The library: entry screen of the app. [onPlay] opens the player; the app module wires it. */
 @Composable
-fun LibraryRoute(onPlay: (Uri) -> Unit) {
+fun LibraryRoute(
+    onPlay: (Uri) -> Unit,
+    /** Opens [uris] as the player's queue at [index] (US-09.2, US-24.1). */
+    onPlayQueue: (uris: List<Uri>, index: Int) -> Unit = { uris, i -> onPlay(uris[i]) },
+) {
     val context = LocalContext.current
     val nav = rememberNavController()
     val vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -132,7 +137,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
     NavHost(nav, startDestination = "home") {
         composable("home") {
             LibraryHome(
-                state, vm, loaders, onPlay,
+                state, vm, loaders, onPlay, onPlayQueue,
                 onAccessResult = { permanentlyDenied = it },
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
@@ -151,7 +156,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
         composable("folder?key={key}", listOf(navArgument("key") { type = NavType.StringType })) { entry ->
             val key = entry.arguments?.getString("key").orEmpty()
             FolderScreen(
-                key, state, vm, loaders, onPlay,
+                key, state, vm, loaders, onPlay, onPlayQueue,
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onSearch = { nav.navigate("search") },
                 onBack = { nav.popBackStack() },
@@ -211,6 +216,7 @@ private fun LibraryHome(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
     onAccessResult: (permanentlyDenied: Boolean) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
@@ -238,11 +244,27 @@ private fun LibraryHome(
     val gridState = rememberLazyGridState()
     var streamOpen by rememberSaveable { mutableStateOf(false) }
     if (streamOpen) StreamDialog(onPlay = { onPlay(it.toUri()) }, onDismiss = { streamOpen = false })
+    val content = state as? LibraryUiState.Content
+    val allMode = content?.prefs?.viewMode == ViewMode.AllVideos
+    val shownFolders = if (allMode || content == null) emptyList() else content.folders
+    val shownVideos = if (allMode && content != null) content.videos else emptyList()
+    var selection by rememberSelection()
+    BackHandler(selection.isNotEmpty()) { selection = emptySet() }
+    val actions = rememberFileActions(onChanged = vm::refresh)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            if (selection.isNotEmpty() && content != null) {
+                SelectionBar(
+                    count = selection.size,
+                    videos = selectedVideos(selection, shownFolders, shownVideos, content.videos),
+                    actions = actions,
+                    onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onSelectAll = { selection = shownFolders.map(SelectionKey::of).toSet() + shownVideos.map(SelectionKey::of) },
+                    onClear = { selection = emptySet() },
+                )
+            } else TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
                 actions = {
                     OverflowMenu(
@@ -272,12 +294,13 @@ private fun LibraryHome(
                         if (state.partial) PartialBanner(onChooseMore = { request.launch(mediaPermissions()) })
                         when {
                             state.videos.isNotEmpty() -> PullToRefreshBox(state.scanning, vm::refresh) {
-                                val allVideos = state.prefs.viewMode == ViewMode.AllVideos
                                 LibraryItems(
-                                    folders = if (allVideos) emptyList() else state.folders,
-                                    videos = if (allVideos) state.videos else emptyList(),
+                                    folders = shownFolders,
+                                    videos = shownVideos,
                                     layout = state.prefs.layout,
-                                    ctx = rowContext(state, vm, loaders, onFolder, onPlay),
+                                    ctx = rowContext(state, vm, loaders, onFolder, shownVideos, onPlayQueue, selection) { k ->
+                                        selection = if (k in selection) selection - k else selection + k
+                                    },
                                     listState = listState,
                                     gridState = gridState,
                                 )
@@ -304,6 +327,7 @@ private fun FolderScreen(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onSearch: () -> Unit,
     onBack: () -> Unit,
@@ -315,11 +339,23 @@ private fun FolderScreen(
     val scroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    var selection by rememberSelection()
+    BackHandler(selection.isNotEmpty()) { selection = emptySet() }
+    val actions = rememberFileActions(onChanged = vm::refresh)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            if (selection.isNotEmpty() && content != null) {
+                SelectionBar(
+                    count = selection.size,
+                    videos = selectedVideos(selection, subfolders, videos, content.videos),
+                    actions = actions,
+                    onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onSelectAll = { selection = subfolders.map(SelectionKey::of).toSet() + videos.map(SelectionKey::of) },
+                    onClear = { selection = emptySet() },
+                )
+            } else TopAppBar(
                 title = { Text(name.ifEmpty { stringResource(R.string.library_storage_root) }, maxLines = 1) },
                 navigationIcon = { BackButton(onBack) },
                 scrollBehavior = scroll,
@@ -333,7 +369,9 @@ private fun FolderScreen(
                         folders = subfolders,
                         videos = videos,
                         layout = content.prefs.layout,
-                        ctx = rowContext(content, vm, loaders, onFolder, onPlay),
+                        ctx = rowContext(content, vm, loaders, onFolder, videos, onPlayQueue, selection) { k ->
+                            selection = if (k in selection) selection - k else selection + k
+                        },
                         listState = listState,
                         gridState = gridState,
                     )
@@ -350,15 +388,22 @@ internal fun rowContext(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onFolder: (LibraryFolder) -> Unit,
-    onPlay: (Uri) -> Unit,
-) = remember(state.prefs.fields, state.volumes, loaders) {
+    /** The videos as listed: tapping one plays this list from there, so next and previous follow it. */
+    queue: List<LibraryVideo>,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
+    selection: Set<String> = emptySet(),
+    onSelect: ((String) -> Unit)? = null,
+) = remember(state.prefs.fields, state.volumes, loaders, queue, selection) {
     RowContext(
         loader = loaders.first,
         fps = loaders.second::fps,
         fields = state.prefs.fields,
         volumeLabel = state::volumeLabel,
         onFolder = onFolder,
-        onVideo = { v: LibraryVideo -> onPlay(v.uri.toUri()) },
+        onVideo = { v: LibraryVideo ->
+            val playable = queue.filter { it.available }
+            onPlayQueue(playable.map { it.uri.toUri() }, playable.indexOfFirst { it.id == v.id }.coerceAtLeast(0))
+        },
         folderActions = listOf(
             RowAction(R.string.action_hide) { f -> vm.setHidden(f.key, true) },
             RowAction(R.string.action_exclude) { f -> vm.setExcluded(f.key, true) },
@@ -366,6 +411,8 @@ internal fun rowContext(
         videoActions = listOf(
             RowAction(R.string.action_hide) { v -> vm.setHidden(v.uri, true) },
         ),
+        selection = selection,
+        onSelect = onSelect,
     )
 }
 

@@ -39,6 +39,27 @@
     <string name="more_options">More options</string>
     <string name="row_menu">More options for %1$s</string>
     <string name="action_hide">Hide</string>
+    <string name="action_play">Play</string>
+    <string name="action_share">Share</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_rename">Rename</string>
+    <string name="selection_clear">Clear selection</string>
+    <string name="selection_all">Select all</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="confirm_delete">
+        <item quantity="one">Delete %d video? This cannot be undone.</item>
+        <item quantity="other">Delete %d videos? This cannot be undone.</item>
+    </plurals>
+    <string name="rename_hint">The extension stays. Android may ask you to allow the change.</string>
+    <string name="renamed">Renamed</string>
+    <string name="rename_failed">Could not rename this video.</string>
+    <string name="rename_denied">Not renamed: changing this video was not allowed.</string>
+    <string name="deleted">Deleted</string>
+    <string name="delete_failed">Could not delete every video.</string>
+    <string name="delete_denied">Not deleted: deleting was not allowed.</string>
     <string name="action_unhide">Show again</string>
     <string name="action_exclude">Don\'t scan this folder</string>
 
