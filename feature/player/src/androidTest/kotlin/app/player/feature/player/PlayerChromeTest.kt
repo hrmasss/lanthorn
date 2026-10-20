@@ -81,15 +81,21 @@ class PlayerChromeTest {
 
     @Test fun screenOnWhilePlayingAndPaused_US60_1() {
         // Read from the window manager (dumpsys), the state the system acts on.
-        runCatching { waitUntil(3_000) { keepScreenOn() } }
-            .onFailure { log("US-60.1 window block: ${windowBlock().take(1_500)}") }.getOrThrow()
-        log("US-60.1 playing: keep-screen-on ${keepScreenOn()}")
-        PlayerSessions.current.value!!.pause()
-        waitUntil(3_000) { !keepScreenOn() }
-        log("US-60.1 paused, setting off: keep-screen-on ${keepScreenOn()}")
+        fun step(name: String, want: Boolean) {
+            runCatching { waitUntil(8_000) { keepScreenOn() == want } }
+                .onFailure { log("US-60.1 $name: wanted $want, window block: ${windowBlock().take(1_200)}") }
+                .getOrThrow()
+            log("US-60.1 $name: keep-screen-on ${keepScreenOn()}")
+        }
+        SystemClock.sleep(1_000)
+        step("playing", true)
+        // Pause the way a viewer does: the play/pause button.
+        compose.onNodeWithTag("video").performClick()
+        compose.waitUntil(2_000) { shown("play-pause") }
+        compose.onNodeWithTag("play-pause").performClick()
+        step("paused, setting off", false)
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
-        waitUntil(3_000) { keepScreenOn() }
-        log("US-60.1 paused, setting on: keep-screen-on ${keepScreenOn()}")
+        step("paused, setting on", true)
     }
 
     @Test fun talkBackActions_US69_2() {
@@ -269,7 +275,10 @@ class PlayerChromeTest {
         val out = InstrumentationRegistry.getInstrumentation().uiAutomation
             .executeShellCommand("dumpsys window windows")
             .let { pfd -> android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().readText() }
-        val start = Regex("Window #\\d+ Window\\{[^}]*PlayerActivity\\}").find(out)?.range?.first ?: return ""
+        // The newest player window: windows of players closed by earlier tests can still be listed.
+        val start = Regex("Window #\\d+ Window\\{[^}]*PlayerActivity\\}").findAll(out)
+            .filter { m -> out.substring(m.range.first, (m.range.first + 3_000).coerceAtMost(out.length)).contains("mViewVisibility=0x0") }
+            .lastOrNull()?.range?.first ?: return ""
         val next = Regex("Window #\\d+ ").find(out, start + 10)?.range?.first ?: out.length
         return out.substring(start, next)
     }
