@@ -12,6 +12,7 @@ import androidx.room.RoomDatabase
 import androidx.room.Upsert
 import app.player.core.data.library.LibraryDao
 import app.player.core.data.library.LibraryVideo
+import app.player.core.data.library.VideoExtra
 
 /** Where the viewer left a file. Keyed by the uri string the player was opened with. */
 @Entity(tableName = "playback_position")
@@ -32,10 +33,10 @@ interface PlaybackPositionDao {
 }
 
 @Database(
-    entities = [PlaybackPosition::class, LibraryVideo::class],
-    version = 2,
+    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class],
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class PlayerDatabase : RoomDatabase() {
     abstract fun playbackPositions(): PlaybackPositionDao
