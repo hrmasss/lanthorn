@@ -50,6 +50,8 @@ fun PlayerScreen(
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(true) },
     extensions: List<PlayerExtension> = emptyList(),
+    /** The viewer picked a decoder by hand (US-36.3: remembered for the file). */
+    onDecoderPicked: (DecoderMode) -> Unit = {},
 ) {
     val state by engine.state.collectAsStateWithLifecycle()
     var controls by controlsState
@@ -70,7 +72,16 @@ fun PlayerScreen(
             update = { it.engine = engine },
             modifier = Modifier.fillMaxSize(),
         )
-        if (controls) Controls(state, engine, entries, { openPanel = it }, Modifier.align(Alignment.BottomCenter))
+        if (controls) Controls(state, engine, entries, { openPanel = it }, onDecoderPicked, Modifier.align(Alignment.BottomCenter))
+        // US-35.3: one line when the chosen decoder could not play the stream.
+        state.decoderNotice?.let {
+            Text(
+                it,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 48.dp)
+                    .background(Color.Black.copy(alpha = 0.6f)).padding(8.dp).testTag("decoder-notice"),
+            )
+        }
         state.error?.let {
             Text(it, color = Color.White, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
         }
@@ -102,6 +113,7 @@ private fun Controls(
     engine: PlayerEngine,
     entries: List<PlayerMenuEntry>,
     onOpenPanel: (String) -> Unit,
+    onDecoderPicked: (DecoderMode) -> Unit,
     modifier: Modifier,
 ) {
     var scrubbing by remember { mutableStateOf(false) }
@@ -134,7 +146,10 @@ private fun Controls(
             Text("${time(state.positionMs)} / ${time(state.durationMs)}", color = Color.White)
             DecoderMode.entries.forEach { mode ->
                 FilledTonalButton(
-                    onClick = { engine.setDecoder(mode) },
+                    onClick = {
+                        engine.setDecoder(mode)
+                        onDecoderPicked(mode)
+                    },
                     enabled = mode != state.decoderMode,
                     modifier = Modifier.testTag("decoder-${mode.name}"),
                 ) { Text(mode.label) }
