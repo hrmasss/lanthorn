@@ -44,13 +44,15 @@ class PlaybackToolsTest {
         waitUntil(2_000) { speed.value == 1.5 }
         val ms = SystemClock.elapsedRealtime() - t0
         val pitch = engine.get("audio-pitch-correction", PropertyType.Flag)
-        // Measure the real rate: media time over wall time across 3 s.
-        val p0 = engine.state.value.positionMs
+        // Measure the real rate: mpv's own playback time over wall time across 3 s. The cached
+        // position in the state updates in steps, which skewed the rate on the hosted emulator.
+        val p0 = engine.get("playback-time", PropertyType.Real)!!
         val w0 = SystemClock.elapsedRealtime()
         SystemClock.sleep(3_000)
-        val rate = (engine.state.value.positionMs - p0).toDouble() / (SystemClock.elapsedRealtime() - w0)
+        val p1 = engine.get("playback-time", PropertyType.Real)!!
+        val rate = (p1 - p0) * 1000 / (SystemClock.elapsedRealtime() - w0)
         log("speed 1.5 applied in $ms ms, pitch correction $pitch, measured rate %.2f".format(rate))
-        assertTrue("applied in $ms ms", ms <= 200)
+        assertWithin("speed applied", ms, 200)
         assertEquals(true, pitch)
         assertTrue("rate $rate", rate in 1.35..1.65)
     }
