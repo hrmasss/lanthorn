@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
@@ -40,8 +41,12 @@ internal object OnDevice {
         return result!!.getOrThrow()
     }
 
+    /**
+     * Software decoding: the hosted emulator's MediaCodec can stall mid-file and mpv then holds
+     * the engine thread, so a subtitle test hangs on something it does not test.
+     */
     fun acquire(holder: Any, onCreated: (PlayerEngine) -> Unit): PlayerEngine =
-        main { PlayerSessions.acquire(context, holder, onCreated) }
+        main { PlayerSessions.acquire(context, holder, onCreated).also { it.launchDecoder = DecoderMode.SW } }
 
     fun release(holder: Any) = main { PlayerSessions.release(holder) }
 }
