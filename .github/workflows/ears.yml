@@ -1,4 +1,6 @@
 name: EARS
+# Branch and commit reported on; the run's own branch and commit are always main's.
+run-name: EARS ${{ github.event.workflow_run.head_branch || 'dispatch' }} ${{ github.event.workflow_run.head_sha || inputs.sha }}
 
 # One EARS report per commit (P1.35): which tagged tests (@Ears) prove which criteria, pass or
 # fail, with their evidenceShot() screenshots. Runs whenever CI or Instrumented finishes and reads
