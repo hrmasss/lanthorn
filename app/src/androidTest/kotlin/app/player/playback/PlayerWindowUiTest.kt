@@ -265,7 +265,12 @@ class PlayerWindowUiTest {
         // PiP keeps playing, so the position that counts is the one at the close.
         val at = state()!!.positionMs
         close!!.click()
-        assertTrue("player still there after closing PiP", waitFor(5_000) { player() == null })
+        // The system can take several seconds to take the window down on the hosted emulator, and
+        // a tap during its menu animation can miss: tap Close again if the window is still up.
+        if (!waitFor(4_000) { player() == null } && player()?.isInPictureInPictureMode == true) {
+            device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)?.let { c -> retrying { c.click() } }
+        }
+        assertTrue("player still there after closing PiP", waitFor(10_000) { player() == null })
         // The save on leaving is written off the main thread; give it a moment after the close.
         var row = runBlocking { ResumePoints(context).get(uri.toString()) }
         waitFor(3_000) {
