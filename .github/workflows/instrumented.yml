@@ -113,7 +113,13 @@ jobs:
             adb shell settings put global device_provisioned 1 || true
             adb shell input keyevent KEYCODE_HOME || true
             # This emulator makes no timing claims: tests that read `timing` log spec limits instead of failing.
-            ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
+            # NF-8 counts every byte of the app's uid, and the test process is shared: a connection an
+            # earlier test left open can take a stray packet. So in the app module the no-traffic test
+            # runs first, alone, in a fresh process; its results are kept aside and put back after.
+            if [ "${{ matrix.module }}" = app ]; then ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.class=app.player.NoTrafficUiTest -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker; fi
+            if [ "${{ matrix.module }}" = app ]; then rm -rf /tmp/notraffic && cp -r app/build/outputs/androidTest-results/connected/debug /tmp/notraffic || true; fi
+            ./gradlew ${{ matrix.task }} ${{ matrix.module == 'app' && '-Pandroid.testInstrumentationRunnerArguments.notClass=app.player.NoTrafficUiTest' || '' }} -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
+            if [ -d /tmp/notraffic ]; then mkdir -p app/build/outputs/androidTest-results/connected/debug/notraffic && cp -r /tmp/notraffic/. app/build/outputs/androidTest-results/connected/debug/notraffic/; fi
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
             # A test class JUnit cannot run (a @Before that returns a value, a bad constructor) is

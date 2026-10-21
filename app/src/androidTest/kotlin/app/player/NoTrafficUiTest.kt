@@ -16,7 +16,9 @@ import app.player.core.testing.evidenceShot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 import java.io.File
 import java.net.ServerSocket
 import kotlin.concurrent.thread
@@ -26,6 +28,8 @@ import kotlin.concurrent.thread
  * and after starting the app, letting the library load, and playing a local file, must not move.
  * The test runs in the app's process, so the counters are the app's.
  */
+// Local use first: the stream control opens a connection, which must not be live during the zero check.
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @RunWith(AndroidJUnit4::class)
 class NoTrafficUiTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
