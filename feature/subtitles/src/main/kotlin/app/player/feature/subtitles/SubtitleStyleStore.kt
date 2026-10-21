@@ -2,16 +2,32 @@ package app.player.feature.subtitles
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
-private val Context.subtitleStore by preferencesDataStore("subtitles")
+internal val Context.subtitleStore by preferencesDataStore("subtitles")
 
-/** Saved subtitle style (US-42, US-43). One JSON value, so a style is read and written whole. */
+/**
+ * Saved Subtitle settings: the style (US-42, US-43) as one JSON value, so a style is read and
+ * written whole, and the default delay (US-41.3).
+ */
 internal class SubtitleStyleStore(context: Context) {
     private val store = context.applicationContext.subtitleStore
+
+    val defaultDelayMs: Flow<Long> = store.data.map { it[DEFAULT_DELAY] ?: 0L }
+
+    suspend fun setDefaultDelay(ms: Long) {
+        store.edit { it[DEFAULT_DELAY] = SubtitleController.snapDelay(ms) }
+    }
+
+    suspend fun resetDelay() {
+        store.edit { it.remove(DEFAULT_DELAY) }
+    }
 
     suspend fun load(): SubtitleStyle = store.data.first()[KEY]?.let(::decodeStyle) ?: SubtitleStyle()
 
@@ -21,6 +37,7 @@ internal class SubtitleStyleStore(context: Context) {
 
     companion object {
         private val KEY = stringPreferencesKey("style")
+        private val DEFAULT_DELAY = longPreferencesKey("default_delay_ms")
     }
 }
 

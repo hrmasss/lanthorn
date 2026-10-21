@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -103,8 +104,8 @@ class ControlsActions(
 )
 
 /**
- * The player overlay (US-16.1): top bar, seek row, bottom bar, placed where MX users expect them
- * (recon/ux-map.md, Player) with the look from docs/design.md. Stateless.
+ * The player overlay (US-16.1): top bar, seek row, bottom bar, in the layout users of other Android
+ * players already know, with the look from docs/design.md. Stateless.
  */
 @Composable
 fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modifier) {
@@ -137,10 +138,15 @@ fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modi
 
 @Composable
 private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier) {
+    val narrow = LocalConfiguration.current.screenWidthDp < 600
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         OverlayIconButton(LanthornIcons.Back, stringResource(R.string.player_back), actions.back, Modifier.testTag("back"))
-        OverlayTitle(ui.title, Modifier.weight(1f).padding(horizontal = 4.dp).testTag("title"))
-        ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
+        // Narrow (portrait): battery and clock go under the title so the name keeps the room.
+        Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+            OverlayTitle(ui.title, Modifier.testTag("title"))
+            if (narrow) ui.status?.let { StatusText(it) }
+        }
+        if (!narrow) ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
         ui.speed?.let {
             val desc = stringResource(R.string.player_speed_badge, it)
             Text(

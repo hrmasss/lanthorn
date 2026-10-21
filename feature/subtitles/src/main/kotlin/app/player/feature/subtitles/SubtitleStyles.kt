@@ -29,6 +29,19 @@ internal class SubtitleStyles(context: Context) {
     val style: StateFlow<SubtitleStyle> = _style.asStateFlow()
     private var loaded = false
 
+    /**
+     * The navigation bar or gesture handle, as a percent of the screen height in landscape.
+     * Subtitles keep at least this bottom margin. Read from the system dimension; 24 dp if absent.
+     */
+    @android.annotation.SuppressLint("DiscouragedApi", "InternalInsetResource")
+    private val navigationInsetPercent: Float = appContext.resources.let { r ->
+        val id = r.getIdentifier("navigation_bar_height_landscape", "dimen", "android")
+            .takeIf { it != 0 } ?: r.getIdentifier("navigation_bar_height", "dimen", "android")
+        val px = if (id != 0) r.getDimensionPixelSize(id) else (24 * r.displayMetrics.density).toInt()
+        val shortSide = minOf(r.displayMetrics.widthPixels, r.displayMetrics.heightPixels).coerceAtLeast(1)
+        100f * px / shortSide
+    }
+
     /** Folder that holds fonts the viewer imported (US-42.1). fontconfig scans it. */
     val userFontDir = File(appContext.filesDir, "fonts")
 
@@ -88,10 +101,30 @@ internal class SubtitleStyles(context: Context) {
         copied
     }
 
-    /** Families for the font picker: the generic ones, system fonts, then the viewer's own. */
+    private var systemFamilies: List<String>? = null
+
+    /**
+     * Families for the font picker: the generic ones, system fonts that can draw Latin text (no
+     * clock digits, emoji or symbol sets), then the viewer's own. System fonts are read once.
+     */
     suspend fun families(): List<String> = withContext(Dispatchers.IO) {
-        GENERIC + (FontNames.families(listOf(File("/system/fonts"), File("/product/fonts"), userFontDir)) - GENERIC.toSet())
+        val system = systemFamilies ?: textFamilies(listOf(File("/system/fonts"), File("/product/fonts"))).also { systemFamilies = it }
+        (GENERIC + system + textFamilies(listOf(userFontDir))).distinct()
     }
+
+    private fun textFamilies(dirs: List<File>): List<String> = dirs
+        .flatMap { it.listFiles()?.toList().orEmpty() }
+        .filter { it.extension.lowercase() in FONT_EXTENSIONS && drawsText(it) }
+        .mapNotNull { runCatching { FontNames.family(it) }.getOrNull() }
+        .filterNot { family -> NOT_TEXT.any { it in family } }
+        .distinct()
+        .sorted()
+
+    /** A font for subtitles has the Latin letters; clock, emoji and symbol fonts do not. */
+    private fun drawsText(file: File): Boolean = runCatching {
+        val paint = android.graphics.Paint().apply { typeface = android.graphics.Typeface.createFromFile(file) }
+        LATIN.all { paint.hasGlyph(it.toString()) }
+    }.getOrDefault(false)
 
     private var appliedTo: PlayerEngine? = null
     private var applied: Map<String, String> = emptyMap()
@@ -102,7 +135,7 @@ internal class SubtitleStyles(context: Context) {
             appliedTo = engine
             applied = emptyMap()
         }
-        val next = style.toMpv()
+        val next = style.toMpv(navigationInsetPercent)
         changed(applied, next).forEach { (name, value) -> engine.set(name, value) }
         applied = next.toMap()
     }
@@ -113,6 +146,10 @@ internal class SubtitleStyles(context: Context) {
             next.filter { (name, value) -> applied[name] != value }
 
         private const val SAVE_DELAY_MS = 500L
+        private val LATIN = ('a'..'z') + ('A'..'Z')
+
+        /** Families that pass the glyph check but are not for reading: the lock-screen clock, emoji, symbols. */
+        private val NOT_TEXT = listOf("Clock", "Emoji", "Symbols", "Music", "Math")
         private val FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")
         private val GENERIC = listOf(SubtitleStyle.DEFAULT_FONT, "serif", "monospace")
     }

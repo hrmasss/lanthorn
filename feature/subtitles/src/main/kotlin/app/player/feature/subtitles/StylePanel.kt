@@ -6,7 +6,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
@@ -89,11 +90,9 @@ internal fun LazyListScope.styleEditor(
 ) {
     item(key = "font") {
         Label(stringResource(R.string.subs_font))
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            families.forEach { family ->
+        // Lazy, with end padding, so the last chip scrolls fully into view.
+        LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(families, key = { it }) { family ->
                 FilterChip(
                     selected = style.font == family,
                     onClick = { update { it.copy(font = family) } },
@@ -171,11 +170,12 @@ private val PALETTE = listOf(
 
 @Composable
 private fun Swatches(selected: Long, tag: String, onPick: (Long) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 4.dp),
+    LazyRow(
+        Modifier.padding(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PALETTE.forEach { c ->
+        items(PALETTE) { c ->
             val on = (selected and 0xFFFFFF) == (c and 0xFFFFFF)
             Box(
                 Modifier

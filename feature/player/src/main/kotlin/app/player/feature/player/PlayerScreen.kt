@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -122,10 +123,12 @@ fun PlayerScreen(
     engine: PlayerEngine,
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
-    /** Hidden on open, as MX users expect (recon/ux-map.md, defaults). */
+    /** Hidden on open, the familiar default for players of this kind (US-16.3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
     settings: PlayerSettings? = null,
+    /** Seek preview above the seek bar (US-30.1, default on). Off: the video itself follows the finger. */
+    seekPreview: Boolean = true,
     /** The viewer picked a decoder by hand (US-36.3: remembered for the file). */
     onDecoderPicked: (DecoderMode) -> Unit = {},
 ) {
@@ -146,6 +149,9 @@ fun PlayerScreen(
     var controls by controlsState
     var openPanel by remember { mutableStateOf<String?>(null) }
     var scrubbing by remember { mutableStateOf(false) }
+    var scrubTargetMs by remember { mutableLongStateOf(0L) }
+    // US-30.1: the preview engine loads with the file, so the first drag shows frames at once.
+    val preview = if (seekPreview) rememberSeekPreview(state.uri) else null
     var touches by remember { mutableIntStateOf(0) }
     var screenshotRequests by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<Note?>(null) }
@@ -243,17 +249,19 @@ fun PlayerScreen(
     // US-35.3: one line when the chosen decoder could not play the stream.
     LaunchedEffect(state.decoderNotice) { state.decoderNotice?.let(::show) }
     val currentState by rememberUpdatedState(state)
-    val actions = remember(engine, activity, fitNames) {
+    val actions = remember(engine, activity, fitNames, preview) {
         ControlsActions(
             back = { activity?.finish() },
             togglePause = engine::togglePause,
             scrub = { f ->
                 scrubbing = true
-                engine.seekTo((f * currentState.durationMs).toLong(), exact = false)
+                scrubTargetMs = (f * currentState.durationMs).toLong()
+                // With a preview the video holds still until release; without, it follows the finger (US-17.3).
+                if (preview == null) engine.scrub(scrubTargetMs)
             },
             seek = { f ->
                 scrubbing = false
-                engine.seekTo((f * currentState.durationMs).toLong(), exact = true)
+                engine.endScrub((f * currentState.durationMs).toLong())
             },
             toggleRemaining = { settings?.update { it.copy(showRemaining = !it.showRemaining) } },
             openDecoder = { openPanel = OwnPanel.DECODER },
@@ -388,6 +396,10 @@ fun PlayerScreen(
                     TextButton(onClick = { run(); note = null }, modifier = Modifier.testTag("note-action")) { Text(label) }
                 }
             }
+        }
+
+        if (scrubbing && preview != null) {
+            SeekPreview(preview, scrubTargetMs, Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp))
         }
 
         // Keep the last panel's content during the exit animation.

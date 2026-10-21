@@ -12,7 +12,8 @@ class SubtitleStyleTest {
         assertEquals("yes", p["sub-bold"])
         assertEquals("0", p["sub-border-size"])
         assertEquals("outline-and-shadow", p["sub-border-style"])
-        assertEquals("2", p["sub-shadow-offset"])
+        assertEquals("3", p["sub-shadow-offset"])
+        assertEquals("#E0000000", p["sub-shadow-color"])
         assertEquals("center", p["sub-align-x"])
         assertEquals("no", p["sub-use-margins"])
     }
@@ -46,6 +47,11 @@ class SubtitleStyleTest {
         val after = SubtitleStyle(color = 0xFFFFEB3B).toMpv()
         assertEquals(listOf("sub-color" to "#FFFFEB3B"), SubtitleStyles.changed(before, after))
         assertEquals(after.size, SubtitleStyles.changed(emptyMap(), after).size)
+    }
+
+    @Test fun `bottom margin never goes under the navigation handle`() {
+        assertEquals("43", SubtitleStyle(bottomMarginPercent = 0f).toMpv(minBottomMarginPercent = 6f).toMap()["sub-margin-y"])
+        assertEquals("180", SubtitleStyle(bottomMarginPercent = 25f).toMpv(minBottomMarginPercent = 6f).toMap()["sub-margin-y"])
     }
 
     @Test fun `scale clamps to 50 to 300 percent`() {

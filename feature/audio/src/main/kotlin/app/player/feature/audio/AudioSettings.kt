@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ListItem
@@ -13,6 +15,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -125,9 +128,17 @@ private fun DelayRow(title: String, summary: String, ms: Long, highlighted: Bool
         colors = ListItemDefaults.colors(containerColor = if (highlighted) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent),
         modifier = Modifier.heightIn(min = 56.dp).testTag(tag),
     )
-    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    // Even widths across the row, same margin both sides; Reset puts it back to 0 in one tap.
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(-100L, -10L, 10L, 100L).forEach { step ->
-            OutlinedButton(onClick = { onChange(ms + step) }, modifier = Modifier.testTag("$tag$step")) { Text("%+.2f".format(step / 1000.0)) }
+            OutlinedButton(
+                onClick = { onChange(ms + step) },
+                modifier = Modifier.weight(1f).testTag("$tag$step"),
+                contentPadding = PaddingValues(horizontal = 4.dp),
+            ) { Text("%+.2f".format(step / 1000.0)) }
+        }
+        TextButton(onClick = { onChange(0) }, enabled = ms != 0L, modifier = Modifier.testTag("$tag-reset")) {
+            Text(stringResource(R.string.audio_reset))
         }
     }
 }
