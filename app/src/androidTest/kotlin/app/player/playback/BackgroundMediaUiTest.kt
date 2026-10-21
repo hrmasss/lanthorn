@@ -303,6 +303,28 @@ class BackgroundMediaUiTest {
         assertTrue("media notification left after Back", waitFor(3_000) { mediaNotification() == null })
     }
 
+    @Ears("US-59.1")
+    @Test fun i_screenOffKeepsPlayingWithBackgroundOn() {
+        play(listOf("clip420.mp4"))
+        instr.runOnMainSync { Playback.toggleBackgroundPlay() }
+        assertTrue("menu switch not on", waitFor(3_000) { Playback.backgroundPlay.value })
+        device.sleep()
+        try {
+            assertTrue("player not stopped with the screen off", waitFor(5_000) { stage(Stage.STOPPED) })
+            val before = state()!!.positionMs
+            SystemClock.sleep(3_000)
+            val after = state()!!.positionMs
+            log("screen off: $before -> $after ms, paused ${state()?.paused}")
+            assertFalse("paused with the screen off", state()!!.paused)
+            // The hosted emulator plays at under half speed at times: moving at all is the point.
+            assertTrue("position did not move with the screen off: $before -> $after", after - before >= 500)
+        } finally {
+            device.wakeUp()
+            // Leave no lock screen for the tests after this one.
+            device.executeShellCommand("wm dismiss-keyguard")
+        }
+    }
+
     // --- helpers
 
     private fun file(name: String): File = File(context.filesDir, name).also { f ->

@@ -153,6 +153,9 @@ object Playback : PlaybackControls {
     /** mpv log lines since the current file started, for the failure reason and "info". */
     private val lines = ArrayDeque<EngineMessage>()
 
+    /** Saves the settled position when the player leaves the screen; set by [bind] for its engine. */
+    private var saveOnLeave: (suspend () -> Unit)? = null
+
     /** The file whose failure is being named, so one failure gives one card. */
     private var failing: Uri? = null
 
@@ -200,6 +203,13 @@ object Playback : PlaybackControls {
             // In front again: the playback service has let go, and its notification with it.
             override fun onStart(owner: LifecycleOwner) {
                 media?.inService = false
+            }
+
+            // Leaving without background play (US-59.4, closing PiP, US-58.4) pauses: save where it stopped.
+            override fun onStop(owner: LifecycleOwner) {
+                if (activity.isChangingConfigurations) return
+                if (PlayerSessions.keepPlayingInBackground && !activity.isFinishing && !e.state.value.paused) return
+                scope.launch { saveOnLeave?.invoke() }
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
@@ -406,6 +416,23 @@ object Playback : PlaybackControls {
                 scope.launch(NonCancellable) {
                     val at = if (fresh) settledPosition(engine) else null
                     write(if (at != null) s.copy(positionMs = at) else s, why)
+                }
+            }
+            // Leaving the player pauses it and may release the engine at once, before the pause
+            // reaches the state: hold the engine until the settled position is saved, so the
+            // release below finds that save and does not write an older position over it.
+            saveOnLeave = saveOnLeave@{
+                val s = last ?: return@saveOnLeave
+                if (PlayerSessions.current.value !== engine || !s.loaded) return@saveOnLeave
+                val hold = Any()
+                PlayerSessions.acquire(context, hold)
+                try {
+                    val left = s.copy(paused = true, positionMs = settledPosition(engine) ?: s.positionMs)
+                    savedAt = SystemClock.elapsedRealtime()
+                    lastSaved = left
+                    withContext(NonCancellable) { write(left, "left the player") }
+                } finally {
+                    PlayerSessions.release(hold)
                 }
             }
             launch {

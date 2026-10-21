@@ -221,13 +221,17 @@ class PlayerWindowUiTest {
         // US-58.2: subtitles stay on (the track is still selected in PiP; the frame shows it).
         val sid = PlayerSessions.current.value!!.observe("sid", PropertyType.Text)
         assertTrue("no subtitle track selected in PiP, sid ${sid.value}", waitFor(2_000) { sid.value.let { it != null && it != "no" } })
-        // Tap the window for the system's PiP menu with our actions.
-        device.click(b.centerX(), b.centerY())
-        SystemClock.sleep(1_500)
-        shot("21-pip-menu")
-        for (a in listOf("Back 10 seconds", "Pause", "Forward 10 seconds")) {
-            assertNotNull("PiP action missing: $a", device.wait(Until.findObject(By.desc(a)), 2_000))
+        // Tap the window for the system's PiP menu with our actions. The menu hides by itself
+        // after a few seconds and a tap during its animation can miss: tap until all three show.
+        val actions = listOf("Back 10 seconds", "Pause", "Forward 10 seconds")
+        var shown = false
+        for (i in 1..3) {
+            if (!device.hasObject(By.desc("Pause"))) device.click(b.centerX(), b.centerY())
+            shown = actions.all { device.wait(Until.hasObject(By.desc(it)), 2_000) }
+            if (shown) break
         }
+        shot("21-pip-menu")
+        assertTrue("PiP actions missing, shown: ${actions.filter { device.hasObject(By.desc(it)) }}", shown)
         val p0 = state()!!.positionMs
         pipAction("Pause", b)
         assertTrue("PiP pause did not pause", waitFor(2_000) { state()!!.paused })
