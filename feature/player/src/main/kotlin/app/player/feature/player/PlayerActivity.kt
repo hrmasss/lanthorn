@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -51,6 +52,7 @@ class PlayerActivity : ComponentActivity() {
         // For automation and until P1.15's setting lands: --ez app.player.background true.
         if (intent.hasExtra(EXTRA_BACKGROUND)) PlayerSessions.keepPlayingInBackground = intent.getBooleanExtra(EXTRA_BACKGROUND, false)
         if (savedInstanceState == null) open(intent)
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.attach(this)
         // A stalled engine is replaced by a new one (PlayerSessions): follow it.
         lifecycleScope.launch { PlayerSessions.current.collect { live -> if (live != null) engine = live } }
         setContent {
@@ -85,6 +87,13 @@ class PlayerActivity : ComponentActivity() {
         val uri = intent.data ?: return
         lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
+
+    // Playback sees keys first: volume keys as brightness (US-77), keys while locked (US-28.3).
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.onKeyUp(keyCode, event)
 
     override fun onStart() {
         super.onStart()

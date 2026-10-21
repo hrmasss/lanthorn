@@ -1,9 +1,11 @@
 package app.player.feature.playback
 
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class NaturalOrderTest {
+    @Ears("US-13.3")
     @Test fun `numbers sort as numbers and case is ignored (US-13_3)`() {
         val names = listOf("Episode 10.mkv", "episode 2.mkv", "Episode 1.mkv", "Episode 02b.mkv", "Alpha.mp4", "episode 01.mkv")
         assertEquals(

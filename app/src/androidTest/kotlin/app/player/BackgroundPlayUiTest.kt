@@ -18,6 +18,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import app.player.feature.playback.OnLeave
+import app.player.feature.playback.PlaybackPrefs
+import kotlinx.coroutines.runBlocking
 
 /**
  * P1.7 in the real app: with background play on, leaving the player keeps the engine playing
@@ -32,10 +35,12 @@ class BackgroundPlayUiTest {
     @Before fun setUp() {
         // The player is opened with file:// uris of the app's own files.
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
+        // US-59.1 is "WHERE on leaving the app is background"; the default is a small window.
+        runBlocking { PlaybackPrefs(context).setOnLeave(OnLeave.Background) }
     }
 
     @After fun tearDown() {
-        PlayerSessions.keepPlayingInBackground = false
+        runBlocking { PlaybackPrefs(context).setOnLeave(OnLeave.Pip) }
         device.pressBack(); device.pressBack()
         waitFor { PlayerSessions.current.value == null }
     }

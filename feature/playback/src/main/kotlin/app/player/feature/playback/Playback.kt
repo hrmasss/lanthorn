@@ -6,6 +6,10 @@ import android.net.Uri
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.KeyEvent
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import app.player.core.data.choice.DecoderChoices
 import app.player.core.data.history.HistoryPrefs
 import app.player.core.data.history.ResumePoints
@@ -107,6 +111,10 @@ object Playback : PlaybackControls {
     private val _failure = MutableStateFlow<Failure?>(null)
     internal val failure: StateFlow<Failure?> = _failure.asStateFlow()
 
+    private val _locked = MutableStateFlow(false)
+    override val locked: StateFlow<Boolean> = _locked.asStateFlow()
+    private var window: PlayerWindow? = null
+
     private val _note = MutableStateFlow<Note?>(null)
     internal val note: StateFlow<Note?> = _note.asStateFlow()
 
@@ -153,6 +161,55 @@ object Playback : PlaybackControls {
         }
         return true
     }
+
+    override fun attach(activity: ComponentActivity) {
+        val e = engine ?: PlayerSessions.current.value ?: return
+        _locked.value = false
+        val w = PlayerWindow(activity, e, settings, _locked)
+        window = w
+        w.start()
+        activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                if (window === w) window = null
+                _locked.value = false
+            }
+        })
+    }
+
+    /**
+     * Media keys while the player is in front, locked or not (US-28.3). In the background the media
+     * session takes them (P1.15). Acts on the first key down and swallows the rest of the press.
+     */
+    override fun onKey(event: KeyEvent): Boolean {
+        val e = engine ?: return false
+        val action: (() -> Unit) = when (event.keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> e::togglePause
+            KeyEvent.KEYCODE_MEDIA_PLAY -> e::play
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> e::pause
+            KeyEvent.KEYCODE_MEDIA_NEXT -> ::next
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> ::previous
+            else -> return false
+        }
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            Log.i(TAG, "media key ${KeyEvent.keyCodeToString(event.keyCode)}, locked ${_locked.value}")
+            action()
+        }
+        return true
+    }
+
+    override fun lock() {
+        window?.lock()
+    }
+
+    internal fun unlock() {
+        window?.unlock()
+    }
+
+    override fun rotate() {
+        window?.rotate()
+    }
+
+    override fun pip(): Boolean = window?.enterPip() ?: false
 
     override fun previous() {
         val e = engine ?: return

@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-/** The Playback group: resume (US-22), lists (US-24, US-75), buttons (US-29) and opening links (US-13.2). */
+/** The Playback group: resume (US-22), lists (US-24, US-75), buttons (US-29), opening links (US-13.2), leaving, orientation and lock (US-58, US-56, US-28). */
 object PlaybackSettingsGroup : SettingsGroup {
     override val id = "playback"
     override val order = 25
@@ -41,6 +41,9 @@ object PlaybackSettingsGroup : SettingsGroup {
     private const val SMART = "smart_previous"
     private const val STEPS = "step_buttons"
     private const val PREV_NEXT = "show_previous_next"
+    private const val LOCK = "lock_mode"
+    private const val ORIENT = "orientation"
+    private const val LEAVE = "on_leave"
 
     override val entries = listOf(
         SettingsEntry(RESUME, R.string.setting_resume),
@@ -51,6 +54,9 @@ object PlaybackSettingsGroup : SettingsGroup {
         SettingsEntry(STEPS, R.string.setting_step_buttons, R.string.setting_step_buttons_summary),
         SettingsEntry(PREV_NEXT, R.string.setting_show_previous_next),
         SettingsEntry(LINKS, R.string.setting_open_links, R.string.setting_open_links_summary),
+        SettingsEntry(LEAVE, R.string.setting_on_leave),
+        SettingsEntry(ORIENT, R.string.setting_orientation),
+        SettingsEntry(LOCK, R.string.setting_lock_mode),
     )
 
     @Composable
@@ -59,7 +65,7 @@ object PlaybackSettingsGroup : SettingsGroup {
         val scope = rememberCoroutineScope()
         val prefs = remember { PlaybackPrefs(context) }
         val s by prefs.settings.collectAsStateWithLifecycle(PlaybackSettings())
-        val order = listOf("h1", RESUME, FIRST_ONLY, "h3", BACK, SKIP, "h4", SMART, STEPS, PREV_NEXT, "h2", LINKS)
+        val order = listOf("h1", RESUME, FIRST_ONLY, "h3", BACK, SKIP, "h4", SMART, STEPS, PREV_NEXT, "h2", LINKS, "h5", LEAVE, ORIENT, LOCK)
         val list = rememberLazyListState()
         LaunchedEffect(highlight) {
             val i = order.indexOf(highlight)
@@ -110,6 +116,37 @@ object PlaybackSettingsGroup : SettingsGroup {
                     highlighted = highlight == LINKS,
                 )
             }
+            item("h5") { SettingsHeader(stringResource(R.string.settings_section_screen)) }
+            choice(LEAVE, R.string.setting_on_leave, listOf(OnLeave.Pip to R.string.on_leave_pip, OnLeave.Background to R.string.on_leave_background, OnLeave.Stop to R.string.on_leave_stop), s.onLeave, highlight) {
+                scope.launch { prefs.setOnLeave(it) }
+            }
+            choice(
+                ORIENT, R.string.setting_orientation,
+                listOf(
+                    OrientationMode.FollowVideo to R.string.orientation_follow,
+                    OrientationMode.Landscape to R.string.orientation_landscape,
+                    OrientationMode.ReverseLandscape to R.string.orientation_reverse,
+                    OrientationMode.SensorLandscape to R.string.orientation_sensor_landscape,
+                    OrientationMode.Sensor to R.string.orientation_sensor,
+                    OrientationMode.System to R.string.orientation_system,
+                ),
+                s.orientation, highlight,
+            ) { scope.launch { prefs.setOrientation(it) } }
+            choice(LOCK, R.string.setting_lock_mode, listOf(LockMode.Lock to R.string.lock_mode_lock, LockMode.Kids to R.string.lock_mode_kids), s.lockMode, highlight) {
+                scope.launch { prefs.setLockMode(it) }
+            }
+        }
+    }
+
+    private fun <T> LazyListScope.choice(key: String, @StringRes title: Int, options: List<Pair<T, Int>>, selected: T, highlight: String?, onSelect: (T) -> Unit) {
+        item(key) {
+            SettingsChoice(
+                stringResource(title),
+                options.map { (v, label) -> v to stringResource(label) },
+                selected,
+                onSelect,
+                highlighted = highlight == key,
+            )
         }
     }
 

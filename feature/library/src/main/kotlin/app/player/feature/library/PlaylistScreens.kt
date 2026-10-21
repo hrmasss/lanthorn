@@ -65,6 +65,7 @@ import app.player.core.designsystem.component.ConfirmDialog
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.component.VideoThumbnail
 import app.player.core.designsystem.icon.LanthornIcons
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -94,7 +95,7 @@ internal fun PlaylistsScreen(onOpen: (Long) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember { Playlists(context) }
     val playlists by store.summaries.collectAsState(initial = null)
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     var creating by rememberSaveable { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -172,7 +173,7 @@ internal fun PlaylistScreen(
     var dragging by remember { mutableStateOf(false) }
     LaunchedEffect(stored) { if (!dragging) stored?.let { items = it } }
     val byUri = remember(content?.indexed) { content?.indexed?.associateBy { it.uri }.orEmpty() }
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     var renaming by rememberSaveable { mutableStateOf(false) }
     var deleting by rememberSaveable { mutableStateOf(false) }
     val missing = stringResource(R.string.playlist_missing)
@@ -359,7 +360,7 @@ internal fun AddToPlaylist(
     val context = LocalContext.current
     val store = remember { Playlists(context) }
     val playlists by store.summaries.collectAsState(initial = emptyList())
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     var creating by rememberSaveable { mutableStateOf(false) }
     // Drawn as nothing while the add runs, but kept composed so [scope] lives until it is done.
     var adding by remember { mutableStateOf(false) }
@@ -465,6 +466,10 @@ private fun NameDialog(title: String, initial: String, confirm: String, onDone: 
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
     )
 }
+
+/** Store calls resume on the main thread, whatever dispatcher the composition runs on. */
+@Composable
+private fun rememberMainScope() = rememberCoroutineScope { Dispatchers.Main.immediate }
 
 @Composable
 internal fun rememberToast(): (String) -> Unit {
