@@ -37,7 +37,7 @@ class AutoLoadOnDeviceTest {
     private val folder = File(OnDevice.context.cacheDir, "autoload")
     private val clip get() = File(folder, "Clip.mkv")
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         prefs.reset()
         folder.deleteRecursively()
         folder.mkdirs()
@@ -52,7 +52,7 @@ class AutoLoadOnDeviceTest {
         Unit
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         prefs.reset()
         PerFileChoices(OnDevice.context).forget(Uri.fromFile(clip).toString())
         runCatching { scenario.onActivity { it.surface.engine = null } }

@@ -29,7 +29,7 @@ class StyleOnDeviceTest {
     private lateinit var styles: SubtitleStyles
     private val holder = Any()
 
-    @Before fun open() = runBlocking {
+    @Before fun open(): Unit = runBlocking {
         // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)

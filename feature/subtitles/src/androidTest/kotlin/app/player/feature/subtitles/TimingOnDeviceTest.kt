@@ -23,7 +23,7 @@ class TimingOnDeviceTest {
     private val holder = Any()
     private val store = SubtitleStyleStore(OnDevice.context)
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         store.resetDelay()
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
@@ -31,7 +31,7 @@ class TimingOnDeviceTest {
         Unit
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         store.resetDelay()
         if (!::scenario.isInitialized) return@runBlocking
         runCatching { scenario.onActivity { it.surface.engine = null } }

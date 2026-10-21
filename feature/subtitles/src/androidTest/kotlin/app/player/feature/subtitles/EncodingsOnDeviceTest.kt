@@ -24,7 +24,7 @@ class EncodingsOnDeviceTest {
     private lateinit var engine: PlayerEngine
     private val holder = Any()
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
@@ -32,7 +32,7 @@ class EncodingsOnDeviceTest {
         Unit
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true)
         runCatching { scenario.onActivity { it.surface.engine = null } }
         OnDevice.release(holder)

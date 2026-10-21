@@ -29,7 +29,7 @@ class AudioSettingsOnDeviceTest {
     private val holder = Any()
     private val store = AudioPrefsStore(OnDevice.context)
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         store.reset()
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { AudioExtension.onEngineCreated(OnDevice.context, it) }
@@ -37,7 +37,7 @@ class AudioSettingsOnDeviceTest {
         Unit
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         store.reset()
         if (!::scenario.isInitialized) return@runBlocking
         runCatching { scenario.onActivity { it.surface.engine = null } }
