@@ -4,7 +4,6 @@ import app.player.core.testing.evidenceShot
 import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -122,8 +121,11 @@ class OnlineSearchOnDeviceTest {
         runCatching { p.close() }
         // The panel is its own activity: while it shows, the video's surface is gone and video is
         // off, and this clip has no audio, so nothing times the subtitle. Closing it lands on the
-        // test runner's empty activity, so bring the video screen back and wait for the video.
-        scenario.moveToState(Lifecycle.State.RESUMED)
+        // test runner's empty activity (the video screen was destroyed), so open the video screen
+        // again on the same engine and wait for the video.
+        scenario.close()
+        scenario = ActivityScenario.launch(VideoTestActivity::class.java)
+        scenario.onActivity { it.surface.engine = engine }
         engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
         engine.seekTo(1000)
         engine.await("sub-text", PropertyType.Text, 10_000) { it == "Downloaded from the service" }
