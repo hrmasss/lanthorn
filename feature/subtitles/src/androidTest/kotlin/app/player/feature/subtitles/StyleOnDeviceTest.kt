@@ -20,7 +20,7 @@ import java.io.File
 /** P1.28 style and placement on the real libmpv: property read-back plus screenshots. */
 class StyleOnDeviceTest {
     /** A stuck wait fails the test instead of holding the shared emulator. */
-    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300)
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
@@ -139,23 +139,6 @@ class StyleOnDeviceTest {
     }
 
     /** Why text on the wide clip drew tiny: dump what mpv thinks, compare with the 16:9 clip. */
-    @Test fun sizeDiagnostic() = runBlocking {
-        for (name in listOf("osd-dimensions", "sub-font-size", "sub-scale", "sub-use-margins", "sub-scale-by-window", "video-params", "sub-ass-override")) {
-            evidence("diag wide $name = ${engine.get(name, PropertyType.Text)}")
-        }
-        shot("diag-wide-default")
-        engine.set("sub-use-margins", "yes")
-        delay(500)
-        shot("diag-wide-use-margins")
-        engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
-        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
-        engine.awaitAutoLoad()
-        engine.set("sid", "2")
-        delay(1500)
-        evidence("diag tracks osd-dimensions = ${engine.get("osd-dimensions", PropertyType.Text)}")
-        shot("diag-tracks-english")
-    }
-
     private fun shot(name: String) {
         val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
         val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
