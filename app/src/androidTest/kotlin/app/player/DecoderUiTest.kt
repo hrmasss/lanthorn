@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.ActiveDecoder
@@ -79,15 +80,20 @@ class DecoderUiTest {
         device.wait(Until.hasObject(By.desc("More options")), 2000)
     }
 
+    /** Runs [step], retrying when the overlay recomposed the node away between find and click. */
+    private fun <T> retrying(step: () -> T): T? {
+        repeat(3) { try { return step() } catch (_: StaleObjectException) { SystemClock.sleep(200) } }
+        return null
+    }
+
     private fun openFromMenu(label: String) {
         repeat(3) {
             showControls()
-            device.findObject(By.desc("More options"))?.click()
+            retrying { device.findObject(By.desc("More options"))?.click() }
             // On smaller screens the entry can sit below the fold of the menu.
             val entry = device.wait(Until.findObject(By.text(label)), 1500)
                 ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
-            if (entry != null) {
-                entry.click()
+            if (entry != null && retrying { entry.click() } != null) {
                 SystemClock.sleep(1200)
                 return
             }
@@ -99,9 +105,8 @@ class DecoderUiTest {
     private fun pickDecoder(summary: String) {
         repeat(3) {
             showControls()
-            device.findObject(By.descStartsWith("Decoder "))?.click()
-            if (device.wait(Until.hasObject(By.text(summary)), 2000)) {
-                device.findObject(By.text(summary)).click()
+            retrying { device.findObject(By.descStartsWith("Decoder "))?.click() }
+            if (device.wait(Until.hasObject(By.text(summary)), 2000) && retrying { device.findObject(By.text(summary)).click() } != null) {
                 return
             }
             device.pressBack()
@@ -111,7 +116,7 @@ class DecoderUiTest {
 
     private fun badge(): String? {
         showControls()
-        return device.findObject(By.descStartsWith("Decoder "))?.contentDescription
+        return retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
     }
 
     private fun shot(name: String) {
