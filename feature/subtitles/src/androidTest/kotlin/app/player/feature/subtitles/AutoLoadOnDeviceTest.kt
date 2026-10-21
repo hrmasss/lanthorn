@@ -1,5 +1,7 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.evidenceShot
+import app.player.core.testing.Ears
 import android.content.ContentValues
 import android.net.Uri
 import android.provider.MediaStore
@@ -91,6 +93,7 @@ class AutoLoadOnDeviceTest {
         return parseTracks(engine.get("track-list", PropertyType.Text)).firstOrNull { it.type == "sub" && it.id == sid }
     }
 
+    @Ears("US-39.1", "US-39.2")
     @Test fun matchingFilesLoad_firstExternalOn_US39_1_US39_2() = runBlocking {
         val subs = openClip()
         val external = subs.filter { it.external }.map { it.title }
@@ -100,6 +103,7 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.2 no preferred language: first external file on (${selected()?.title})")
     }
 
+    @Ears("US-39.1")
     @Test fun reopeningTheSameFileLoadsItsFilesAgain_US39_1() = runBlocking {
         openClip()
         engine.awaitAutoLoad()
@@ -111,6 +115,7 @@ class AutoLoadOnDeviceTest {
     }
 
     /** US-39.1: one clip per format, each with one subtitle file beside it; each loads and turns on. */
+    @Ears("US-39.1")
     @Test fun eachFormatLoadsOnDevice_US39_1() = runBlocking {
         data class Case(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
         val cases = listOf(
@@ -143,6 +148,7 @@ class AutoLoadOnDeviceTest {
         }
     }
 
+    @Ears("US-39.2")
     @Test fun preferredLanguageWins_US39_2() = runBlocking {
         prefs.setLanguage("it")
         openClip()
@@ -156,6 +162,7 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.2 preferred Italian: Clip.it.srt on; preferred English: embedded '${english.title}' (eng) on")
     }
 
+    @Ears("US-39.2")
     @Test fun autoOffShowsNone_US39_2() = runBlocking {
         prefs.setShowAutomatically(false)
         openClip()
@@ -163,6 +170,7 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.2 show automatically off: tracks loaded, none on (sid ${engine.get("sid", PropertyType.Text)})")
     }
 
+    @Ears("US-39.4")
     @Test fun rememberedTrackComesBack_US39_4() = runBlocking {
         prefs.setLanguage("en")
         val subs = openClip()
@@ -176,6 +184,7 @@ class AutoLoadOnDeviceTest {
     }
 
     /** US-40: "Open subtitle file" starts in the video's folder; the picked file comes back with the video. */
+    @Ears("US-40.1", "US-40.2")
     @Test fun zyOpenByHandStartsInTheVideoFolder_US40() = runBlocking {
         fun step(s: String) = android.util.Log.i("evidence", "open-by-hand step: $s")
         OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.READ_MEDIA_VIDEO)
@@ -244,6 +253,7 @@ class AutoLoadOnDeviceTest {
      * Shared storage under scoped storage: the video's folder is not listable until the viewer
      * allows it once in the system folder picker. Drives the real picker.
      */
+    @Ears("US-39.1", "US-39.5")
     @Test fun zzFolderGrantFindsSubtitles_US39_1() = runBlocking {
         fun step(s: String) = android.util.Log.i("evidence", "grant step: $s")
         OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.READ_MEDIA_VIDEO)
@@ -322,8 +332,6 @@ class AutoLoadOnDeviceTest {
     }
 
     private fun shotTo(name: String) {
-        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
-        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 }

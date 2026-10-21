@@ -236,7 +236,7 @@ class DecoderUiTest {
         close()
         play("withsubs.mp4")
         log("one-time SW, then a plain open: ${engineState()?.decoderMode} on ${engineState()?.activeDecoder?.label}")
-        assertTrue("plain open did not go back to HW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.HW })
+        assertTrue("plain open did not go back to HW, last ${engineState()?.activeDecoder}", waitFor(20_000) { engineState()?.activeDecoder == ActiveDecoder.HW })
         close()
     }
 

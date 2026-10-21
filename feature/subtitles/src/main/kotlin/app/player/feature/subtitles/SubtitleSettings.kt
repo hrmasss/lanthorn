@@ -73,6 +73,10 @@ object SubtitleSettings : SettingsGroup {
     private const val FOLDER = "subtitle_folder"
     private const val ALLOWED = "allowed_folders"
     private const val DEFAULT_DELAY = "default_delay"
+    private const val ONLINE = "online_search"
+    private const val ONLINE_KEY = "online_api_key"
+    private const val ONLINE_USER = "online_username"
+    private const val ONLINE_PASSWORD = "online_password"
 
     /** Loading rows sit first; their LazyColumn positions, header at 0. */
     private val LOADING = listOf(AUTO, LANGUAGE, FOLDER, ALLOWED)
@@ -83,6 +87,10 @@ object SubtitleSettings : SettingsGroup {
         SettingsEntry(FOLDER, R.string.subs_setting_folder),
         SettingsEntry(ALLOWED, R.string.subs_setting_allowed),
         SettingsEntry(DEFAULT_DELAY, R.string.subs_setting_default_delay, R.string.subs_setting_default_delay_summary),
+        SettingsEntry(ONLINE, R.string.subs_setting_online_on, R.string.subs_setting_online_summary),
+        SettingsEntry(ONLINE_KEY, R.string.subs_setting_online_key, R.string.subs_setting_online_key_summary),
+        SettingsEntry(ONLINE_USER, R.string.subs_setting_online_user),
+        SettingsEntry(ONLINE_PASSWORD, R.string.subs_setting_online_password),
     ) + KEYS.zip(TITLES) { k, t -> SettingsEntry(k, t) }
 
     @Composable
@@ -117,6 +125,8 @@ object SubtitleSettings : SettingsGroup {
         val languages = remember(none) {
             listOf("" to none) + SUBTITLE_LANGUAGES.map { it to java.util.Locale(it).let { l -> l.getDisplayLanguage(l) }.replaceFirstChar(Char::titlecase) }
         }
+        val onlineStore = remember { OnlineAccountStore(context) }
+        val online by onlineStore.account.collectAsState(OnlineAccount())
         val delayStore = remember { SubtitleStyleStore(context) }
         val defaultDelay by delayStore.defaultDelayMs.collectAsState(0L)
         val state = rememberLazyListState()
@@ -171,6 +181,34 @@ object SubtitleSettings : SettingsGroup {
             item(DEFAULT_DELAY) {
                 DelayRow(defaultDelay, highlight == DEFAULT_DELAY) { ms -> scope.launch { delayStore.setDefaultDelay(ms) } }
             }
+            item("online") { SettingsHeader(stringResource(R.string.subs_setting_online)) }
+            item(ONLINE) {
+                SettingsSwitch(
+                    stringResource(R.string.subs_setting_online_on),
+                    online.enabled,
+                    { on -> scope.launch { onlineStore.setEnabled(on) } },
+                    summary = stringResource(R.string.subs_setting_online_summary),
+                    highlighted = highlight == ONLINE,
+                    modifier = Modifier.testTag("sub-setting-online"),
+                )
+            }
+            if (online.enabled) {
+                item(ONLINE_KEY) {
+                    TextSetting(stringResource(R.string.subs_setting_online_key), online.apiKey, secret = true, highlight == ONLINE_KEY, "sub-setting-online-key") {
+                        scope.launch { onlineStore.setApiKey(it) }
+                    }
+                }
+                item(ONLINE_USER) {
+                    TextSetting(stringResource(R.string.subs_setting_online_user), online.username, secret = false, highlight == ONLINE_USER, "sub-setting-online-user") {
+                        scope.launch { onlineStore.setUsername(it) }
+                    }
+                }
+                item(ONLINE_PASSWORD) {
+                    TextSetting(stringResource(R.string.subs_setting_online_password), online.password, secret = true, highlight == ONLINE_PASSWORD, "sub-setting-online-password") {
+                        scope.launch { onlineStore.setPassword(it) }
+                    }
+                }
+            }
             item("header") { SettingsHeader(stringResource(R.string.subs_style_title)) }
             item("preview") { SubtitlePreview(style, Modifier.padding(horizontal = 16.dp)) }
             styleEditor(style, styles::update, families, onPickFontFolder = { folder.launch(null) }, highlight = highlight)
@@ -180,6 +218,7 @@ object SubtitleSettings : SettingsGroup {
     override suspend fun reset(context: Context) {
         SubtitlePrefsStore(context).reset()
         SubtitleStyleStore(context).resetDelay()
+        OnlineAccountStore(context).setEnabled(false)
         withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).reset() }
     }
 
@@ -199,6 +238,34 @@ object SubtitleSettings : SettingsGroup {
         if (data.has("defaultDelayMs")) SubtitleStyleStore(context).setDefaultDelay(data.optLong("defaultDelayMs"))
         val style = data.optJSONObject("style")?.let { decodeStyle(it.toString()) } ?: return
         withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).update { style } }
+    }
+}
+
+/** A text setting: shows set or not set (never the secret itself); tapping edits it in a dialog. */
+@Composable
+private fun TextSetting(title: String, value: String, secret: Boolean, highlighted: Boolean, tag: String, onSave: (String) -> Unit) {
+    var editing by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val shown = when {
+        value.isEmpty() -> stringResource(R.string.subs_setting_not_set)
+        secret -> stringResource(R.string.subs_setting_set)
+        else -> value
+    }
+    SettingsAction(title, onClick = { editing = true }, summary = shown, highlighted = highlighted, modifier = Modifier.testTag(tag))
+    if (editing) {
+        var text by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (secret) "" else value) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { editing = false },
+            title = { Text(title) },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    text, { text = it }, singleLine = true,
+                    visualTransformation = if (secret) androidx.compose.ui.text.input.PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+                    modifier = Modifier.testTag("$tag-field"),
+                )
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { onSave(text); editing = false }, modifier = Modifier.testTag("$tag-save")) { Text(stringResource(R.string.subs_setting_save)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { editing = false }) { Text(stringResource(android.R.string.cancel)) } },
+        )
     }
 }
 

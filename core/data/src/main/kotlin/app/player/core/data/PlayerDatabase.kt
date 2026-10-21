@@ -37,6 +37,10 @@ interface PlaybackPositionDao {
     @Query("SELECT * FROM playback_position")
     suspend fun all(): List<PlaybackPosition>
 
+    /** Every resume point, live: the library's progress, finished and last-played marks (US-07). */
+    @Query("SELECT * FROM playback_position")
+    fun observeAll(): kotlinx.coroutines.flow.Flow<List<PlaybackPosition>>
+
     @Upsert
     suspend fun putAll(positions: List<PlaybackPosition>)
 

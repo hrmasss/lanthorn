@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.designsystem.theme.LanthornTheme
+import app.player.core.testing.Ears
 import app.player.feature.library.network.NetworkPrefs
 import app.player.feature.library.network.StreamDialog
 import kotlinx.coroutines.flow.first
@@ -41,6 +42,7 @@ class StreamDialogTest {
         }
     }
 
+    @Ears("US-61.2")
     @Test fun us_61_2_dialog_opens_with_a_url_from_the_clipboard() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             context.getSystemService(ClipboardManager::class.java)
@@ -55,6 +57,7 @@ class StreamDialogTest {
         assertEquals(0, rule.onAllNodesWithText("not a url", substring = true).fetchSemanticsNodes().size)
     }
 
+    @Ears("US-61.3")
     @Test fun us_61_3_played_urls_are_kept_and_each_removable() {
         var played: String? = null
         rule.setContent { LanthornTheme { StreamDialog(onPlay = { played = it }, onDismiss = {}) } }
@@ -71,6 +74,7 @@ class StreamDialogTest {
         rule.waitUntil(3_000) { runBlocking { prefs.history.first() }.isEmpty() }
     }
 
+    @Ears("US-61.3")
     @Test fun us_61_3_keep_none_records_nothing() {
         runBlocking { prefs.setKeepHistory(false) }
         rule.setContent { LanthornTheme { StreamDialog(onPlay = {}, onDismiss = {}) } }

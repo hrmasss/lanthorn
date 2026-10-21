@@ -11,7 +11,9 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.player.core.data.PlaybackPosition
 import app.player.core.data.history.HistoryPrefs
+import app.player.core.data.history.ResumePoints
 import app.player.core.data.library.LibraryFolder
 import app.player.core.data.library.LibraryIndex
 import app.player.core.data.library.LibraryVideo
@@ -57,6 +59,10 @@ sealed interface LibraryUiState {
         val scanned: Boolean,
         /** Storage the scan covers (US-01.4, US-80.1). */
         val volumes: List<Volume>,
+        /** Watch state per video id (US-07). */
+        val marks: Map<Long, VideoMark> = emptyMap(),
+        /** For the resume button (US-08); null hides it. */
+        val lastPlayed: LibraryVideo? = null,
     ) : LibraryUiState {
         val videoCount get() = videos.size
 
@@ -74,6 +80,9 @@ class LibraryViewModel(
     io: CoroutineDispatcher = Dispatchers.IO,
     prefs: Flow<LibraryPrefs> = prefsStore?.prefs ?: flowOf(LibraryPrefs()),
     private val historyPaused: suspend () -> Boolean = { false },
+    /** The player's resume points, live (US-07, US-08). */
+    positions: Flow<List<PlaybackPosition>> = flowOf(emptyList()),
+    private val nowSec: () -> Long = { System.currentTimeMillis() / 1000 },
 ) : ViewModel() {
     private data class Access(val access: MediaAccess, val permanentlyDenied: Boolean)
 
@@ -89,9 +98,14 @@ class LibraryViewModel(
         when {
             a == null -> flowOf(LibraryUiState.Loading)
             a.access == MediaAccess.None -> flowOf(LibraryUiState.NeedsAccess(a.permanentlyDenied))
-            else -> combine(index.videos, prefs, index.scanning, scanned, mounted) { indexed, p, scanning, done, vols ->
+            else -> combine(
+                combine(index.videos, positions) { indexed, ps -> indexed to ps.associateBy { it.uri } },
+                prefs, index.scanning, scanned, mounted,
+            ) { (indexed, ps), p, scanning, done, vols ->
                 val shown = indexed.filter(p.filter::accepts)
                 LibraryUiState.Content(
+                    marks = marks(shown, ps, nowSec(), p.newDays, p.markLastPlayed),
+                    lastPlayed = if (p.resumeButton) lastPlayed(shown, ps) else null,
                     folders = shown.toFolders().sortedFor(p.sort, shown),
                     videos = shown.sortedFor(p.sort),
                     indexed = indexed,
@@ -169,6 +183,7 @@ class LibraryViewModel(
                     LibraryPrefsStore(app),
                     { mountedVolumes(app) },
                     historyPaused = HistoryPrefs(app)::isPaused,
+                    positions = ResumePoints(app).flow,
                 )
             }
         }

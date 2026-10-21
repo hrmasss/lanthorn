@@ -17,6 +17,8 @@ data class PlaybackState(
     val firstFrameMs: Long? = null,
     /** One line when the chosen decoder could not play the stream and another took over (US-35.3). */
     val decoderNotice: String? = null,
+    /** Back from the background (US-59.3): ms from the surface coming back to the video showing. */
+    val videoBackMs: Long? = null,
     /** Goes up each time playback restarts after a load or a seek: the new frame is ready. */
     val restarts: Int = 0,
     val error: String? = null,

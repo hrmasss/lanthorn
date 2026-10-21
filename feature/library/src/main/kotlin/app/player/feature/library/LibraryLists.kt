@@ -5,7 +5,8 @@ import android.text.format.DateUtils
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -70,7 +74,31 @@ internal class RowContext(
     val onVideo: (LibraryVideo) -> Unit,
     val folderActions: List<RowAction<LibraryFolder>> = emptyList(),
     val videoActions: List<RowAction<LibraryVideo>> = emptyList(),
+    /** Watch state per video id (US-07). */
+    val marks: Map<Long, VideoMark> = emptyMap(),
+    /** Selected row keys ([SelectionKey]); non-empty means selection mode (US-09.1). */
+    val selection: Set<String> = emptySet(),
+    /** Toggles a row. Null where the screen has no selection mode. */
+    val onSelect: ((String) -> Unit)? = null,
 )
+
+/**
+ * Tap opens, long-press selects (US-09.1). While anything is selected, a tap toggles instead.
+ * A selected row gets the selected-container colour and the selected state for TalkBack.
+ */
+@Composable
+private fun Modifier.selectableRow(key: String, ctx: RowContext, enabled: Boolean, open: () -> Unit): Modifier {
+    val selected = key in ctx.selection
+    val select = ctx.onSelect
+    return this
+        .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+        .combinedClickable(
+            enabled = enabled,
+            onClick = { if (ctx.selection.isNotEmpty() && select != null) select(key) else open() },
+            onLongClick = select?.let { { it(key) } },
+        )
+        .semantics { this.selected = selected }
+}
 
 /** The per-row menu button. */
 @Composable
@@ -134,7 +162,7 @@ private fun FolderRow(folder: LibraryFolder, ctx: RowContext) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable { ctx.onFolder(folder) }
+            .selectableRow(SelectionKey.of(folder), ctx, enabled = true) { ctx.onFolder(folder) }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("folder-row"),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -162,7 +190,9 @@ private fun FolderRow(folder: LibraryFolder, ctx: RowContext) {
 @Composable
 private fun FolderCell(folder: LibraryFolder, ctx: RowContext) {
     Column(
-        Modifier.clip(MaterialTheme.shapes.medium).clickable { ctx.onFolder(folder) }.testTag("folder-cell"),
+        Modifier.clip(MaterialTheme.shapes.medium)
+            .selectableRow(SelectionKey.of(folder), ctx, enabled = true) { ctx.onFolder(folder) }
+            .testTag("folder-cell"),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         FolderThumb(folder, ctx, Modifier.fillMaxWidth())
@@ -197,7 +227,7 @@ private fun VideoRow(video: LibraryVideo, ctx: RowContext) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = video.available) { ctx.onVideo(video) }
+            .selectableRow(SelectionKey.of(video), ctx, enabled = video.available) { ctx.onVideo(video) }
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .unavailable(video)
             .testTag("video-row"),
@@ -209,6 +239,7 @@ private fun VideoRow(video: LibraryVideo, ctx: RowContext) {
             Text(
                 displayName(video.name),
                 style = MaterialTheme.typography.titleMedium,
+                color = nameColor(ctx.marks[video.id]),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -223,7 +254,7 @@ private fun VideoCell(video: LibraryVideo, ctx: RowContext) {
     Column(
         Modifier
             .clip(MaterialTheme.shapes.medium)
-            .clickable(enabled = video.available) { ctx.onVideo(video) }
+            .selectableRow(SelectionKey.of(video), ctx, enabled = video.available) { ctx.onVideo(video) }
             .unavailable(video)
             .testTag("video-cell"),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -234,6 +265,7 @@ private fun VideoCell(video: LibraryVideo, ctx: RowContext) {
                 Text(
                     displayName(video.name),
                     style = MaterialTheme.typography.titleSmall,
+                    color = nameColor(ctx.marks[video.id]),
                     maxLines = 2,
                     minLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -256,6 +288,11 @@ private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
     }
     val parts = buildList {
         if (!video.available) add(stringResource(R.string.library_unavailable))
+        ctx.marks[video.id]?.let { m ->
+            if (m.lastPlayed) add(stringResource(R.string.mark_last_played))
+            if (m.finished) add(stringResource(R.string.mark_finished))
+            if (m.isNew) add(stringResource(R.string.mark_new))
+        }
         ctx.volumeLabel(video.volume)?.let(::add)
         for (field in Field.entries) {
             if (field !in ctx.fields) continue
@@ -280,7 +317,13 @@ private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
 
 @Composable
 private fun VideoThumb(video: LibraryVideo, ctx: RowContext, modifier: Modifier) {
-    VideoThumbnail(duration = formatDuration(video.durationMs), modifier = modifier) {
+    val mark = ctx.marks[video.id]
+    VideoThumbnail(
+        duration = formatDuration(video.durationMs),
+        modifier = modifier,
+        resume = mark?.progress,
+        unplayed = mark?.isNew == true,
+    ) {
         ThumbImage(video, ctx.loader)
     }
 }
@@ -328,4 +371,12 @@ private fun ThumbImage(video: LibraryVideo, loader: ThumbnailLoader) {
             modifier = Modifier.fillMaxSize(),
         )
     }
+}
+
+/** Last played in the accent colour, finished dimmed, everything else as usual. */
+@Composable
+private fun nameColor(mark: VideoMark?) = when {
+    mark?.lastPlayed == true -> MaterialTheme.colorScheme.primary
+    mark?.finished == true -> MaterialTheme.colorScheme.onSurfaceVariant
+    else -> MaterialTheme.colorScheme.onSurface
 }

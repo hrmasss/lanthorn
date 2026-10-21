@@ -62,8 +62,9 @@ object SubtitlesExtension : PlayerExtension {
     const val TRACKS_PANEL = "subtitle-tracks"
     const val SYNC_PANEL = "subtitle-sync"
     const val STYLE_PANEL = "subtitle-style"
+    const val ONLINE_PANEL = "subtitle-online"
 
-    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel, StylePanel)
+    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel, StylePanel, OnlineSearchPanel)
 
     override val menuEntries = listOf(
         PlayerMenuEntry(id = TRACKS_PANEL, group = MenuGroup.Subtitle, order = 0, opensPanel = TRACKS_PANEL) {
@@ -189,6 +190,7 @@ private object TracksPanel : PlayerPanel {
                 scope.launch { host.engine.state.value.uri?.let { loader.onFileLoaded(host.engine, it) } }
             }
         }
+        val online by remember { OnlineAccountStore(context).account }.collectAsState(OnlineAccount())
         val offerFolder = loader.lastResult?.takeIf { !it.folderGranted }?.place?.let(loader::folderUri)
 
         Column(Modifier.padding(bottom = 16.dp)) {
@@ -230,6 +232,13 @@ private object TracksPanel : PlayerPanel {
                         }
                     }
                 }
+            }
+            // US-46.4: hidden unless the viewer turned online search on in settings.
+            if (online.ready) {
+                OutlinedButton(
+                    onClick = { host.open(SubtitlesExtension.ONLINE_PANEL) },
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag("sub-search-online"),
+                ) { Text(stringResource(R.string.subs_online_search_action)) }
             }
             if (offerFolder != null) {
                 OutlinedButton(
