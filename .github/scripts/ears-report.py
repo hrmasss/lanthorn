@@ -34,6 +34,59 @@ def module_of(path):
     return "-".join(parts[:i]), kind
 
 
+def blank_literals(text):
+    """The text with strings, chars and comments blanked out (same length), so braces can be counted."""
+    out, i, n = list(text), 0, len(text)
+    while i < n:
+        c, two = text[i], text[i:i + 2]
+        if two == "//":
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+        elif two == "/*":
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+        elif text.startswith('"""', i):
+            j = text.find('"""', i + 3)
+            j = n if j < 0 else j + 3
+        elif c in "\"'":
+            j = i + 1
+            while j < n and text[j] != c and text[j] != "\n":
+                j += 2 if text[j] == "\\" else 1
+            j += 1
+        else:
+            i += 1
+            continue
+        for k in range(i, min(j, n)):
+            if out[k] != "\n":
+                out[k] = " "
+        i = j
+    return "".join(out)
+
+
+def class_spans(code, package):
+    """[(start, end, "pkg.Outer$Inner")] for every class or object body in [code]."""
+    spans = []
+    for m in re.finditer(r"\b(?:class|object)\s+(\w+)", code):
+        open_at = code.find("{", m.end())
+        # A class without a body (or whose next brace belongs to something later) has no members.
+        if open_at < 0 or re.search(r"\b(?:class|object|fun)\s", code[m.end():open_at]):
+            continue
+        depth, j = 0, open_at
+        while j < len(code):
+            depth += {"{": 1, "}": -1}.get(code[j], 0)
+            if depth == 0:
+                break
+            j += 1
+        spans.append((m.start(), j, m.group(1)))
+    # Nested classes take their outer class's name as a prefix, as JUnit reports them.
+    named = []
+    for sp in spans:
+        outer = sorted(o for o in spans if o[0] < sp[0] and sp[1] <= o[1])
+        names = [o[2] for o in outer] + [sp[2]]
+        named.append((sp[0], sp[1], (f"{package}." if package else "") + "$".join(names)))
+    return named
+
+
 def scan_sources(src):
     """{"pkg.Class#method": {"ids": [...], "module": m, "kind": k}} and class-level tags."""
     tests, class_tags = {}, {}
@@ -48,19 +101,32 @@ def scan_sources(src):
             path = os.path.join(root, name)
             text = open(path, encoding="utf-8", errors="replace").read()
             module, kind = module_of(os.path.relpath(path, src))
-            package, cls, pending = "", None, []
+            code = blank_literals(text)
+            pm = re.search(r"\bpackage\s+([\w.]+)", code)
+            package = pm.group(1) if pm else ""
+            spans = class_spans(code, package)
+
+            def enclosing(pos):
+                inside = [sp for sp in spans if sp[0] < pos <= sp[1]]
+                return max(inside, key=lambda sp: sp[0])[2] if inside else None
+
+            pending = []
+            # Tags are read from the original text (their ids are strings); positions match.
             for m in TOKENS.finditer(text):
+                if code[m.start()] == " " and not m.group(0).startswith(" "):
+                    continue  # inside a comment or string
                 if m.group(1) is not None:
                     pending += IDS.findall(m.group(1))
                 elif m.group(2):
-                    package = m.group(2)
+                    continue
                 elif m.group(3):
-                    cls = f"{package}.{m.group(3)}" if package else m.group(3)
-                    if pending:
+                    cls = next((sp[2] for sp in spans if sp[0] == m.start()), None)
+                    if pending and cls:
                         class_tags[cls] = {"ids": pending, "module": module, "kind": kind}
                     pending = []
                 else:
                     fun = m.group(4) or m.group(5)
+                    cls = enclosing(m.start())
                     if pending and cls:
                         tests[f"{cls}#{fun}"] = {"ids": pending, "module": module, "kind": kind}
                     pending = []

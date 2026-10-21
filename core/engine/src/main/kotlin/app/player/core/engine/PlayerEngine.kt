@@ -363,6 +363,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // decoder and shows the frame at the current audio position.
         videoBeforeDetach?.let {
             reattachedAt = SystemClock.elapsedRealtime()
+            _state.update { s -> s.copy(videoBackMs = null) }
             setProperty("vid", it)
             videoBeforeDetach = null
             Log.i(TAG, "video back on at ${_state.value.positionMs} ms")
@@ -478,7 +479,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private fun refreshVideo(triesLeft: Int = DECODER_SETTLE_TRIES) {
         val lib = mpv ?: return
         if (reattachedAt > 0 && triesLeft == DECODER_SETTLE_TRIES) {
-            Log.i(TAG, "video shown again ${SystemClock.elapsedRealtime() - reattachedAt} ms after the surface came back, at ${_state.value.positionMs} ms")
+            val back = SystemClock.elapsedRealtime() - reattachedAt
+            Log.i(TAG, "video shown again $back ms after the surface came back, at ${_state.value.positionMs} ms")
+            _state.update { it.copy(videoBackMs = back) }
             reattachedAt = 0
         }
         // VIDEO_RECONFIG can come before mpv knows the format, and no second one may follow: read

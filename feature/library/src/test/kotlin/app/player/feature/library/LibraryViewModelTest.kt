@@ -7,6 +7,7 @@ import app.player.core.data.library.LibraryIndex
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.VideoExtra
 import app.player.core.data.library.VideoSource
+import app.player.core.testing.Ears
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +68,7 @@ class LibraryViewModelTest {
         assertEquals(LibraryUiState.Loading, vm.state.value)
     }
 
+    @Ears("US-71.1")
     @Test fun `us_71_1 no access shows the access screen and never scans`() = runTest(main) {
         onDisk = listOf(video(1, "external_primary/Movies/"))
         val vm = vm()
@@ -77,6 +79,7 @@ class LibraryViewModelTest {
         assertTrue(dao.rows.value.isEmpty())
     }
 
+    @Ears("US-71.4")
     @Test fun `us_71_4 permanently denied keeps a way to grant`() = runTest(main) {
         val vm = vm()
         vm.onAccess(MediaAccess.None, permanentlyDenied = true)
@@ -84,6 +87,7 @@ class LibraryViewModelTest {
         assertEquals(LibraryUiState.NeedsAccess(true), vm.state.value)
     }
 
+    @Ears("NF-1")
     @Test fun `nf_1 cached index shows before any scan`() = runTest(main) {
         dao.rows.value = mapOf(1L to video(1, "external_primary/Movies/"))
         val vm = vm()
@@ -94,6 +98,7 @@ class LibraryViewModelTest {
         assertFalse(s.scanned)
     }
 
+    @Ears("US-01.3")
     @Test fun `us_01_3 refresh picks up files added and removed while closed`() = runTest(main) {
         dao.rows.value = mapOf(1L to video(1, "external_primary/Movies/"))
         onDisk = listOf(video(2, "external_primary/Movies/"), video(3, "external_primary/Clips/"))
@@ -107,6 +112,7 @@ class LibraryViewModelTest {
         assertTrue(s.scanned)
     }
 
+    @Ears("US-01.4")
     @Test fun `us_01_4 empty after a scan names the scanned storage`() = runTest(main) {
         val vm = vm()
         vm.onAccess(MediaAccess.Full, false)

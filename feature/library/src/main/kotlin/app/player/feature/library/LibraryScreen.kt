@@ -39,6 +39,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
@@ -70,6 +71,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -258,6 +261,10 @@ private fun LibraryHome(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        floatingActionButton = {
+            val last = (state as? LibraryUiState.Content)?.lastPlayed
+            if (last != null && selection.isEmpty()) ResumeButton { onPlayQueue(listOf(last.uri.toUri()), 0) }
+        },
         topBar = {
             if (selection.isNotEmpty() && content != null) {
                 SelectionBar(
@@ -351,6 +358,10 @@ private fun FolderScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        floatingActionButton = {
+            val last = (state as? LibraryUiState.Content)?.lastPlayed
+            if (last != null && selection.isEmpty()) ResumeButton { onPlayQueue(listOf(last.uri.toUri()), 0) }
+        },
         topBar = {
             if (selection.isNotEmpty() && content != null) {
                 SelectionBar(
@@ -402,7 +413,7 @@ internal fun rowContext(
     /** Share and properties in each video's row menu (US-74.1, US-10.4). */
     actions: FileActions? = null,
     onSelect: ((String) -> Unit)? = null,
-) = remember(state.prefs.fields, state.volumes, loaders, queue, selection, actions) {
+) = remember(state.prefs.fields, state.volumes, loaders, queue, selection, actions, state.marks) {
     RowContext(
         loader = loaders.first,
         fps = loaders.second::fps,
@@ -424,6 +435,7 @@ internal fun rowContext(
         ),
         selection = selection,
         onSelect = onSelect,
+        marks = state.marks,
     )
 }
 
@@ -715,5 +727,19 @@ private fun Context.openAppSettings() {
     startActivity(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+}
+
+/** US-08: one tap back into the last played video; the player resumes it at its resume point. */
+@Composable
+internal fun ResumeButton(onClick: () -> Unit) {
+    val label = stringResource(R.string.resume_last)
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        icon = { Icon(LanthornIcons.Play, contentDescription = null) },
+        text = { Text(label) },
+        // Above the floating view toolbar. The label is also set on the button itself: on API 36 the
+        // accessibility tree showed the button with an empty text node (P1.21 evidence).
+        modifier = Modifier.padding(bottom = 72.dp).testTag("resume-last").semantics { contentDescription = label },
     )
 }

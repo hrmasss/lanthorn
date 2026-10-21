@@ -39,6 +39,19 @@
     <string name="more_options">More options</string>
     <string name="row_menu">More options for %1$s</string>
     <string name="action_hide">Hide</string>
+    <string name="mark_new">New</string>
+    <string name="mark_finished">Watched</string>
+    <string name="mark_last_played">Last played</string>
+    <string name="resume_last">Resume</string>
+    <string name="setting_new_days">Mark as new for</string>
+    <string name="setting_mark_last">Mark last played</string>
+    <string name="setting_mark_last_summary">Highlight the last played video in each folder</string>
+    <string name="setting_resume_button">Resume button</string>
+    <string name="setting_resume_button_summary">A button on lists that plays the last video from where it stopped</string>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
     <string name="action_play">Play</string>
     <string name="action_share">Share</string>
     <string name="action_delete">Delete</string>

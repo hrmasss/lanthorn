@@ -2,6 +2,7 @@ package app.player.feature.library
 
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.toFolders
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -17,12 +18,14 @@ class SelectionTest {
     private val all = listOf(v(1, a), v(2, a), v(3, b), v(4, b), v(5, b, available = false))
     private val folders = all.toFolders().sortedBy { it.name }
 
+    @Ears("US-09.2")
     @Test fun `us_09_2 selected videos in the order shown`() {
         val shown = listOf(all[3], all[0], all[2])
         val picked = selectedVideos(setOf("v:1", "v:4"), emptyList(), shown, all)
         assertEquals(listOf(4L, 1L), picked.map { it.id })
     }
 
+    @Ears("US-09.4")
     @Test fun `us_09_4 a selected folder is all its videos`() {
         val picked = selectedVideos(setOf(SelectionKey.of(folders[0])), folders, emptyList(), all)
         assertEquals(listOf(1L, 2L), picked.map { it.id })
@@ -33,6 +36,7 @@ class SelectionTest {
         assertEquals(listOf(3L, 4L), picked.map { it.id })
     }
 
+    @Ears("US-10.1")
     @Test fun `us_10_1 rename keeps the extension`() {
         assertEquals("Holiday.mkv", renamed("clip.mkv", "Holiday"))
         assertEquals("Holiday.mkv", renamed("clip.mkv", " Holiday.mkv "))

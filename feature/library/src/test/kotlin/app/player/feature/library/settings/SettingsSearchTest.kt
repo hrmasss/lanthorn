@@ -1,5 +1,6 @@
 package app.player.feature.library.settings
 
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,12 +13,14 @@ class SettingsSearchTest {
         SettingHit("subtitle", "Subtitle", "font", "Police des sous-titres", "Taille et écart"),
     )
 
+    @Ears("US-65.1")
     @Test fun `us_65_1 all typed words must match, in title or summary`() {
         assertEquals(listOf("pause_history", "clear_history"), searchSettings("history", index).map { it.key })
         assertEquals(listOf("clear_history"), searchSettings("delete RESUME", index).map { it.key })
         assertEquals(listOf("pause_history"), searchSettings("resume keep", index).map { it.key })
     }
 
+    @Ears("US-65.1")
     @Test fun `us_65_1 accents and case are ignored`() {
         assertEquals(listOf("font"), searchSettings("ECART", index).map { it.key })
     }
@@ -26,6 +29,7 @@ class SettingsSearchTest {
         assertTrue(searchSettings("   ", index).isEmpty())
     }
 
+    @Ears("US-65.1")
     @Test fun `us_65_1 well under 100 ms per keystroke for 500 settings`() {
         val big = (1..500).map { SettingHit("g", "G", "k$it", "Setting number $it with a title", "And a summary é $it") }
         repeat(20) { searchSettings("summary 4", big) }

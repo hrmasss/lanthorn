@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,7 +80,15 @@ object LibrarySettings : SettingsGroup {
     override val title = R.string.settings_library
 
     private const val CACHE = "cache_thumbnails"
-    override val entries = listOf(SettingsEntry(CACHE, R.string.setting_cache_thumbnails, R.string.setting_cache_thumbnails_summary))
+    private const val NEW_DAYS = "new_days"
+    private const val MARK_LAST = "mark_last_played"
+    private const val RESUME = "resume_button"
+    override val entries = listOf(
+        SettingsEntry(CACHE, R.string.setting_cache_thumbnails, R.string.setting_cache_thumbnails_summary),
+        SettingsEntry(NEW_DAYS, R.string.setting_new_days),
+        SettingsEntry(MARK_LAST, R.string.setting_mark_last, R.string.setting_mark_last_summary),
+        SettingsEntry(RESUME, R.string.setting_resume_button, R.string.setting_resume_button_summary),
+    )
 
     @Composable
     override fun Content(highlight: String?) {
@@ -87,7 +96,7 @@ object LibrarySettings : SettingsGroup {
         val store = remember { LibraryPrefsStore(context) }
         val prefs by store.prefs.collectAsStateWithLifecycle(LibraryPrefs())
         val scope = rememberCoroutineScope()
-        SettingsPage(highlight, listOf("h", CACHE)) {
+        SettingsPage(highlight, listOf("h", CACHE, NEW_DAYS, MARK_LAST, RESUME)) {
             item("h") { SettingsHeader(stringResource(R.string.settings_section_list)) }
             item(CACHE) {
                 SettingsSwitch(
@@ -96,6 +105,31 @@ object LibrarySettings : SettingsGroup {
                     { scope.launch { store.setCacheThumbnails(it) } },
                     summary = stringResource(R.string.setting_cache_thumbnails_summary),
                     highlighted = highlight == CACHE,
+                )
+            }
+            item(NEW_DAYS) {
+                SettingsChoice(
+                    stringResource(R.string.setting_new_days),
+                    listOf(1, 3, 7, 14, 30).map { it to pluralStringResource(R.plurals.days, it, it) },
+                    prefs.newDays,
+                    { scope.launch { store.setNewDays(it) } },
+                    highlighted = highlight == NEW_DAYS,
+                )
+            }
+            item(MARK_LAST) {
+                SettingsSwitch(
+                    stringResource(R.string.setting_mark_last), prefs.markLastPlayed,
+                    { scope.launch { store.setMarkLastPlayed(it) } },
+                    summary = stringResource(R.string.setting_mark_last_summary),
+                    highlighted = highlight == MARK_LAST,
+                )
+            }
+            item(RESUME) {
+                SettingsSwitch(
+                    stringResource(R.string.setting_resume_button), prefs.resumeButton,
+                    { scope.launch { store.setResumeButton(it) } },
+                    summary = stringResource(R.string.setting_resume_button_summary),
+                    highlighted = highlight == RESUME,
                 )
             }
         }
