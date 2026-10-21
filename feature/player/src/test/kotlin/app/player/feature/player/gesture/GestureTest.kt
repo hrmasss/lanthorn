@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -12,6 +14,8 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.pinch
+import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.testing.Ears
 import app.player.feature.player.settings.GesturePrefs
 import app.player.feature.player.settings.TouchAction
 import org.junit.Assert.assertEquals
@@ -327,5 +331,32 @@ class GestureTest {
         rule.mainClock.advanceTimeBy(500)
         rule.waitForIdle()
         assertEquals(2, fx.fitCrop)
+    }
+
+    @Ears("US-76.1")
+    @Test fun `US-76_1 two-finger speed shows the speed in the centre`() {
+        c.prefs = GesturePrefs(twoFingerSpeed = true)
+        fx.spd = 1.0
+        c.twoFingerStart(TwoFingerKind.Speed)
+        c.twoFinger(TwoFingerKind.Speed, 1f, 0f, -80f, 800f, 400f)
+        assertEquals(Readout.Speed(1.2, top = false), c.readout)
+        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { GestureReadout(c.readout, onResetSpeed = c::resetSpeed, Modifier.fillMaxSize()) } }
+        rule.onNodeWithTag("readout-speed").assertIsDisplayed()
+        rule.onNodeWithText("1.2x").assertIsDisplayed()
+    }
+
+    @Ears("US-76.3")
+    @Test fun `US-76_3 double tap on the speed readout goes back to 1x`() {
+        c.prefs = GesturePrefs(twoFingerSpeed = true)
+        fx.spd = 1.0
+        c.twoFingerStart(TwoFingerKind.Speed)
+        c.twoFinger(TwoFingerKind.Speed, 1f, 0f, -200f, 800f, 400f)
+        assertEquals(1.5, fx.speed, 1e-9)
+        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { GestureReadout(c.readout, onResetSpeed = c::resetSpeed, Modifier.fillMaxSize()) } }
+        rule.onNodeWithTag("readout-speed").performTouchInput { doubleClick() }
+        rule.waitForIdle()
+        assertEquals(1.0, fx.speed, 0.0)
+        assertEquals(Readout.Speed(1.0, top = false), c.readout)
+        rule.onNodeWithText("1x").assertIsDisplayed()
     }
 }
