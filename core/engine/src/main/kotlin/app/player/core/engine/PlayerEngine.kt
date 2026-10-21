@@ -424,13 +424,32 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             pixelFormat = lib.getPropertyString("video-params/hw-pixelformat")
                 ?: lib.getPropertyString("video-params/pixelformat"),
         )
-        // The decoder is settled once video is reconfigured: compare it with what was chosen.
+        _state.update { it.copy(video = info) }
+        Log.i(TAG, "video ${info.codec} ${info.width}x${info.height}")
+        settleDecoder()
+    }
+
+    /**
+     * Compares the running decoder with the chosen one. Right after a live switch hwdec-current
+     * can be unavailable while mpv opens the new decoder, and no change event follows when it
+     * comes up, so read it again until mpv has a value.
+     */
+    private fun settleDecoder(triesLeft: Int = DECODER_SETTLE_TRIES) {
+        val lib = mpv ?: return
         val hwdec = lib.getPropertyString("hwdec-current")
-        val running = ActiveDecoder.fromHwdecCurrent(hwdec)
-        val s = _state.updateAndGet {
-            it.copy(video = info, activeDecoder = running, decoderNotice = fallbackNotice(it.decoderMode, running))
+        if (hwdec == null && triesLeft > 0) {
+            thread.schedule({ if (!released) settleDecoder(triesLeft - 1) }, DECODER_SETTLE_STEP_MS, TimeUnit.MILLISECONDS)
+            return
         }
-        Log.i(TAG, "video ${info.codec} ${info.width}x${info.height}, decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
+        val running = ActiveDecoder.fromHwdecCurrent(hwdec)
+        // A pick reaches mpv after the state changes: until mpv has it, the decoder running is the
+        // old one and says nothing about the pick.
+        val requested = lib.getPropertyString("hwdec")
+        val s = _state.updateAndGet {
+            val judged = requested == it.decoderMode.hwdec
+            it.copy(activeDecoder = running, decoderNotice = if (judged) fallbackNotice(it.decoderMode, running) else it.decoderNotice)
+        }
+        Log.i(TAG, "decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
     }
 
     private val observer = object : MPVLib.EventObserver {
@@ -468,12 +487,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             when (property) {
                 "hwdec-current" -> {
                     val before = _state.value.activeDecoder
-                    val s = _state.updateAndGet {
-                        val running = ActiveDecoder.fromHwdecCurrent(value)
-                        // An empty value is mpv between decoders; judge only settled values on loaded video.
-                        val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
-                        it.copy(activeDecoder = running, decoderNotice = notice)
-                    }
+                    // Only the badge follows this. The fallback is judged in settleDecoder, once the
+                    // decoder has settled after VIDEO_RECONFIG.
+                    val s = _state.updateAndGet { it.copy(activeDecoder = ActiveDecoder.fromHwdecCurrent(value)) }
                     if (s.activeDecoder != before) Log.i(TAG, "decoder ${before.label} -> ${s.activeDecoder.label} ($value) at ${s.positionMs} ms, notice ${s.decoderNotice}")
                 }
             }
@@ -519,6 +535,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
         private const val SURFACE_WAIT_MS = 1000L
+        private const val DECODER_SETTLE_STEP_MS = 100L
+        private const val DECODER_SETTLE_TRIES = 50
         private const val SCRUB_STALL_MS = 250L
         private const val SCRUB_REFINE_MS = 1500L
 

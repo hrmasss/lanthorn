@@ -39,21 +39,32 @@ class DecoderFeatureUiTest {
         }
         log("US-35.4 decoder before opening the panel: ${engine.state.value.activeDecoder}")
         assumeTrue("no hardware decoder on this emulator run", engine.state.value.activeDecoder == ActiveDecoder.HW)
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("more") }
+        // The hosted emulator can drop the first tap while the player starts: tap until it shows.
+        repeat(3) { if (!shown("more")) { compose.onNodeWithTag("video").performClick(); runCatching { compose.waitUntil(3_000) { shown("more") } } } }
         compose.onNodeWithTag("more").performClick()
-        compose.waitUntil(2_000) { shown("menu-deinterlace") }
+        compose.waitUntil(3_000) { shown("menu-deinterlace") }
         compose.onNodeWithTag("menu-deinterlace").performScrollTo().performClick()
-        compose.waitUntil(2_000) { shown("deint-switch") }
+        compose.waitUntil(3_000) { shown("deint-switch") }
         shot("p15-deint-disabled-hw")
         val before = engine.state.value.positionMs
         val t0 = SystemClock.elapsedRealtime()
         compose.onNodeWithTag("deint-switch").performClick()
-        waitUntil(3_000) { engine.state.value.activeDecoder != ActiveDecoder.HW }
+        // Engine judges a pick once mpv reports the decoder, up to 5 s (3789810).
+        compose.waitUntil(8_000) { engine.state.value.activeDecoder != ActiveDecoder.HW }
         val after = engine.state.value.positionMs
         log("US-35.4 switch pressed: now ${engine.state.value.activeDecoder} after ${SystemClock.elapsedRealtime() - t0} ms, position $before -> $after")
-        compose.waitUntil(2_000) { !shown("deint-switch") }
+        compose.waitUntil(8_000) { !shown("deint-switch") }
+        // US-35.1 with engine's notice: the badge names the decoder that runs, the same one the
+        // notice names when the pick fell back (this emulator has no working HW+).
+        SystemClock.sleep(1_000)
+        val running = engine.state.value.activeDecoder.label
+        val notice = engine.state.value.decoderNotice
+        val badge = compose.onNodeWithTag("decoder-badge", useUnmergedTree = true).fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
+        log("US-35.1 after picking HW+: badge \"$badge\", notice \"$notice\", running $running")
         shot("p15-deint-enabled-after-switch")
+        org.junit.Assert.assertTrue("badge names the running decoder", badge.contains("Decoder $running."))
+        if (notice != null) org.junit.Assert.assertTrue("notice names the same decoder", notice.endsWith("Playing with $running."))
     }
 
     private fun shown(tag: String) = compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
