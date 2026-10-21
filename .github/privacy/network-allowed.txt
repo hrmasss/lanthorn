@@ -1,0 +1,3 @@
+# Source files reviewed to open network connections themselves, outside libmpv (P2.1, NF-8).
+# Each connects only on the viewer's action. A new file needs review and a line here.
+feature/subtitles/src/main/kotlin/app/player/feature/subtitles/OpenSubtitles.kt  # US-46: online subtitle search, off by default, only when the viewer taps search
