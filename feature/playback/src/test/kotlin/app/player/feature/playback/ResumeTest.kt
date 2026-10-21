@@ -24,7 +24,12 @@ class ResumeTest {
     @Test fun `the last 5 percent saves as finished, position equals duration (US-22_1, US-07_3)`() {
         assertEquals(600_000, Resume.toSave(playing(570_000), 0)!!.positionMs)
         assertEquals(569_000, Resume.toSave(playing(569_999), 0)!!.positionMs)
-        assertEquals(600_000, Resume.toSave(playing(10_000, ended = true), 0)!!.positionMs)
+        assertEquals(600_000, Resume.toSave(playing(596_000, ended = true), 0)!!.positionMs)
+    }
+
+    @Ears("US-22.1", "US-07.3")
+    @Test fun `an end reported mid-file, as mpv does while shutting down, keeps the real position (US-22_1)`() {
+        assertEquals(14_000, Resume.toSave(playing(14_000, durationMs = 60_000, ended = true), 0)!!.positionMs)
     }
 
     @Test fun `nothing is saved before load, on error or without a duration`() {
