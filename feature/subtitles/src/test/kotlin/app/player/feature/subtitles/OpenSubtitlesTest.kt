@@ -42,6 +42,7 @@ class OpenSubtitlesTest {
         assertEquals("Clip.BluRay", r[0].release)
     }
 
+    @Ears("US-46.2")
     @Test fun `saved beside a writable local video, else in app storage (US-46_2)`() {
         val root = kotlin.io.path.createTempDirectory().toFile()
         val app = File(root, "app")
