@@ -76,6 +76,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     // before the next one goes out, or the next seek cancels the frame before it is drawn.
     @Volatile var reportsShownFrames = false
     private var awaitingShow = false
+    private var nudged = false
     private var landedAt = 0L
     private var openFd: android.os.ParcelFileDescriptor? = null
 
@@ -231,6 +232,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             scrubInFlight = true
             scrubSentAt = SystemClock.elapsedRealtime()
             awaitingShow = true
+            nudged = false
             landedAt = scrubSentAt
             landedPos = shown
             return@post
@@ -240,7 +242,16 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
     /** The preview view put a new frame on screen. Called from its thread. */
     fun frameShown() = post {
+        if (preview) Log.i(TAG, "preview view update, ${if (!awaitingShow) "extra" else if (nudged) "after nudge" else "first"}")
         if (!awaitingShow) return@post
+        if (!nudged) {
+            // Paused, mpv presents the old picture again when the seek ends and draws the new frame
+            // only when something next wakes its video output (gate runs: the view always showed
+            // the frame before the last landed one). An OSD change wakes it; its update is the frame.
+            nudged = true
+            mpvCommand("show-text", " ", "1")
+            return@post
+        }
         awaitingShow = false
         scrubInFlight = false
         Log.i(TAG, "preview frame shown at $landedPos ms, ${SystemClock.elapsedRealtime() - landedAt} ms after it landed")
