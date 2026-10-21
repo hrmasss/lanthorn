@@ -33,6 +33,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.FixMethodOrder
 import org.junit.Rule
@@ -294,12 +295,16 @@ class PlayerWindowUiTest {
 
     /** Taps a PiP menu action. The system hides the menu after a few seconds: tap the window to bring it back first. */
     private fun pipAction(desc: String, window: android.graphics.Rect) {
-        if (!device.hasObject(By.desc(desc))) {
-            device.click(window.centerX(), window.centerY())
-            device.wait(Until.hasObject(By.desc(desc)), 2_000)
+        // The menu can hide between the look and the find, so bring it back and try again then.
+        repeat(3) {
+            if (!device.hasObject(By.desc(desc))) {
+                device.click(window.centerX(), window.centerY())
+                device.wait(Until.hasObject(By.desc(desc)), 2_000)
+            }
+            // Found and tapped at once, so the menu cannot change between the two.
+            if (retrying { device.findObject(By.desc(desc))?.click() != null } == true) return
         }
-        // Found and tapped at once, so the menu cannot change between the two.
-        retrying { device.findObject(By.desc(desc))!!.click() }
+        fail("PiP action $desc never tappable")
     }
 
     private fun file(name: String): File = File(context.filesDir, name).also { f ->
