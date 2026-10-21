@@ -143,13 +143,8 @@ class ToolsUiTest {
 
     private fun shown(tag: String) = compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun waitUntil(ms: Long, check: () -> Boolean) {
-        val end = SystemClock.elapsedRealtime() + ms
-        while (!check()) {
-            if (SystemClock.elapsedRealtime() > end) throw AssertionError("timed out after $ms ms")
-            SystemClock.sleep(20)
-        }
-    }
+    /** Waits through the compose rule, so frames run and effects fire while we wait. */
+    private fun waitUntil(ms: Long, check: () -> Boolean) = compose.waitUntil(ms) { check() }
 
     private fun copy(asset: String): Uri {
         val file = File(context.cacheDir, asset)
