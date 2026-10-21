@@ -12,6 +12,7 @@ One line each: id, owner, why. Add your own; keep the reason concrete.
 | NF-3 | engine | 0.1% drops at 1080p60 on hardware decoding: the emulator has no hardware decoder. |
 | NF-4 | engine | 4K HEVC 10-bit and AV1 hardware decoding: not on the emulator. |
 | NF-6 | engine | 200 ms release and 10 preview frames a second: emulators decode in software at 0.5 to 1 frame a second. |
+| NF-5 | engine | Mid-playback: a hardware decoder that stalls inside a seek. The emulator proves the watchdog with an injected block (EngineStallUiTest, DecoderFallbackTest); a real MediaCodec stall, falling to SW at the same place with the player still responsive, needs the phone. Check: scrub hard on 4K HEVC 10-bit on HW. |
 | NF-7 | engine | ASS within the NF-3 drop budget: same as NF-3. |
 | US-17.2 | engine | Lands on the target on the emulator (SeekPreviewUiTest); the NF-6 time budget is the phone's. |
 | US-17.3 | engine | 10 updates a second while swiping: NF-6, phone. |

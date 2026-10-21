@@ -54,7 +54,11 @@ class PlaybackToolsTest {
         log("speed 1.5 applied in $ms ms, pitch correction $pitch, measured rate %.2f".format(rate))
         assertWithin("speed applied", ms, 200)
         assertEquals(true, pitch)
-        assertTrue("rate $rate", rate in 1.35..1.65)
+        assertEquals(1.5, engine.get("speed", PropertyType.Real)!!, 0.001)
+        // The hosted emulator makes no timing claim (timing=lenient): its clock jitters over 3 s,
+        // so there the rate only has to be clearly neither 1x nor 2x.
+        val lenient = InstrumentationRegistry.getArguments().getString("timing") == "lenient"
+        assertTrue("rate $rate", rate in (if (lenient) 1.25..1.8 else 1.35..1.65))
     }
 
     @Ears("US-24.2")

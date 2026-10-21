@@ -10,4 +10,6 @@ android {
 
 dependencies {
     api(project(":core:engine"))
+    // PlaybackControls.attach takes the player activity.
+    api(libs.androidx.activity.compose)
 }

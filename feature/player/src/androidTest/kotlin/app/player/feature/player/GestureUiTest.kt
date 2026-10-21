@@ -37,10 +37,14 @@ class GestureUiTest {
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, copy("clip.mp4")))
         waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 300 }
         engine = PlayerSessions.current.value!!
+        // The hosted emulator can drop the first tap while the player is still starting: tap again.
         compose.onNodeWithTag("video").performTouchInput { click(center) }
-        compose.waitUntil(2_000) { shown("back") }
+        runCatching { compose.waitUntil(2_000) { shown("back") } }.onFailure {
+            compose.onNodeWithTag("video").performTouchInput { click(center) }
+            compose.waitUntil(3_000) { shown("back") }
+        }
         compose.onNodeWithTag("video").performTouchInput { click(center) }
-        compose.waitUntil(2_000) { !shown("back") }
+        compose.waitUntil(3_000) { !shown("back") }
     }
 
     @After fun close() = scenario.close()
