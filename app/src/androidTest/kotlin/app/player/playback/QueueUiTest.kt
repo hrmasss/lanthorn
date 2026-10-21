@@ -148,7 +148,8 @@ class QueueUiTest {
 
     @Ears("US-29.1", "US-29.3")
     @Test fun f_smartPreviousRestartsThenOpensThePreviousFile() {
-        val (p1, p2) = TestMedia.videos("Parts" to "Part 1.mp4", "Parts" to "Part 2.mp4")
+        // Two long files of their own: a short first file ends by itself and moves on while the test steps.
+        val (p1, p2) = TestMedia.videos("Smart" to "Step 1.mp4", "Smart" to "Step 2.mp4")
         ui.play(p2)
         assertTrue("never reached 6 s", ui.waitFor(60_000) { ui.state()!!.positionMs >= 6_000 })
         ui.engine()!!.pause()
