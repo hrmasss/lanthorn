@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # subs-audio emulator job through Android Test Orchestrator (each test in its own process).
-# Args: <apk root> <out dir>. <apk root> holds app-debug-x86_64/, test-feature-subtitles/, test-feature-audio/.
+# Args: <apk root> <out dir>. <apk root> holds app-debug-x86_64/, test-app/, test-feature-subtitles/, test-feature-audio/.
 set -u
 APK=$1; OUT=$2; mkdir -p "$OUT"
 # Orchestrator APKs: curl -fLO https://dl.google.com/dl/android/maven2/androidx/test/orchestrator/1.6.1/orchestrator-1.6.1.apk
@@ -27,5 +27,9 @@ orch() { # <pkg> <out name>
 }
 orch $S subtitles
 orch $A audio
+# The Subtitle and Audio groups in the real Settings screen (app module).
+adb install -r -t "$(ls "$APK"/test-app/*.apk | head -1)" >/dev/null
+adb shell am instrument -w -e class app.player.SettingsGroupsUiTest app.player.test/$R > "$OUT/app-instrument.txt" 2>&1
+adb pull /sdcard/Android/data/app.player/files/gate "$OUT/app-shots" >/dev/null 2>&1
 adb logcat -d -s evidence:I > "$OUT/evidence-lines.txt"
 adb logcat -d | grep -E " mpv |PlayerEngine|AndroidRuntime|TestRunner|evidence" | tail -6000 > "$OUT/logcat-tail.txt"
