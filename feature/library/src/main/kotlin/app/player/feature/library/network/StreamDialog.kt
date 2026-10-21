@@ -1,6 +1,7 @@
 package app.player.feature.library.network
 
 import android.content.ClipboardManager
+import app.player.feature.library.rememberMainScope
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -50,7 +50,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun StreamDialog(onPlay: (String) -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     val prefs = remember { NetworkPrefs(context) }
     val history by prefs.history.collectAsStateWithLifecycle(emptyList())
     var text by rememberSaveable { mutableStateOf(clipboardUrl(context).orEmpty()) }

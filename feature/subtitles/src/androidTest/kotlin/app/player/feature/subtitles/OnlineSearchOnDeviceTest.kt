@@ -94,6 +94,10 @@ class OnlineSearchOnDeviceTest {
 
     @Ears("US-46.1", "US-46.2", "US-46.3")
     @Test fun searchOnlyOnTapThenDownloadAndTurnOn_US46_1_US46_2_US46_3() = runBlocking {
+        // Paused near the start: the clip is 9 s long, and a slow search and download on a hosted
+        // emulator let it reach its end, where a paused seek back showed no frame and no line.
+        engine.pause()
+        engine.seekTo(1000)
         accounts.setEnabled(true)
         accounts.setApiKey("viewer-own-key")
         accounts.setUsername("viewer")
@@ -111,12 +115,20 @@ class OnlineSearchOnDeviceTest {
         assertTrue("no name in ${search.path}", search.path.contains("query=Clip"))
         assertEquals("viewer-own-key", search.headers["api-key"])
         result!!.click()
-        delay(3000)
+        // Picked: logged in, downloaded, saved and turned on. Wait for that, not a fixed time.
+        val saved = File(video.parentFile, "Clip.en.srt")
+        engine.await("sid", PropertyType.Text, 20_000) { saved.exists() && it != null && it != "no" }
         runCatching { p.close() }
-        engine.pause()
+        // The panel is its own activity: while it shows, the video's surface is gone and video is
+        // off, and this clip has no audio, so nothing times the subtitle. Closing it lands on the
+        // test runner's empty activity (the video screen was destroyed), so open the video screen
+        // again on the same engine and wait for the video.
+        scenario.close()
+        scenario = ActivityScenario.launch(VideoTestActivity::class.java)
+        scenario.onActivity { it.surface.engine = engine }
+        engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
         engine.seekTo(1000)
         engine.await("sub-text", PropertyType.Text, 10_000) { it == "Downloaded from the service" }
-        val saved = File(video.parentFile, "Clip.en.srt")
         assertTrue("not saved beside the video", saved.exists())
         val paths = fake.requests.map { "${it.method} ${it.path.substringBefore('?')}" }
         val login = fake.requests.first { it.path.startsWith("/api/v1/login") }

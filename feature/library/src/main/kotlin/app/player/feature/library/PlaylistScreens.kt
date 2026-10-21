@@ -39,7 +39,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,7 +64,6 @@ import app.player.core.designsystem.component.ConfirmDialog
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.component.VideoThumbnail
 import app.player.core.designsystem.icon.LanthornIcons
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -467,9 +465,6 @@ private fun NameDialog(title: String, initial: String, confirm: String, onDone: 
     )
 }
 
-/** Store calls resume on the main thread, whatever dispatcher the composition runs on. */
-@Composable
-private fun rememberMainScope() = rememberCoroutineScope { Dispatchers.Main.immediate }
 
 @Composable
 internal fun rememberToast(): (String) -> Unit {

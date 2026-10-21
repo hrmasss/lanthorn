@@ -18,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
@@ -162,7 +161,7 @@ class FileActions internal constructor(
 @Composable
 fun rememberFileActions(onChanged: () -> Unit): FileActions {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     var pending by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         pending?.invoke(r.resultCode == Activity.RESULT_OK)
