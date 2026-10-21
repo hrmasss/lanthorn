@@ -176,6 +176,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Read by the EARS workflow (P1.35) together with the Instrumented run's results.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unit-test-results
+          path: |
+            **/build/test-results/testDebugUnitTest/*.xml
+          retention-days: 30
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:

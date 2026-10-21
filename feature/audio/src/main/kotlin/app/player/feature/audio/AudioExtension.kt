@@ -51,7 +51,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -156,9 +155,10 @@ object AudioExtension : PlayerExtension {
                 effects.state.map { it.saved }.distinctUntilChanged().drop(1).debounce(SAVE_DEBOUNCE_MS).collect { store.setEq(it) }
             },
             scope.launch { effects.state.map { it.boost }.distinctUntilChanged().collect { boostGain.value = it } },
-            // US-48.3: every new file starts at the default delay.
+            // US-48.3: every new file starts at the default delay, applied once it has loaded.
             scope.launch {
-                engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { delay.setBase(prefs.defaultDelayMs) }
+                engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first && it.second != null }
+                    .collect { delay.setBase(prefs.defaultDelayMs) }
             },
         )
         bluetooth.start()

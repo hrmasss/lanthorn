@@ -56,19 +56,28 @@ class PlayerChromeTest {
         // No screenshot while the overlay is about to animate out: taking one during a layout
         // pass made Espresso's idle check fail on the hosted emulator. 01-controls comes from
         // controlsStayWhilePaused instead.
-        compose.waitUntil(9_000) { !shown("back") }
+        // Effects run on the rule's clock, which does not move by itself while nothing draws:
+        // move it past the 3 s delay. The exact 3 s is proven by the unit test AutoHideTest.
+        compose.mainClock.advanceTimeBy(2_500)
+        compose.waitForIdle()
+        assertTrue("still shown before 3 s", shown("back"))
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitUntil(3_000) { !shown("back") }
         val hiddenAfter = SystemClock.elapsedRealtime() - shownAt
-        // The Compose test clock skews wall time on the emulator; the exact 3 s is proven by the
-        // unit test AutoHideTest. Here: it does hide by itself while playing.
-        log("auto-hide after $hiddenAfter ms (wall clock under the test rule)")
-        assertTrue("hid after $hiddenAfter ms", hiddenAfter <= 9_000)
+        log("auto-hide: shown at 2.5 s, hidden after 3.5 s on the test clock ($hiddenAfter ms wall clock)")
         shot("02-hidden")
     }
 
     @Test fun controlsStayWhilePaused_US16_3() {
         showControls("back")
         compose.onNodeWithTag("play-pause").performClick()
-        SystemClock.sleep(5_000)
+        // The pause reaches the screen from mpv's thread; until then the playing timer runs.
+        compose.waitUntil(5_000) { PlayerSessions.current.value?.state?.value?.paused == true }
+        compose.waitForIdle()
+        // Past the 3 s auto-hide on the rule's clock, and in wall time.
+        compose.mainClock.advanceTimeBy(5_000)
+        SystemClock.sleep(2_000)
+        compose.waitForIdle()
         assertTrue(shown("back"))
         shot("01-controls")
         shot("03-paused")

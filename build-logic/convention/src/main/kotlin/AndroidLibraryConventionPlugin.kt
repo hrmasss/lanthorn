@@ -15,6 +15,11 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
         }
         dependencies {
             add("testImplementation", catalog.findLibrary("junit").get())
+            // @Ears and evidenceShot() for every module's tests (P1.35).
+            if (path != ":core:testing") {
+                add("testImplementation", project(":core:testing"))
+                add("androidTestImplementation", project(":core:testing"))
+            }
         }
         // Instrumented-test APKs only run on the x86_64 emulator. Without this each one carries
         // libmpv for four ABIs (about 140 MB) and the CI artifact grows past 400 MB.

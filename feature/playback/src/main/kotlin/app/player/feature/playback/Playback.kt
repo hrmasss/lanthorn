@@ -9,6 +9,7 @@ import android.util.Log
 import app.player.core.data.choice.DecoderChoices
 import app.player.core.data.history.HistoryPrefs
 import app.player.core.data.history.ResumePoints
+import app.player.core.data.library.LibraryIndex
 import app.player.core.engine.DecoderMode
 import app.player.core.engine.EngineMessage
 import app.player.core.engine.PlaybackState
@@ -43,6 +44,8 @@ internal data class StartOver(val engine: PlayerEngine, val uri: Uri)
 internal data class Failure(
     val engine: PlayerEngine,
     val name: String,
+    /** The codec no decoder could read, when mpv named it. */
+    val codec: String?,
     val reason: FailureReason,
     val details: List<String>,
     val canSkip: Boolean,
@@ -105,6 +108,14 @@ object Playback : PlaybackControls {
     private var opening: Job? = null
     private var onClose = WeakReference<() -> Unit>(null)
     private var queue = PlayQueue(emptyList<Uri>(), 0)
+
+    /** mpv's `seekable` for the current file, and the network stream found live when it loaded. */
+    @Volatile private var seekable: Boolean? = null
+    @Volatile private var liveUri: String? = null
+
+    /** The current file's name, for the audio-only screen. */
+    private val _title = MutableStateFlow<String?>(null)
+    internal val title: StateFlow<String?> = _title.asStateFlow()
 
     /** mpv log lines since the current file started, for the failure reason and "info". */
     private val lines = ArrayDeque<EngineMessage>()
@@ -179,7 +190,10 @@ object Playback : PlaybackControls {
     }
 
     internal fun dismissNote(n: Note) {
-        if (_note.value == n) _note.value = null
+        if (_note.value == n) {
+            _note.value = null
+            Log.i(TAG, "note hidden")
+        }
     }
 
     internal fun skip() {
@@ -218,6 +232,7 @@ object Playback : PlaybackControls {
             val decoder = decoders.choose(uri.toString())
             val start = Resume.startAt(saved, settings.resume, laterInQueue, settings.resumeFirstOnly)
             Log.i(TAG, "open $uri item ${queue.index + 1}/${queue.size} start $start")
+            launch { _title.value = displayName(uri) }
             lines.clear()
             when (start) {
                 StartAt.Beginning -> e.open(uri, decoder = decoder)
@@ -258,7 +273,14 @@ object Playback : PlaybackControls {
             // mpv's own pause flag: PlaybackState.paused starts true after open() and only changes
             // when mpv reports a change, so a file that plays from the start can read as paused.
             val pause = engine.observe("pause", PropertyType.Flag)
-            combine(engine.state, pause) { st, p -> if (p == null) st else st.copy(paused = p) }.collect { s ->
+            val seekableFlow = engine.observe("seekable", PropertyType.Flag)
+            combine(engine.state, pause, seekableFlow) { st, p, sk -> (if (p == null) st else st.copy(paused = p)) to sk }.collect { (s, sk) ->
+                seekable = sk
+                // A network stream that shows its first frame without a duration is live, whatever it reports later.
+                if (s.firstFrameMs != null && s.uri != null && s.uri != liveUri && s.durationMs <= 0 && s.uri!!.substringBefore("://") in NETWORK_SCHEMES) {
+                    liveUri = s.uri
+                    Log.i(TAG, "live stream, no resume point: ${s.uri}")
+                }
                 val prev = last
                 val now = SystemClock.elapsedRealtime()
                 if (prev != null && (prev.paused != s.paused || prev.loaded != s.loaded || prev.error != s.error)) {
@@ -280,7 +302,7 @@ object Playback : PlaybackControls {
                     if (s.ended && (newFile || prev?.ended == false)) {
                         // No decoder for any stream: mpv "plays" nothing and ends at once (US-75.1).
                         val nothingPlayed = s.video == null && (lines.any(Failures::isDecoderFailure) || s.positionMs < 1000)
-                        if (nothingPlayed) failed(engine, s) else ended()
+                        if (nothingPlayed || Failures.endedEarly(s.positionMs, s.durationMs, lines.toList())) failed(engine, s) else ended()
                     }
                 }
                 last = s
@@ -317,7 +339,7 @@ object Playback : PlaybackControls {
         if (uri.scheme in NETWORK_SCHEMES) return
         queue.markFailed()
         val reason = Failures.classify(s.error, lines.toList())
-        val details = listOfNotNull(s.error) + lines.filter { it.level == EngineMessage.Level.Error }.map { "[${it.prefix}] ${it.text}" }
+        val details = Failures.technical(s.error, lines.toList())
         Log.w(TAG, "failed $uri: $reason")
         scope.launch {
             val name = displayName(uri)
@@ -326,16 +348,21 @@ object Playback : PlaybackControls {
             val canSkip = !allFailed && queue.hasNext(settings.loop)
             if (settings.skipFailed && canSkip) {
                 _note.value = Note(engine, context.getString(R.string.playback_skipped, name))
+                Log.i(TAG, "note shown: skipped $name")
                 next()
             } else {
-                _failure.value = Failure(engine, name, reason, details, canSkip, allFailed)
+                _failure.value = Failure(engine, name, Failures.codecOf(lines.toList()), reason, details, canSkip, allFailed)
                 Log.i(TAG, "failure card: $reason${if (allFailed) ", whole queue" else ""}")
             }
         }
     }
 
+    /**
+     * What the viewer calls the file: the provider's display name, the library's name for it (a
+     * deleted file keeps its row until the next scan), or the last part of its path. Never a bare id.
+     */
     private suspend fun displayName(uri: Uri): String = withContext(Dispatchers.IO) {
-        if (uri.scheme == "content") {
+        val fromProvider = if (uri.scheme == "content") {
             runCatching {
                 context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                     if (c.moveToFirst()) c.getString(0) else null
@@ -343,14 +370,18 @@ object Playback : PlaybackControls {
             }.getOrNull()
         } else {
             null
-        } ?: uri.lastPathSegment ?: uri.toString()
+        }
+        fromProvider
+            ?: runCatching { LibraryIndex.get(context).videos.first().firstOrNull { it.uri == uri.toString() }?.name }.getOrNull()
+            ?: Failures.nameFromPath(Uri.decode(uri.lastPathSegment ?: ""))
+            ?: context.getString(R.string.failure_unknown_name)
     }
 
     private fun <T> PlayQueue<T>.currentOrNull(): T? = if (size == 0) null else current
 
     private suspend fun write(s: PlaybackState, why: String) {
-        val row = Resume.toSave(s, System.currentTimeMillis()) ?: run {
-            Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, uri ${s.uri}")
+        val row = Resume.toSave(s, System.currentTimeMillis(), seekable, live = s.uri == liveUri) ?: run {
+            Log.d(TAG, "not saved ($why): at ${s.positionMs}, loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, seekable $seekable, uri ${s.uri}")
             return
         }
         if (history.isPaused()) return
