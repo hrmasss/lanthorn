@@ -49,6 +49,18 @@ class NoTrafficUiTest {
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instr.uiAutomation.executeShellCommand(command)).bufferedReader().readText()
     }.getOrDefault("")
 
+    /** Open sockets in this process (app and test share it), with their /proc/net rows where readable. */
+    private fun sockets(): List<String> {
+        val inodes = File("/proc/self/fd").listFiles().orEmpty().mapNotNull { f ->
+            runCatching { android.system.Os.readlink(f.path) }.getOrNull()?.takeIf { it.startsWith("socket:[") }
+                ?.removePrefix("socket:[")?.removeSuffix("]")
+        }.toSet()
+        val rows = listOf("tcp", "tcp6", "udp", "udp6", "raw", "raw6", "unix").flatMap { t ->
+            runCatching { File("/proc/self/net/$t").readLines().drop(1).map { "$t $it" } }.getOrDefault(emptyList())
+        }
+        return inodes.map { inode -> rows.firstOrNull { r -> r.split(Regex("\\s+")).contains(inode) }?.trim() ?: "socket $inode (no /proc/net row)" }
+    }
+
     private fun settle(uid: Int) {
         var last = TrafficStats.getUidRxBytes(uid) + TrafficStats.getUidTxBytes(uid)
         var stillSince = SystemClock.elapsedRealtime()
@@ -74,6 +86,7 @@ class NoTrafficUiTest {
         settle(uid)
         val tx0 = TrafficStats.getUidTxBytes(uid)
         val rx0 = TrafficStats.getUidRxBytes(uid)
+        sockets().filterNot { it.startsWith("unix") }.forEach { Log.i("P2.1", "baseline socket: $it") }
         // Logs the moment any counter moves, so a failure lines up with the logcat around it.
         val sampling = java.util.concurrent.atomic.AtomicBoolean(true)
         val sampler = kotlin.concurrent.thread(isDaemon = true, name = "nf8-sampler") {
@@ -83,6 +96,7 @@ class NoTrafficUiTest {
                 val now = longArrayOf(TrafficStats.getUidTxBytes(uid), TrafficStats.getUidRxBytes(uid), TrafficStats.getUidTxPackets(uid), TrafficStats.getUidRxPackets(uid))
                 if (!now.contentEquals(last)) {
                     Log.i("P2.1", "moved: tx +${now[0] - last[0]} B/${now[2] - last[2]} pk, rx +${now[1] - last[1]} B/${now[3] - last[3]} pk")
+                    sockets().filterNot { it.startsWith("unix") }.forEach { Log.i("P2.1", "socket now: $it") }
                     last = now
                 }
             }
