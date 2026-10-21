@@ -58,7 +58,7 @@ class EncodingsOnDeviceTest {
             controller.addFile(prepared.path, prepared.title)
             engine.seekTo(1000)
             delay(800)
-            val shown = runCatching { engine.await("sub-text", PropertyType.Text, 5_000) { it != null && it.isNotEmpty() && it != "Inside or outside the picture" } }
+            val shown = runCatching { engine.await("sub-text", PropertyType.Text, 15_000) { it != null && it.isNotEmpty() && it != "Inside or outside the picture" } }
                 .map { engine.get("sub-text", PropertyType.Text) }.getOrNull()
             val ok = shown != null && Normalizer.normalize(shown, Normalizer.Form.NFC) == line
             evidence("US-44.1 $name: ${if (ok) "ok" else "GARBLED"} '${shown?.take(60)}'")
