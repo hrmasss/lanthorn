@@ -42,7 +42,11 @@ class VideoMenuTest {
 
     @After fun close() {
         scenario.close()
-        runBlocking { RememberPerFile(context).set(true) }
+        // Leave no stored fit behind: other tests open the same clip and measure the picture.
+        runBlocking {
+            RememberPerFile(context).set(true)
+            PerFileChoices(context).forget(clip.toString())
+        }
     }
 
     /** Taps until the controls show: a slow emulator can drop the first tap while the player starts. */

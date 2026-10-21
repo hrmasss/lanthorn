@@ -8,6 +8,7 @@ import android.view.WindowInsets
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.ActiveDecoder
@@ -225,7 +226,7 @@ class PlayerChromeTest {
         val after = engine.state.value.positionMs
         SystemClock.sleep(500)
         log("decoder switch to $target: playback restarted after $switchMs ms, position $before -> $after (difference ${after - before} ms), now running ${engine.state.value.activeDecoder}")
-        assertTrue("switch took $switchMs ms", switchMs <= 1_000)
+        assertWithin("decoder switch", switchMs, 1_000)
         assertTrue("position moved by ${after - before} ms", kotlin.math.abs(after - before) <= 500)
     }
 
@@ -281,7 +282,7 @@ class PlayerChromeTest {
         compose.onNodeWithTag("more").performClick()
         compose.waitUntil(2_000) { shown("menu-player-settings") }
         shot("07-menu")
-        compose.onNodeWithTag("menu-player-settings").performClick()
+        compose.onNodeWithTag("menu-player-settings").performScrollTo().performClick()
         compose.waitUntil(2_000) { shown("player-settings") }
         shot("08-player-settings")
         assertTrue("playback continued", PlayerSessions.current.value?.state?.value?.paused == false)

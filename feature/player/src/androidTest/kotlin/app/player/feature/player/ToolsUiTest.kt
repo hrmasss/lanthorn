@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.PlayerEngine
@@ -53,7 +54,7 @@ class ToolsUiTest {
         runCatching { showControls(); compose.onNodeWithTag("more").performClick() }
             .onFailure { showControls(); compose.onNodeWithTag("more").performClick() }
         compose.waitUntil(2_000) { shown("menu-$item") }
-        compose.onNodeWithTag("menu-$item").performClick()
+        compose.onNodeWithTag("menu-$item").performScrollTo().performClick()
     }
 
     @Test fun speedFromMenuShowsInTopBar_US23() = runBlocking<Unit> {
