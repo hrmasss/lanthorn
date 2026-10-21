@@ -125,6 +125,62 @@ class PlaybackToolsTest {
         context.contentResolver.delete(uri, null, null)
     }
 
+    /**
+     * US-33.1 "without subtitles": with a subtitle on screen, the saved PNG has no subtitle text,
+     * while mpv's own subtitle-including capture of the same paused frame does.
+     */
+    @Test fun screenshotLeavesSubtitlesOut_US33_1() = runBlocking<Unit> {
+        open("clip.mp4")
+        engine.command("sub-add", copy("sub.srt").path!!, "select")
+        SystemClock.sleep(1_000)
+        engine.pause()
+        SystemClock.sleep(500)
+        val uri = tools.screenshot(context)!!
+        val saved = context.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it) }
+        val withSubs = File(context.cacheDir, "with-subs.png")
+        engine.command("screenshot-to-file", withSubs.path, "subtitles")
+        engine.get("pause", PropertyType.Flag)
+        val reference = android.graphics.BitmapFactory.decodeFile(withSubs.path)
+        // Same paused frame: the two captures match on the picture above the subtitle band and
+        // differ only where mpv's capture draws the subtitle text.
+        val bandTop = saved.height * 3 / 4
+        val diffBand = differing(saved, reference, bandTop, saved.height)
+        val diffAbove = differing(saved, reference, 0, bandTop)
+        log("US-33.1 pixels differing from mpv's capture with subtitles: subtitle band $diffBand, picture above $diffAbove (${saved.width}x${saved.height})")
+        File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }.let { dir ->
+            context.contentResolver.openInputStream(uri)!!.use { input -> File(dir, "p113-screenshot-saved.png").outputStream().use { input.copyTo(it) } }
+            withSubs.copyTo(File(dir, "p113-screenshot-with-subs-reference.png"), overwrite = true)
+        }
+        context.contentResolver.delete(uri, null, null)
+        assertTrue("same frame above the band", diffAbove <= 20)
+        assertTrue("the saved frame lacks the subtitle the reference shows", diffBand >= 40)
+    }
+
+    /** Pixels in rows [from, to) whose channels differ by more than 60. */
+    private fun differing(a: android.graphics.Bitmap, b: android.graphics.Bitmap, from: Int, to: Int): Int {
+        var n = 0
+        for (y in from until to) for (x in 0 until minOf(a.width, b.width)) {
+            val p = a.getPixel(x, y); val q = b.getPixel(x, y)
+            val d = maxOf(
+                kotlin.math.abs(android.graphics.Color.red(p) - android.graphics.Color.red(q)),
+                kotlin.math.abs(android.graphics.Color.green(p) - android.graphics.Color.green(q)),
+                kotlin.math.abs(android.graphics.Color.blue(p) - android.graphics.Color.blue(q)),
+            )
+            if (d > 60) n++
+        }
+        return n
+    }
+
+    /** Near-white pixels in the bottom third, where the subtitle sits. */
+    private fun whiteRows(b: android.graphics.Bitmap): Int {
+        var n = 0
+        for (y in b.height * 2 / 3 until b.height) for (x in 0 until b.width) {
+            val c = b.getPixel(x, y)
+            if (android.graphics.Color.red(c) > 235 && android.graphics.Color.green(c) > 235 && android.graphics.Color.blue(c) > 235) n++
+        }
+        return n
+    }
+
     private fun waitUntil(ms: Long, check: () -> Boolean) {
         val end = SystemClock.elapsedRealtime() + ms
         while (!check()) {
@@ -134,11 +190,10 @@ class PlaybackToolsTest {
     }
 
     private fun copy(asset: String): Uri {
+        // Always fresh: a crashed run once left a truncated copy here.
         val file = File(context.cacheDir, asset)
-        if (!file.exists()) {
-            InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
-                file.outputStream().use { input.copyTo(it) }
-            }
+        InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
+            file.outputStream().use { input.copyTo(it) }
         }
         return Uri.fromFile(file)
     }
