@@ -54,6 +54,6 @@ def main(assets, refs):
     for i, script in enumerate(FONTS):
         out = os.path.join(refs, f"reference-{script}.png")
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"color=c=black:s={W}x{H}:r=25:d=12",
-                        "-vf", f"subtitles={ass}:fontsdir={t}", "-ss", f"{i*3+1.5}", "-frames:v", "1", out], check=True)
+                        "-vf", f"ass={ass}:fontsdir={t}:shaping=complex", "-ss", f"{i*3+1.5}", "-frames:v", "1", out], check=True)
 
 main(sys.argv[1], sys.argv[2])

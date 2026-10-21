@@ -66,6 +66,13 @@ class AutoLoadOnDeviceTest {
         return parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" }
     }
 
+    /** What mpv has, for a test that waits on subtitle text after another screen was on top. */
+    private suspend fun dumpState(tag: String) {
+        for (name in listOf("vid", "sid", "current-tracks/sub/id", "current-tracks/sub/title", "time-pos", "pause", "video-params/w", "track-list/count")) {
+            android.util.Log.i("evidence", "$tag state $name = ${engine.get(name, PropertyType.Text)}")
+        }
+    }
+
     private suspend fun selected(): Track? {
         val sid = engine.get("sid", PropertyType.Text)?.toLongOrNull() ?: return null
         return parseTracks(engine.get("track-list", PropertyType.Text)).firstOrNull { it.type == "sub" && it.id == sid }
@@ -194,6 +201,8 @@ class AutoLoadOnDeviceTest {
             PanelTestActivity.withVideo = true
             engine.pause()
             engine.seekTo(1000)
+            delay(1000)
+            dumpState("open-by-hand after pick")
             engine.await("sub-text", PropertyType.Text, 10_000) { it == "Opened by hand" }
             step("picked and on")
             // US-40.2: another file, then this video again: the picked file is back and on.
@@ -280,6 +289,8 @@ class AutoLoadOnDeviceTest {
             // The picker took time; the 10 s clip may have played past its line. Look at 1 s.
             engine.pause()
             engine.seekTo(1000)
+            delay(1000)
+            dumpState("grant after rescan")
             engine.await("sub-text", PropertyType.Text, 10_000) { it == "Found through the folder grant" }
             engine.pause()
             delay(1500)
