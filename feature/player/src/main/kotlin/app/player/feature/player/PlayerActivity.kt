@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import app.player.core.data.choice.DecoderChoices
 import app.player.core.designsystem.theme.LanthornPlayerTheme
@@ -51,8 +53,12 @@ class PlayerActivity : ComponentActivity() {
         if (intent.hasExtra(EXTRA_BACKGROUND)) PlayerSessions.keepPlayingInBackground = intent.getBooleanExtra(EXTRA_BACKGROUND, false)
         if (savedInstanceState == null) open(intent)
         playerExtensions.firstNotNullOfOrNull { it.playback }?.attach(this)
+        // A stalled engine is replaced by a new one (PlayerSessions): follow it.
+        lifecycleScope.launch { PlayerSessions.current.collect { live -> if (live != null) engine = live } }
         setContent {
             LanthornPlayerTheme {
+                val live by PlayerSessions.current.collectAsState()
+                val engine = live ?: engine
                 PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this), onDecoderPicked = { mode ->
                     val uri = engine.state.value.uri ?: return@PlayerScreen
                     lifecycleScope.launch { decoders.rememberManualChoice(uri, mode) }
