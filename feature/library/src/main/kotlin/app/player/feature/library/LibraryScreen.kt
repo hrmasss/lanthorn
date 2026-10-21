@@ -149,6 +149,7 @@ fun LibraryRoute(
                 onFolderSettings = { nav.navigate("folder-settings") },
                 onSettings = { nav.navigate("settings") },
                 onShares = { nav.navigate("smb") },
+                onPlaylists = { nav.navigate("playlists") },
                 onSearch = { nav.navigate("search") },
             )
         }
@@ -209,6 +210,18 @@ fun LibraryRoute(
                 onBack = { nav.popBackStack() },
             )
         }
+        composable("playlists") {
+            PlaylistsScreen(onOpen = { nav.navigate("playlist/$it") }, onBack = { nav.popBackStack() })
+        }
+        composable("playlist/{id}", listOf(navArgument("id") { type = NavType.LongType })) { entry ->
+            PlaylistScreen(
+                entry.arguments?.getLong("id") ?: 0L,
+                content,
+                loaders.first,
+                onPlayQueue,
+                onBack = { nav.popBackStack() },
+            )
+        }
         composable("folder-settings") {
             FolderSettingsScreen(content, vm, onBack = { nav.popBackStack() })
         }
@@ -229,6 +242,7 @@ private fun LibraryHome(
     onFolderSettings: () -> Unit,
     onSettings: () -> Unit,
     onShares: () -> Unit,
+    onPlaylists: () -> Unit,
     onSearch: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -284,6 +298,7 @@ private fun LibraryHome(
                         onSettings,
                         onStream = { streamOpen = true },
                         onShares = onShares,
+                        onPlaylists = onPlaylists,
                     )
                 },
                 scrollBehavior = scroll,
@@ -543,7 +558,13 @@ private val Field.label
 
 /** Top bar overflow menu. */
 @Composable
-private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit, onStream: () -> Unit, onShares: () -> Unit) {
+private fun OverflowMenu(
+    onFolderSettings: (() -> Unit)?,
+    onSettings: () -> Unit,
+    onStream: () -> Unit,
+    onShares: () -> Unit,
+    onPlaylists: () -> Unit,
+) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("library-overflow")) {
@@ -565,6 +586,14 @@ private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit
                     onShares()
                 },
                 modifier = Modifier.testTag("open-shares"),
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.playlists_title)) },
+                onClick = {
+                    open = false
+                    onPlaylists()
+                },
+                modifier = Modifier.testTag("open-playlists"),
             )
             if (onFolderSettings != null) {
                 DropdownMenuItem(

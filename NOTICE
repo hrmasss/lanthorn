@@ -22,5 +22,7 @@ This app bundles or links the following third-party software:
   - Bouncy Castle bcprov (https://www.bouncycastle.org), Bouncy Castle Licence (MIT-style).
   - SLF4J API (https://www.slf4j.org), MIT.
   - MBassador (https://github.com/bennidi/mbassador), MIT.
+- Reorderable (sh.calvin.reorderable, drag to reorder playlist rows), Apache-2.0:
+  https://github.com/Calvin-LL/Reorderable
 - Material Symbols (a few glyphs, as Compose vectors in core/designsystem), Apache-2.0.
   https://github.com/google/material-design-icons
