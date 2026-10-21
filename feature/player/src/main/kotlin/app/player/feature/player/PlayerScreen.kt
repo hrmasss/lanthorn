@@ -516,8 +516,8 @@ fun PlayerScreen(
             }
         }
 
-        if (scrubbing && preview != null) {
-            SeekPreview(preview, scrubTargetMs, Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp))
+        if (preview != null) {
+            SeekPreview(preview, scrubTargetMs, Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp), visible = scrubbing)
         }
 
         // Keep the last panel's content during the exit animation.
