@@ -16,6 +16,7 @@ class VideoTextureView(context: Context) : TextureView(context), TextureView.Sur
             if (field === value) return
             surface?.let { field?.detachSurface() }
             field = value
+            value?.reportsShownFrames = true
             surface?.let { value?.attachSurface(it) }
         }
 
@@ -43,5 +44,8 @@ class VideoTextureView(context: Context) : TextureView(context), TextureView.Sur
         return true
     }
 
-    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+    // A new frame is on screen: the preview engine sends its next seek only now.
+    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {
+        engine?.frameShown()
+    }
 }

@@ -72,6 +72,11 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     // Preview only: this file's keyframes sit too far apart for a keyframe seek to land near the
     // finger, so preview seeks go exact. Learnt from the first keyframe seek of each file.
     private var longGop = false
+    // Preview on a view that reports shown frames: a landed seek waits until its frame is on screen
+    // before the next one goes out, or the next seek cancels the frame before it is drawn.
+    @Volatile var reportsShownFrames = false
+    private var awaitingShow = false
+    private var landedAt = 0L
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -188,7 +193,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
      * updates as fast as the decoder can deliver keyframes.
      */
     fun scrub(positionMs: Long) = post {
-        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < SCRUB_STALL_MS) {
+        val wait = if (awaitingShow) SHOW_WAIT_MS else SCRUB_STALL_MS
+        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < wait) {
             scrubNext = positionMs
         } else {
             sendScrub(positionMs)
@@ -200,10 +206,12 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         scrubNext = null
         scrubTarget = null
         scrubInFlight = false
+        awaitingShow = false
         mpvCommand("seek", "${positionMs / 1000.0}", "absolute+exact")
     }
 
     private fun sendScrub(positionMs: Long) {
+        awaitingShow = false
         scrubInFlight = true
         scrubTarget = positionMs
         scrubSentAt = SystemClock.elapsedRealtime()
@@ -217,6 +225,32 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         val shown = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() }
         val sent = scrubTarget
         if (preview) Log.i(TAG, "preview frame at $shown ms, target $sent ms")
+        if (preview && reportsShownFrames) {
+            // Keep the slot taken until the view has the frame; scrub() queues meanwhile, and the
+            // stall window, restarted here, sends anyway if the view never reports.
+            scrubInFlight = true
+            scrubSentAt = SystemClock.elapsedRealtime()
+            awaitingShow = true
+            landedAt = scrubSentAt
+            landedPos = shown
+            return@post
+        }
+        continueScrub(shown)
+    }
+
+    /** The preview view put a new frame on screen. Called from its thread. */
+    fun frameShown() = post {
+        if (!awaitingShow) return@post
+        awaitingShow = false
+        scrubInFlight = false
+        Log.i(TAG, "preview frame shown at $landedPos ms, ${SystemClock.elapsedRealtime() - landedAt} ms after it landed")
+        continueScrub(landedPos)
+    }
+
+    private var landedPos: Long? = null
+
+    private fun continueScrub(shown: Long?) {
+        val sent = scrubTarget
         if (preview && !scrubExact && sent != null && shown != null && kotlin.math.abs(shown - sent) > SCRUB_REFINE_MS) {
             if (!longGop) Log.i(TAG, "preview: keyframe landed ${shown - sent} ms from the target, seeking exact from now on")
             longGop = true
@@ -225,12 +259,12 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         if (next != null) {
             scrubNext = null
             sendScrub(next)
-            return@post
+            return
         }
         // Nothing newer waiting: if the keyframe is far from the target (long GOPs), refine with
         // an exact seek, so a slowing finger sees the frame it points at (US-30.1: within 2 s).
-        val target = scrubTarget ?: return@post
-        val landed = shown ?: return@post
+        val target = scrubTarget ?: return
+        val landed = shown ?: return
         if (kotlin.math.abs(landed - target) > SCRUB_REFINE_MS) {
             scrubTarget = null
             scrubInFlight = true
@@ -562,6 +596,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // A newer seek cancels the one in flight, so replacing slow seeks early means no frame ever
         // lands on a slow decoder. Wait this long for a seek to finish before giving up on it.
         private const val SCRUB_STALL_MS = 5000L
+        // Longest a landed preview frame holds the next seek back when the view never reports it.
+        private const val SHOW_WAIT_MS = 500L
         private const val SCRUB_REFINE_MS = 1500L
 
         /**
