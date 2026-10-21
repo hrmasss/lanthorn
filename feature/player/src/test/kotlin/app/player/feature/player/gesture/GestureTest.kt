@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.pinch
+import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.testing.Ears
 import app.player.feature.player.settings.GesturePrefs
 import app.player.feature.player.settings.TouchAction
@@ -30,32 +33,6 @@ import org.robolectric.annotation.Config
 @Config(sdk = [35], qualifiers = "w800dp-h400dp-mdpi")
 class GestureTest {
     @get:Rule val rule = createComposeRule()
-
-    private class Fake : GestureEffects {
-        override var positionMs = 60_000L
-        override var durationMs = 600_000L
-        override var paused = false
-        var spd = 1.0
-        override val speed get() = spd
-        override var controlsShown = false
-        val seeks = mutableListOf<Pair<Long, Boolean>>()
-        var zoomed = 1.0
-        var pan = 0.0 to 0.0
-        var fitCrop = 0
-        override fun seek(ms: Long, exact: Boolean) { seeks += ms to exact; if (exact) positionMs = ms }
-        override fun togglePause() { paused = !paused }
-        override fun pause() { paused = true }
-        override fun setSpeed(speed: Double) { spd = speed }
-        override fun setControls(shown: Boolean) { controlsShown = shown }
-        override var brightness = 0.5f
-        override var volume = 0.5f
-        override val volumeSteps = 15
-        override var boostOn = false
-        override var boost = 1f
-        override fun setZoom(scale: Double) { zoomed = scale }
-        override fun setPan(x: Double, y: Double) { pan = x to y }
-        override fun toggleFitCrop() { fitCrop++ }
-    }
 
     private val fx = Fake()
     private val c = GestureController(fx)
@@ -356,4 +333,58 @@ class GestureTest {
         rule.waitForIdle()
         assertEquals(2, fx.fitCrop)
     }
+
+    @Ears("US-76.1")
+    @Test fun `US-76_1 two-finger speed shows the speed in the centre`() {
+        c.prefs = GesturePrefs(twoFingerSpeed = true)
+        fx.spd = 1.0
+        c.twoFingerStart(TwoFingerKind.Speed)
+        c.twoFinger(TwoFingerKind.Speed, 1f, 0f, -80f, 800f, 400f)
+        assertEquals(Readout.Speed(1.2, top = false), c.readout)
+        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { GestureReadout(c.readout, onResetSpeed = c::resetSpeed, Modifier.fillMaxSize()) } }
+        rule.onNodeWithTag("readout-speed").assertIsDisplayed()
+        rule.onNodeWithText("1.2x").assertIsDisplayed()
+    }
+
+    @Ears("US-76.3")
+    @Test fun `US-76_3 double tap on the speed readout goes back to 1x`() {
+        c.prefs = GesturePrefs(twoFingerSpeed = true)
+        fx.spd = 1.0
+        c.twoFingerStart(TwoFingerKind.Speed)
+        c.twoFinger(TwoFingerKind.Speed, 1f, 0f, -200f, 800f, 400f)
+        assertEquals(1.5, fx.speed, 1e-9)
+        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { GestureReadout(c.readout, onResetSpeed = c::resetSpeed, Modifier.fillMaxSize()) } }
+        rule.onNodeWithTag("readout-speed").performTouchInput { doubleClick() }
+        rule.waitForIdle()
+        assertEquals(1.0, fx.speed, 0.0)
+        assertEquals(Readout.Speed(1.0, top = false), c.readout)
+        rule.onNodeWithText("1x").assertIsDisplayed()
+    }
+}
+
+/** Records what the gesture layer changed. Top level: the EARS report reads the enclosing class of each test. */
+private class Fake : GestureEffects {
+    override var positionMs = 60_000L
+    override var durationMs = 600_000L
+    override var paused = false
+    var spd = 1.0
+    override val speed get() = spd
+    override var controlsShown = false
+    val seeks = mutableListOf<Pair<Long, Boolean>>()
+    var zoomed = 1.0
+    var pan = 0.0 to 0.0
+    var fitCrop = 0
+    override fun seek(ms: Long, exact: Boolean) { seeks += ms to exact; if (exact) positionMs = ms }
+    override fun togglePause() { paused = !paused }
+    override fun pause() { paused = true }
+    override fun setSpeed(speed: Double) { spd = speed }
+    override fun setControls(shown: Boolean) { controlsShown = shown }
+    override var brightness = 0.5f
+    override var volume = 0.5f
+    override val volumeSteps = 15
+    override var boostOn = false
+    override var boost = 1f
+    override fun setZoom(scale: Double) { zoomed = scale }
+    override fun setPan(x: Double, y: Double) { pan = x to y }
+    override fun toggleFitCrop() { fitCrop++ }
 }
