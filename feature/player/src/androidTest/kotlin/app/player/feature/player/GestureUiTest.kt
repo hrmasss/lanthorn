@@ -56,6 +56,24 @@ class GestureUiTest {
         assertTrue(after - before in 20_000..34_000 || after >= engine.state.value.durationMs - 1_000)
     }
 
+    @Test fun seekBarDragElapsedFollowsFinger() {
+        open()
+        repeat(3) { if (!shown("seek-bar")) { compose.onNodeWithTag("video").performTouchInput { click(Offset(width * 0.5f, height * 0.2f)) }; runCatching { compose.waitUntil(3_000) { shown("seek-bar") } } } }
+        val duration = engine.state.value.durationMs
+        compose.onNodeWithTag("seek-bar").performTouchInput {
+            down(Offset(width * 0.1f, centerY))
+            repeat(10) { moveBy(Offset(width * 0.05f, 0f)) }
+        }
+        compose.waitForIdle()
+        val elapsed = compose.onNodeWithTag("elapsed", useUnmergedTree = true).fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+        shot("p110-seekbar-mid-drag")
+        compose.onNodeWithTag("seek-bar").performTouchInput { up() }
+        val secs = elapsed.split(":").fold(0L) { acc, part -> acc * 60 + part.trim().toLong() }
+        log("seek bar drag to 60%: elapsed reads $elapsed while the finger is down (duration $duration ms)")
+        assertTrue("elapsed follows the finger", kotlin.math.abs(secs * 1000 - duration * 0.6) <= 2_000)
+    }
+
     @Test fun volumeSwipeShowsLevel_US18_2() {
         open()
         compose.onNodeWithTag("video").performTouchInput {

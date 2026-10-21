@@ -467,7 +467,8 @@ fun PlayerScreen(
                 ControlsUi(
                     title = title,
                     playing = !state.paused && state.error == null,
-                    positionMs = state.positionMs,
+                    // While scrubbing (bar or swipe) the elapsed time and the bar follow the finger.
+                    positionMs = if (scrubbing) scrubTargetMs else state.positionMs,
                     durationMs = state.durationMs,
                     decoder = state.activeDecoder.label,
                     speed = speedLabel(speed),
