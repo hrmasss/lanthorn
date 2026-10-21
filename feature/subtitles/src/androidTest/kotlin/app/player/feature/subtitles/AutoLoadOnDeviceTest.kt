@@ -189,11 +189,13 @@ class AutoLoadOnDeviceTest {
             assertTrue(before.found.isEmpty())
             // The track panel offers to look in this folder.
             PanelTestActivity.panelId = SubtitlesExtension.TRACKS_PANEL
+            PanelTestActivity.withVideo = false
             val panel = ActivityScenario.launch(PanelTestActivity::class.java)
             val offer = UiDevice.getInstance(OnDevice.instrumentation).wait(Until.findObject(By.text("Find subtitles in this folder")), 5_000)
             shotTo("us39-panel-offers-folder")
             panel.close()
             PanelTestActivity.panelId = SubtitlesExtension.STYLE_PANEL
+            PanelTestActivity.withVideo = true
             assertTrue("no offer in the track panel", offer != null)
             // The panel's offer: the system picker, opened at the video's folder.
             GrantTestActivity.start = loader.folderUri(before.place!!)
