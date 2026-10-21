@@ -4,6 +4,7 @@
 #   perf/bench.sh --apk app-arm64-v8a-bench.apk            full run (about 25 minutes)
 #   perf/bench.sh --apk ... --quick                        short runs, for the emulator
 #   perf/bench.sh --apk ... --only startup,first-frame     a subset
+#   perf/bench.sh --apk ... --force                        record even if the phone is not ready
 #   ANDROID_SERIAL=<serial> perf/bench.sh ...              pick a device
 #
 # Needs: adb, perf/media/ from perf/gen-media.sh, the bench build (./gradlew assembleBench).
@@ -12,17 +13,42 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APK=""; QUICK=0; ONLY="startup,first-frame,playback,seek,scrub,preview"
+APK=""; QUICK=0; FORCE=0; ONLY="startup,first-frame,playback,seek,scrub,preview"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apk) APK=$2; shift 2 ;;
     --quick) QUICK=1; shift ;;
     --only) ONLY=$2; shift 2 ;;
+    --force) FORCE=1; shift ;;
     *) echo "unknown argument $1"; exit 2 ;;
   esac
 done
 [ -n "$APK" ] && [ -f "$APK" ] || { echo "--apk <bench apk> is required"; exit 2; }
 want() { [[ ",$ONLY," == *",$1,"* ]]; }
+
+# Preflight: one device, the media, and a phone in a state whose numbers mean something.
+# Problems stop the run; --force runs anyway and writes them at the top of the results.
+devices=$(adb devices | awk 'NR > 1 && $2 == "device" {print $1}')
+if [ -z "${ANDROID_SERIAL:-}" ] && [ "$(echo "$devices" | grep -c .)" != 1 ]; then
+  echo "need exactly one adb device (or ANDROID_SERIAL); have: ${devices:-none}"; exit 2
+fi
+missing=""
+for f in h264-1080p60.mp4 hevc8-1080p60.mp4 hevc10-2160p60.mp4 av1-2160p60.mp4 av1-1080p60.mp4 \
+         vp9-1080p60.webm ass-karaoke-1080p60.mkv h264-444-1080p30.mp4 h264-long-1080p30.mp4; do
+  [ -f "media/$f" ] || missing="$missing $f"
+done
+[ -z "$missing" ] || { echo "missing media:$missing (run perf/gen-media.sh)"; exit 2; }
+warnings=""
+battery=$(adb shell dumpsys battery | tr -d '\r' | awk '$1 == "level:" {print $2; exit}')
+temp=$(adb shell dumpsys battery | tr -d '\r' | awk '$1 == "temperature:" {print $2 / 10; exit}')
+plane=$(adb shell settings get global airplane_mode_on | tr -d '\r')
+[ "${battery:-0}" -ge 50 ] || warnings="$warnings battery ${battery:-?}% (want 50% or more);"
+[ "$plane" = 1 ] || warnings="$warnings airplane mode off;"
+awk -v t="${temp:-0}" 'BEGIN {exit !(t > 38)}' && warnings="$warnings battery at ${temp} C (let the phone cool);"
+if [ -n "$warnings" ]; then
+  echo "phone not ready:$warnings"
+  [ $FORCE = 1 ] || { echo "fix it, or rerun with --force to record anyway"; exit 2; }
+fi
 
 PKG=app.player.bench
 MAIN=$PKG/app.player.MainActivity
@@ -83,6 +109,8 @@ j() { python3 -c "import json,sys; d=json.load(open(sys.argv[1])); v=d.get(sys.a
   echo "# Bench: $model"
   echo
   echo "Android $release, SoC ${soc:-unknown}${emu:+, **emulator: regressions only, not claims**}. $stamp. APK \`$(basename "$APK")\`."
+  echo "Battery ${battery:-?}%, ${temp:-?} C, airplane mode $([ "$plane" = 1 ] && echo on || echo off)."
+  [ -n "$warnings" ] && echo "**Recorded with --force:$warnings**"
   [ $QUICK = 1 ] && echo "Quick mode: short runs, not comparable with full runs."
   echo
 } > "$OUT"
@@ -107,14 +135,15 @@ fi
 if want first-frame; then
   echo "first frame (NF-2)"
   {
-    echo "## Open to first video frame (NF-2: p50 <= 300 ms, p90 <= 500 ms)"
+    echo "## Open to first video frame (NF-2: p50 <= 300 ms, p90 <= 500 ms; NF-5: 4:4:4 on SW)"
     echo
     echo "Measured from the VIEW intent reaching the system to the engine's first-frame event, cold process."
     echo
     echo "| File | Runs | p50 ms | p90 ms | Decoder |"
     echo "|---|---|---|---|---|"
   } >> "$OUT"
-  for f in h264-1080p60.mp4 hevc8-1080p60.mp4; do
+  # The 4:4:4 file is NF-5: hardware refuses it, so the decoder column must read SW and it still plays.
+  for f in h264-1080p60.mp4 hevc8-1080p60.mp4 h264-444-1080p30.mp4; do
     [ -f "media/$f" ] || continue
     : > "$RAW/first-frame-$f.txt"; dec=""
     for _ in $(seq 1 $RUNS); do

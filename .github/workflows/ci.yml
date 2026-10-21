@@ -95,6 +95,15 @@ jobs:
           path: app/build/outputs/apk/debug/app-x86_64-debug.apk
           retention-days: 7
 
+      # The phone bench (P2.4): the arm64 bench build, kept a month so a phone run can use any recent main.
+      #   gh run download <id> -R hrmasss/player-app -n app-bench-arm64
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-bench-arm64
+          path: app/build/outputs/apk/bench/app-arm64-v8a-bench.apk
+          if-no-files-found: ignore
+          retention-days: 30
+
       - uses: actions/upload-artifact@v7
         with:
           name: app-bench-x86_64
