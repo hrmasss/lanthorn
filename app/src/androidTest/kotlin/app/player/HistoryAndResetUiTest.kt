@@ -83,8 +83,12 @@ class HistoryAndResetUiTest {
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         assertTrue("never played", waitFor(15_000) { state()?.let { !it.paused && it.uri?.endsWith("longgop.mp4") == true } == true })
-        // Past two periodic saves, then Back, which saves too when history is on.
-        assertTrue("never reached 12 s", waitFor(30_000) { state()!!.positionMs >= 12_000 })
+        // Past two periodic saves, then Back, which saves too when history is on. Saves run on the
+        // clock (every 5 s while playing), so wait 12 s of play, not 12 s of video: a slow emulator
+        // plays at half speed or less.
+        SystemClock.sleep(12_000)
+        assertTrue("stopped playing", state()?.paused == false)
+        assertTrue("position never moved", state()!!.positionMs >= 2_000)
         device.pressBack()
         SystemClock.sleep(1_500)
         device.pressBack()
