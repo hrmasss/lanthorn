@@ -80,6 +80,16 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.2 no preferred language: first external file on (${selected()?.title})")
     }
 
+    @Test fun reopeningTheSameFileLoadsItsFilesAgain_US39_1() = runBlocking {
+        openClip()
+        engine.awaitAutoLoad()
+        val again = openClip()
+        engine.awaitAutoLoad()
+        val external = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" && it.external }.map { it.title }
+        assertEquals(listOf("Clip.de.srt", "Clip.it.srt"), external)
+        evidence("US-39.1 the same file opened twice: its two subtitle files load again (${external}), ${again.size} sub tracks")
+    }
+
     @Test fun preferredLanguageWins_US39_2() = runBlocking {
         prefs.setLanguage("it")
         openClip()
