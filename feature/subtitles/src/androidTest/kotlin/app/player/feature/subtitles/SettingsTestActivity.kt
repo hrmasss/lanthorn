@@ -10,6 +10,6 @@ import androidx.compose.material3.Surface
 class SettingsTestActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { Surface { SubtitleSettings.Content(highlight = "box") } } }
+        setContent { MaterialTheme { Surface { SubtitleSettings.Content(highlight = null) } } }
     }
 }

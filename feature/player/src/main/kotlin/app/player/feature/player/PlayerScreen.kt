@@ -28,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -77,6 +78,8 @@ import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
 import app.player.feature.player.tools.FitMode
+import app.player.feature.player.tools.Deinterlace
+import app.player.feature.player.overlay.DeinterlaceContent
 import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,6 +90,7 @@ internal object OwnPanel {
     const val MENU = "player-menu"
     const val DECODER = "player-decoder"
     const val SETTINGS = "player-settings"
+    const val DEINTERLACE = "player-deinterlace"
 }
 
 private const val SEEK_STEP_MS = 10_000L
@@ -102,16 +106,25 @@ fun PlayerScreen(
     engine: PlayerEngine,
     modifier: Modifier = Modifier,
     /** Hoisted so the bench can open and close the overlay like a viewer would (NF-3). */
-    /** Hidden on open, as MX users expect (recon/ux-map.md, defaults). */
+    /** Hidden on open, the familiar default for players of this kind (US-16.3). */
     controlsState: MutableState<Boolean> = remember { mutableStateOf(false) },
     extensions: List<PlayerExtension> = emptyList(),
     settings: PlayerSettings? = null,
+    /** Seek preview above the seek bar (US-30.1, default on). Off: the video itself follows the finger. */
+    seekPreview: Boolean = true,
     /** The viewer picked a decoder by hand (US-36.3: remembered for the file). */
     onDecoderPicked: (DecoderMode) -> Unit = {},
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
-    val state by engine.state.collectAsStateWithLifecycle()
+    val engineState by engine.state.collectAsStateWithLifecycle()
+    // mpv's own pause flag: PlaybackState.paused resets to true on open and mpv sends no event when
+    // pause was already off, so it can read paused while playing (reported to engine).
+    val pauseFlag by remember(engine) { engine.observe("pause", PropertyType.Flag) }.collectAsStateWithLifecycle()
+    // Until the first pause event arrives, read the value once per load.
+    var pauseRead by remember(engine) { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(engine, engineState.uri, engineState.loaded) { pauseRead = engine.get("pause", PropertyType.Flag) }
+    val state = engineState.copy(paused = pauseFlag ?: pauseRead ?: engineState.paused)
     val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
     val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
         .collectAsStateWithLifecycle()
@@ -119,6 +132,9 @@ fun PlayerScreen(
     var controls by controlsState
     var openPanel by remember { mutableStateOf<String?>(null) }
     var scrubbing by remember { mutableStateOf(false) }
+    var scrubTargetMs by remember { mutableLongStateOf(0L) }
+    // US-30.1: the preview engine loads with the file, so the first drag shows frames at once.
+    val preview = if (seekPreview) rememberSeekPreview(state.uri) else null
     var touches by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<Pair<String, Long>?>(null) }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
@@ -126,13 +142,29 @@ fun PlayerScreen(
     var fitMode by remember { mutableStateOf(FitMode.Fit) }
     val fitNames = FitMode.entries.associateWith { stringResource(it.label) }
 
+    // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
+    val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
+    val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
+    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
+    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
+    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle()
+    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle()
+    // While locked, playback's Overlay owns every touch and the controls stay hidden (US-28).
+    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle()
+    LaunchedEffect(locked) { if (locked) { controls = false; openPanel = null } }
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
     val settingsLabel = stringResource(R.string.menu_player_settings)
+    val deinterlaceLabel = stringResource(R.string.video_deinterlace)
+    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle()
     val items = remember(entries, settingsLabel) {
-        val own = listOf(MenuItem("player-settings", MenuGroup.Tools, 900, { settingsLabel }) { openPanel = OwnPanel.SETTINGS })
+        val own = listOf(
+            MenuItem("deinterlace", MenuGroup.Video, 120, { deinterlaceLabel }) { openPanel = OwnPanel.DEINTERLACE },
+            MenuItem("player-settings", MenuGroup.Tools, 900, { settingsLabel }) { openPanel = OwnPanel.SETTINGS },
+        )
         menuItems(entries, own) { openPanel = it }
     }
     val title by produceState(titleOf(state.uri), state.uri) { value = displayName(context, state.uri) ?: titleOf(state.uri) }
@@ -167,27 +199,31 @@ fun PlayerScreen(
     // US-35.3: one line when the chosen decoder could not play the stream.
     LaunchedEffect(state.decoderNotice) { state.decoderNotice?.let(::show) }
     val currentState by rememberUpdatedState(state)
-    val actions = remember(engine, activity, fitNames) {
+    val actions = remember(engine, activity, fitNames, preview) {
         ControlsActions(
             back = { activity?.finish() },
             togglePause = engine::togglePause,
             scrub = { f ->
                 scrubbing = true
-                engine.seekTo((f * currentState.durationMs).toLong(), exact = false)
+                scrubTargetMs = (f * currentState.durationMs).toLong()
+                // With a preview the video holds still until release; without, it follows the finger (US-17.3).
+                if (preview == null) engine.scrub(scrubTargetMs)
             },
             seek = { f ->
                 scrubbing = false
-                engine.seekTo((f * currentState.durationMs).toLong(), exact = true)
+                engine.endScrub((f * currentState.durationMs).toLong())
             },
             toggleRemaining = { settings?.update { it.copy(showRemaining = !it.showRemaining) } },
             openDecoder = { openPanel = OwnPanel.DECODER },
             openSubtitles = { subtitleEntry?.let { openPanel = it.opensPanel } },
             openAudio = { audioEntry?.let { openPanel = it.opensPanel } },
             openMenu = { openPanel = OwnPanel.MENU },
-            lock = {},
-            previous = {},
-            next = {},
-            rotate = { activity?.let(::toggleOrientation) },
+            lock = { playback?.lock() },
+            previous = { playback?.previous() },
+            next = { playback?.next() },
+            rotate = { playback?.rotate() ?: activity?.let(::toggleOrientation) },
+            stepBack = { engine.seekTo((currentState.positionMs - SEEK_STEP_MS).coerceAtLeast(0)) },
+            stepForward = { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
             fit = {
                 // US-53.1: cycle and name the mode for 1 s.
                 fitMode = fitMode.next()
@@ -236,7 +272,7 @@ fun PlayerScreen(
             Modifier
                 .fillMaxSize()
                 .testTag("video")
-                .clickable(remember { MutableInteractionSource() }, indication = null) { controls = !controls }
+                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked) { controls = !controls }
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions
@@ -247,7 +283,16 @@ fun PlayerScreen(
         extensions.forEach { it.Overlay(host) }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
-            Text(it, color = PlayerColors.Content, modifier = Modifier.align(Alignment.Center).testTag("player-error"))
+            Text(
+                it.replaceFirstChar(Char::uppercaseChar),
+                color = PlayerColors.Content,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(PlayerColors.Scrim, CircleShape)
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .testTag("player-error"),
+            )
         }
 
         val status = rememberStatus(active = (controls && prefs.statusInTopBar) || (!controls && prefs.keepStatusVisible))
@@ -259,7 +304,7 @@ fun PlayerScreen(
             Controls(
                 ControlsUi(
                     title = title,
-                    playing = !state.paused,
+                    playing = !state.paused && state.error == null,
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
                     decoder = state.activeDecoder.label,
@@ -269,9 +314,11 @@ fun PlayerScreen(
                     status = if (prefs.statusInTopBar) status else null,
                     subtitleButton = subtitleEntry?.label?.invoke(),
                     audioButton = audioEntry?.label?.invoke(),
-                    hasPrevious = false,
-                    hasNext = false,
-                    canLock = false,
+                    hasPrevious = hasPrevious,
+                    hasNext = hasNext,
+                    canLock = playback != null,
+                    showPreviousNext = showPreviousNext,
+                    stepButtons = stepButtons,
                 ),
                 actions,
             )
@@ -287,13 +334,16 @@ fun PlayerScreen(
                 color = PlayerColors.Content,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.displayCutout)
-                    .padding(top = 72.dp)
+                    .align(Alignment.Center)
+                    .padding(bottom = 160.dp)
                     .background(PlayerColors.Scrim, CircleShape)
                     .padding(horizontal = 20.dp, vertical = 10.dp)
                     .testTag("note"),
             )
+        }
+
+        if (scrubbing && preview != null) {
+            SeekPreview(preview, scrubTargetMs, Modifier.align(Alignment.BottomCenter).padding(bottom = 160.dp))
         }
 
         // Keep the last panel's content during the exit animation.
@@ -309,6 +359,15 @@ fun PlayerScreen(
                     openPanel = null
                 }
                 OwnPanel.SETTINGS -> PlayerSettingsContent(prefs, { change -> settings?.update(change) })
+                OwnPanel.DEINTERLACE -> DeinterlaceContent(
+                    Deinterlace.fromMpv(deinterlaceMode),
+                    state.activeDecoder,
+                    pick = video::setDeinterlace,
+                    switchDecoder = { mode ->
+                        engine.setDecoder(mode)
+                        onDecoderPicked(mode)
+                    },
+                )
                 null -> Unit
                 else -> panels[id]?.Content(host)
             }

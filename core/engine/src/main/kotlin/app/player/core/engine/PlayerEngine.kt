@@ -18,6 +18,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.RejectedExecutionException
@@ -34,7 +35,9 @@ import java.util.concurrent.TimeUnit
  * - [attachSurface] and [detachSurface] block the caller until mpv has let go of the old surface,
  *   because Android destroys the surface as soon as `surfaceDestroyed` returns.
  */
-class PlayerEngine(context: Context) {
+class PlayerEngine private constructor(context: Context, private val preview: Boolean) {
+    constructor(context: Context) : this(context, preview = false)
+
     private val appContext = context.applicationContext
     private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine") }
     private val _state = MutableStateFlow(PlaybackState())
@@ -59,6 +62,12 @@ class PlayerEngine(context: Context) {
     private var videoBeforeDetach: String? = null
     private var reattachedAt = 0L
     @Volatile private var released = false
+
+    // Engine thread only. Latest-wins scrubbing: one keyframe seek in flight, the newest target waits.
+    private var scrubInFlight = false
+    private var scrubNext: Long? = null
+    private var scrubSentAt = 0L
+    private var scrubTarget: Long? = null
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -94,6 +103,21 @@ class PlayerEngine(context: Context) {
         lib.setOptionString("demuxer-max-back-bytes", "${32 * 1024 * 1024}")
         lib.setOptionString("save-position-on-quit", "no")
         lib.setOptionString("msg-level", "all=warn")
+        if (preview) {
+            // Seek preview (US-30.1): video only, paused, keyframe seeks, cheapest decode.
+            lib.setOptionString("aid", "no")
+            lib.setOptionString("sid", "no")
+            lib.setOptionString("ao", "null")
+            lib.setOptionString("hr-seek", "no")
+            lib.setOptionString("pause", "yes")
+            lib.setOptionString("vd-lavc-skiploopfilter", "all")
+            lib.setOptionString("vd-lavc-fast", "yes")
+            // Copy-back decoding: the preview surface comes and goes with the finger, and the
+            // zero-copy path would lose HW whenever the file loads before the surface exists.
+            lib.setOptionString("hwdec", DecoderMode.HW_PLUS.hwdec)
+            lib.setOptionString("demuxer-max-bytes", "${8 * 1024 * 1024}")
+            lib.setOptionString("demuxer-max-back-bytes", "0")
+        }
         lib.init()
         lib.addObserver(observer)
         lib.addLogObserver(logObserver)
@@ -119,7 +143,7 @@ class PlayerEngine(context: Context) {
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
             val load: () -> Unit = {
                 mpvCommand("loadfile", path, "replace", "-1", opts)
-                setProperty("pause", "no")
+                setProperty("pause", if (preview) "yes" else "no")
             }
             if (hasSurface) {
                 load()
@@ -151,9 +175,65 @@ class PlayerEngine(context: Context) {
         mpvCommand("seek", "${positionMs / 1000.0}", if (exact) "absolute+exact" else "absolute+keyframes")
     }
 
+    /**
+     * Seek while a finger drags (US-17.3, NF-6): keyframe seeks, at most one in flight, and the
+     * newest target replaces any waiting one. Each finished seek shows a frame, so the picture
+     * updates as fast as the decoder can deliver keyframes.
+     */
+    fun scrub(positionMs: Long) = post {
+        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < SCRUB_STALL_MS) {
+            scrubNext = positionMs
+        } else {
+            sendScrub(positionMs)
+        }
+    }
+
+    /** The finger lifted: exact seek to where it stopped (US-17.2). */
+    fun endScrub(positionMs: Long) = post {
+        scrubNext = null
+        scrubTarget = null
+        scrubInFlight = false
+        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+exact")
+    }
+
+    private fun sendScrub(positionMs: Long) {
+        scrubInFlight = true
+        scrubTarget = positionMs
+        scrubSentAt = SystemClock.elapsedRealtime()
+        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
+        if (preview) Log.i(TAG, "preview seek to $positionMs ms")
+    }
+
+    private fun scrubLanded() = post {
+        scrubInFlight = false
+        val next = scrubNext
+        if (next != null) {
+            scrubNext = null
+            sendScrub(next)
+            return@post
+        }
+        // Nothing newer waiting: if the keyframe is far from the target (long GOPs), refine with
+        // an exact seek, so a slowing finger sees the frame it points at (US-30.1: within 2 s).
+        val target = scrubTarget ?: return@post
+        val landed = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() } ?: return@post
+        if (kotlin.math.abs(landed - target) > SCRUB_REFINE_MS) {
+            scrubTarget = null
+            scrubInFlight = true
+            scrubSentAt = SystemClock.elapsedRealtime()
+            mpvCommand("seek", "${target / 1000.0}", "absolute+exact")
+        }
+    }
+
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
     fun setDecoder(mode: DecoderMode) {
-        _state.update { it.copy(decoderMode = mode, decoderNotice = null) }
+        // Judge the pick against the decoder running now. HW and Auto share one hwdec list, so a
+        // pick of HW over a file already on SW changes nothing in mpv and sends no event; if mpv
+        // does switch, the hwdec-current event corrects this.
+        _state.update {
+            val mpvSeesNoChange = mode.hwdec == it.decoderMode.hwdec
+            val notice = if (mpvSeesNoChange && it.video != null) fallbackNotice(mode, it.activeDecoder) else null
+            it.copy(decoderMode = mode, decoderNotice = notice)
+        }
         post { setProperty("hwdec", mode.hwdec) }
     }
 
@@ -345,10 +425,12 @@ class PlayerEngine(context: Context) {
                 ?: lib.getPropertyString("video-params/pixelformat"),
         )
         // The decoder is settled once video is reconfigured: compare it with what was chosen.
-        val running = ActiveDecoder.fromHwdecCurrent(lib.getPropertyString("hwdec-current"))
-        _state.update {
+        val hwdec = lib.getPropertyString("hwdec-current")
+        val running = ActiveDecoder.fromHwdecCurrent(hwdec)
+        val s = _state.updateAndGet {
             it.copy(video = info, activeDecoder = running, decoderNotice = fallbackNotice(it.decoderMode, running))
         }
+        Log.i(TAG, "video ${info.codec} ${info.width}x${info.height}, decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
     }
 
     private val observer = object : MPVLib.EventObserver {
@@ -384,11 +466,15 @@ class PlayerEngine(context: Context) {
         override fun eventProperty(property: String, value: String) {
             publish(property, MpvFormat.MPV_FORMAT_STRING, value)
             when (property) {
-                "hwdec-current" -> _state.update {
-                    val running = ActiveDecoder.fromHwdecCurrent(value)
-                    // An empty value is mpv between decoders; judge only settled values on loaded video.
-                    val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
-                    it.copy(activeDecoder = running, decoderNotice = notice)
+                "hwdec-current" -> {
+                    val before = _state.value.activeDecoder
+                    val s = _state.updateAndGet {
+                        val running = ActiveDecoder.fromHwdecCurrent(value)
+                        // An empty value is mpv between decoders; judge only settled values on loaded video.
+                        val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
+                        it.copy(activeDecoder = running, decoderNotice = notice)
+                    }
+                    if (s.activeDecoder != before) Log.i(TAG, "decoder ${before.label} -> ${s.activeDecoder.label} ($value) at ${s.positionMs} ms, notice ${s.decoderNotice}")
                 }
             }
         }
@@ -401,10 +487,15 @@ class PlayerEngine(context: Context) {
                     _state.update { it.copy(loaded = true, error = null) }
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
-                MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> _state.update {
-                    if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
-                    else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
-                        Log.i(TAG, "first frame ${s.firstFrameMs} ms, decoder ${s.activeDecoder.label}")
+                MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
+                    if (preview) Log.i(TAG, "preview frame at ${_state.value.positionMs} ms")
+                    scrubLanded()
+                    _state.update {
+                        if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
+                        else it.copy(firstFrameMs = SystemClock.elapsedRealtime() - openedAt, restarts = it.restarts + 1).also { s ->
+                            // The decoder line comes with VIDEO_RECONFIG; it may not be known yet here.
+                            Log.i(TAG, "first frame ${s.firstFrameMs} ms")
+                        }
                     }
                 }
                 // An end before the file loaded means mpv could not open it. The end of the
@@ -428,6 +519,14 @@ class PlayerEngine(context: Context) {
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
         private const val SURFACE_WAIT_MS = 1000L
+        private const val SCRUB_STALL_MS = 250L
+        private const val SCRUB_REFINE_MS = 1500L
+
+        /**
+         * A second, video-only engine for seek preview frames (US-30.1). Not shared: the caller
+         * owns it, gives it a small [VideoSurfaceView] and releases it.
+         */
+        fun preview(context: Context): PlayerEngine = PlayerEngine(context, preview = true)
         private val OBSERVED = listOf(
             "time-pos" to MpvFormat.MPV_FORMAT_DOUBLE,
             "duration" to MpvFormat.MPV_FORMAT_DOUBLE,

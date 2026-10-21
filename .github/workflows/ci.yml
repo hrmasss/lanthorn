@@ -6,7 +6,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Main runs always finish (agents land several merges an hour); branch runs cancel older ones.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -154,6 +155,13 @@ jobs:
         with:
           name: test-bench
           path: bench/build/outputs/apk/androidTest/debug/bench-debug-androidTest.apk
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-app
+          path: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: ignore
           retention-days: 7
 

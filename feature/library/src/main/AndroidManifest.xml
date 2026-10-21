@@ -9,4 +9,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- Network streams the viewer opens (US-61, NF-8). Nothing in the app connects on its own. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!-- Files on SMB shares as seekable descriptors for the player. Not exported. -->
+        <provider
+            android:name="app.player.feature.library.smb.SmbProvider"
+            android:authorities="${applicationId}.smb"
+            android:exported="false" />
+    </application>
 </manifest>

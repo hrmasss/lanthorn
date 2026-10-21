@@ -54,10 +54,10 @@ ffmpeg -loglevel error -y \
 ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=600:duration=300:sample_rate=48000" -c:a aac -b:a 32k "$AUD/dub.m4a"
 du -h "$SUB"/* "$AUD"/*
 
-# Wide 2.39:1 clip with a text subtitle: on a phone screen it gets black bars top and bottom,
+# Wide 3.2:1 clip with a text subtitle: on a 20:9 phone it gets black bars of about 15% top and bottom,
 # so "keep inside the picture" (US-43.2) is visible.
 printf '1\n00:00:00,000 --> 00:00:10,000\nInside or outside the picture\n' > "$T/wide.srt"
-ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x268:rate=25:duration=10 -i "$T/wide.srt" \
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x200:rate=25:duration=10 -i "$T/wide.srt" \
   -map 0:v -map 1:s -c:v libx264 -preset veryfast -crf 32 -pix_fmt yuv420p -c:s srt -metadata:s:s:0 language=eng "$SUB/wide.mkv"
 # ASS that names a font only the file carries (DejaVu Sans Mono, Bitstream Vera licence, free to
 # redistribute), for "ignore embedded fonts" (US-42.4).
@@ -82,3 +82,9 @@ ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=10 
 
 # Loud tone for the limiter check (US-49.2): 1 kHz at -3 dBFS, lossless so the peak is exact.
 ffmpeg -loglevel error -y -f lavfi -i "aevalsrc=0.7079*sin(2*PI*1000*t):s=48000:d=10" -c:a flac "$AUD/loud.flac"
+
+# Two audio tracks where the default-flagged one is second (US-47.2, "else the default-flagged track").
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=25:duration=10 \
+  -f lavfi -i sine=frequency=440:duration=10:sample_rate=48000 -f lavfi -i sine=frequency=880:duration=10:sample_rate=48000 \
+  -map 0:v -map 1:a -map 2:a -c:v libx264 -preset veryfast -crf 35 -pix_fmt yuv420p -c:a aac -b:a 48k \
+  -metadata:s:a:0 language=eng -metadata:s:a:1 language=ita -disposition:a:0 0 -disposition:a:1 default "$AUD/default-second.mkv"
