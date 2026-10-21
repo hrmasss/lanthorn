@@ -241,7 +241,8 @@ internal object TestMedia {
             name.startsWith("Long") || name.startsWith("Step") -> asset("longgop.mp4")
             name.startsWith("Part 2") -> asset("clip420.mp4")
             name.startsWith("Broken") || name.startsWith("Bad") || name == "A 2.mp4" -> Random(name.hashCode()).nextBytes(200_000)
-            name.startsWith("Codec unknown") -> asset("short.mp4").also { replace(it, "avc1", "zq9x"); replace(it, "avcC", "zq9C") }
+            // Video only: with a sound track mpv plays the sound and nothing fails.
+            name.startsWith("Codec unknown") -> asset("clip444.mp4").also { replace(it, "avc1", "zq9x"); replace(it, "avcC", "zq9C") }
             else -> asset("short.mp4")
         }
     }
