@@ -92,7 +92,7 @@ jobs:
             echo "Signing certificate SHA-256: \`$cert\`"
             echo '```'; cat "$out/SHA256SUMS"; echo '```'
             echo '```'; ls -l "$out"; echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Draft release
         if: env.TAG != ''
