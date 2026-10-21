@@ -4,6 +4,7 @@ import app.player.core.testing.evidenceShot
 import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -119,6 +120,12 @@ class OnlineSearchOnDeviceTest {
         val saved = File(video.parentFile, "Clip.en.srt")
         engine.await("sid", PropertyType.Text, 20_000) { saved.exists() && it != null && it != "no" }
         runCatching { p.close() }
+        // The panel is its own activity: while it shows, the video's surface is gone and video is
+        // off, and this clip has no audio, so nothing times the subtitle. Closing it lands on the
+        // test runner's empty activity, so bring the video screen back and wait for the video.
+        scenario.moveToState(Lifecycle.State.RESUMED)
+        engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
+        engine.seekTo(1000)
         engine.await("sub-text", PropertyType.Text, 10_000) { it == "Downloaded from the service" }
         assertTrue("not saved beside the video", saved.exists())
         val paths = fake.requests.map { "${it.method} ${it.path.substringBefore('?')}" }
