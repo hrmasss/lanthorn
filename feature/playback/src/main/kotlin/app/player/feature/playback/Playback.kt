@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.sync.Mutex
@@ -378,6 +379,7 @@ object Playback : PlaybackControls {
         media?.release()
         watcher?.cancel()
         watcher = scope.launch {
+            val self = coroutineContext.job
             val m = MediaControls(context, engine, this, title, ::act)
             media = m
             m.start()
@@ -407,7 +409,8 @@ object Playback : PlaybackControls {
                     media = null
                     PlaybackService.notificationFactory = null
                 }
-                watcher?.cancel()
+                // This watcher only: a player opened right after the close may have bound a new one already.
+                self.cancel()
             }
             // mpv's own pause flag: PlaybackState.paused starts true after open() and only changes
             // when mpv reports a change, so a file that plays from the start can read as paused.
