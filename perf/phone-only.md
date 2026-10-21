@@ -16,3 +16,4 @@ One line each: id, owner, why. Add your own; keep the reason concrete.
 | US-17.2 | engine | Lands on the target on the emulator (SeekPreviewUiTest); the NF-6 time budget is the phone's. |
 | US-17.3 | engine | 10 updates a second while swiping: NF-6, phone. |
 | US-30.1 | engine | Preview shown, 192 dp, exact frames on the emulator (SeekPreviewUiTest); 10 a second within 2 s of the finger is NF-6, phone. |
+| US-24.2 | playback | Restarts the same video with no next file and no end on the emulator (QueueUiTest); the 500 ms gap at the restart needs the phone. |
