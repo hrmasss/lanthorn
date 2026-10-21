@@ -33,5 +33,5 @@ done < "$dir/trackers.txt"
 echo
 echo "### Network code outside libmpv"
 net=$(git grep -n -E "HttpURLConnection|OkHttp|okhttp|Retrofit|java\.net\.URL\b|Socket\(|URLConnection" -- '*.kt' ':!**/src/test/**' ':!**/src/androidTest/**' || true)
-if [ -n "$net" ]; then echo '```'; echo "$net"; echo '```'; else echo "None."; fi
+if [ -n "$net" ]; then echo "**Network code found** (only libmpv may open connections; a reviewed exception goes in this script):"; echo '```'; echo "$net"; echo '```'; fail=1; else echo "None."; fi
 exit $fail

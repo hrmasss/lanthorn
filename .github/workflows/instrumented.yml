@@ -116,6 +116,12 @@ jobs:
             ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
+            # A test class JUnit cannot run (a @Before that returns a value, a bad constructor) is
+            # dropped without a failure in the XML. Make that fail the job.
+            if grep -E "discarding as bogus|initializationError" logcat.txt > dropped.txt; then
+              echo "Test classes dropped by JUnit:" | tee -a "$GITHUB_STEP_SUMMARY"; head -20 dropped.txt | tee -a "$GITHUB_STEP_SUMMARY"
+              touch failed.marker
+            fi
             echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"
             test ! -f failed.marker
 
