@@ -66,8 +66,7 @@ class PlayerChromeTest {
     }
 
     @Test fun controlsStayWhilePaused_US16_3() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        showControls("back")
         compose.onNodeWithTag("play-pause").performClick()
         SystemClock.sleep(5_000)
         assertTrue(shown("back"))
@@ -76,8 +75,7 @@ class PlayerChromeTest {
     }
 
     @Test fun systemBarsFollowControls_US16_5() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        showControls("back")
         SystemClock.sleep(500)
         assertTrue("bars visible with controls", barsVisible())
         compose.onNodeWithTag("video").performClick()
@@ -101,8 +99,7 @@ class PlayerChromeTest {
         // Preconditions, logged so a failure says which side is wrong.
         waitUntil(3_000) { !PlayerSettings.get(context).prefs.value.keepScreenOnPaused }
         // Pause the way a viewer does: the play/pause button.
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("play-pause") }
+        showControls("play-pause")
         compose.onNodeWithTag("play-pause").performClick()
         waitUntil(3_000) { mpvPaused() == true }
         log("US-60.1 after the pause tap: mpv pause=${mpvPaused()}, setting keepScreenOnPaused=${PlayerSettings.get(context).prefs.value.keepScreenOnPaused}")
@@ -201,8 +198,7 @@ class PlayerChromeTest {
             org.junit.Assume.assumeTrue("no hardware decoder on this emulator run", engine.state.value.activeDecoder == ActiveDecoder.HW)
             SystemClock.sleep(1_000)
         }
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("decoder-badge") }
+        showControls("decoder-badge")
         compose.onNodeWithTag("decoder-badge").performClick()
         compose.waitUntil(2_000) { shown("decoder-picker") }
         shot("04-decoder-picker")
@@ -272,8 +268,7 @@ class PlayerChromeTest {
     }
 
     @Test fun menuOpensSideSheetWithSettings_US65_3() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("more") }
+        showControls("more")
         compose.onNodeWithTag("more").performClick()
         compose.waitUntil(2_000) { shown("menu-player-settings") }
         shot("07-menu")
@@ -281,6 +276,16 @@ class PlayerChromeTest {
         compose.waitUntil(2_000) { shown("player-settings") }
         shot("08-player-settings")
         assertTrue("playback continued", PlayerSessions.current.value?.state?.value?.paused == false)
+    }
+
+    /** Taps the video until [tag] shows: the hosted emulator can drop a tap while the player starts. */
+    private fun showControls(tag: String) {
+        repeat(3) {
+            if (shown(tag)) return
+            compose.onNodeWithTag("video").performClick()
+            if (runCatching { compose.waitUntil(3_000) { shown(tag) } }.isSuccess) return
+        }
+        compose.waitUntil(3_000) { shown(tag) }
     }
 
     private fun back() = scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
