@@ -442,8 +442,12 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             return
         }
         val running = ActiveDecoder.fromHwdecCurrent(hwdec)
+        // A pick reaches mpv after the state changes: until mpv has it, the decoder running is the
+        // old one and says nothing about the pick.
+        val requested = lib.getPropertyString("hwdec")
         val s = _state.updateAndGet {
-            it.copy(activeDecoder = running, decoderNotice = fallbackNotice(it.decoderMode, running))
+            val judged = requested == it.decoderMode.hwdec
+            it.copy(activeDecoder = running, decoderNotice = if (judged) fallbackNotice(it.decoderMode, running) else it.decoderNotice)
         }
         Log.i(TAG, "decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
     }
