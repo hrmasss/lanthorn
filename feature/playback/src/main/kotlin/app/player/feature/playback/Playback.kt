@@ -393,10 +393,14 @@ object Playback : PlaybackControls {
             var last: PlaybackState? = null
             var lastSaved: PlaybackState? = null
             var savedAt = 0L
-            fun save(s: PlaybackState, why: String) {
+            fun save(s: PlaybackState, why: String, fresh: Boolean = false) {
                 savedAt = SystemClock.elapsedRealtime()
                 lastSaved = s
-                scope.launch(NonCancellable) { write(s, why) }
+                scope.launch(NonCancellable) {
+                    // The state's position can be one update behind the pause: ask mpv where it stopped.
+                    val at = if (fresh) engine.get("time-pos", PropertyType.Real)?.let { (it * 1000).toLong() } else null
+                    write(if (at != null) s.copy(positionMs = at) else s, why)
+                }
             }
             launch {
                 PlayerSessions.current.first { it !== engine }
@@ -432,7 +436,7 @@ object Playback : PlaybackControls {
                 }
                 when {
                     prev != null && prev.uri != s.uri -> save(prev, "next file")
-                    s.loaded && s.paused && prev?.paused == false -> save(s, "paused")
+                    s.loaded && s.paused && prev?.paused == false -> save(s, "paused", fresh = true)
                     s.ended && prev?.ended == false -> save(s, "ended")
                     s.loaded && !s.paused && now - savedAt >= Resume.SAVE_EVERY_MS -> save(s, "every 5 s")
                 }
