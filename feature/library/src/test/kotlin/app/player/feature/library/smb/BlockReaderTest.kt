@@ -4,14 +4,14 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class BlockReaderTest {
     private val file = ByteArray(10 * 16 + 5) { it.toByte() }
 
-    private fun reader(ahead: Int = 3, reads: MutableList<Long> = Collections.synchronizedList(mutableListOf())) =
+    private fun reader(ahead: Int = 3, reads: MutableList<Long> = CopyOnWriteArrayList()) =
         BlockReader(file.size.toLong(), ahead = ahead, block = 16) { pos, buf, off, len ->
             reads += pos
             val n = minOf(len, (file.size - pos).toInt())
@@ -31,7 +31,8 @@ class BlockReaderTest {
     }
 
     @Test fun `us_62_2 blocks ahead are fetched before they are asked for`() {
-        val reads = Collections.synchronizedList(mutableListOf<Long>())
+        // Copy-on-write: the read-ahead thread keeps adding while the test reads the list.
+        val reads = CopyOnWriteArrayList<Long>()
         val r = reader(ahead = 3, reads = reads)
         r.read(0, 4, ByteArray(4))
         val deadline = System.currentTimeMillis() + 2_000
