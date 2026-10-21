@@ -155,6 +155,65 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.4 picked Clip.it.srt by hand; reopened with English preferred: Clip.it.srt restored")
     }
 
+    /** US-40: "Open subtitle file" starts in the video's folder; the picked file comes back with the video. */
+    @Test fun zyOpenByHandStartsInTheVideoFolder_US40() = runBlocking {
+        fun step(s: String) = android.util.Log.i("evidence", "open-by-hand step: $s")
+        OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.READ_MEDIA_VIDEO)
+        val resolver = OnDevice.context.contentResolver
+        val dir = "Movies/LanthornOpen"
+        val video = resolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Holiday.mkv")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, dir)
+        })!!
+        resolver.openOutputStream(video)!!.use { out -> OnDevice.asset("wide.mkv").inputStream().use { it.copyTo(out) } }
+        // A name that does not start with the video's: auto-load leaves it, so it must be opened by hand.
+        val srt = resolver.insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Picked by hand.srt")
+            put(MediaStore.MediaColumns.MIME_TYPE, "application/x-subrip")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, dir)
+        })!!
+        resolver.openOutputStream(srt)!!.use { it.write("1\n00:00:00,000 --> 00:00:10,000\nOpened by hand\n".toByteArray()) }
+        try {
+            engine.open(video)
+            engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+            engine.awaitAutoLoad()
+            step("opened")
+            PanelTestActivity.panelId = SubtitlesExtension.TRACKS_PANEL
+            PanelTestActivity.withVideo = false
+            val panel = ActivityScenario.launch(PanelTestActivity::class.java)
+            val device = UiDevice.getInstance(OnDevice.instrumentation)
+            device.wait(Until.findObject(By.text("Open subtitle file")), 5_000)?.click() ?: throw AssertionError("no open button")
+            val inFolder = device.wait(Until.findObject(By.textContains("LanthornOpen")), 10_000)
+            shotTo("us40-picker-in-video-folder")
+            step("picker shows the folder: ${inFolder != null}")
+            assertTrue("picker did not start in the video's folder", inFolder != null)
+            device.wait(Until.findObject(By.text("Picked by hand.srt")), 5_000)?.click() ?: throw AssertionError("file not listed")
+            delay(2000)
+            panel.close()
+            PanelTestActivity.panelId = SubtitlesExtension.STYLE_PANEL
+            PanelTestActivity.withVideo = true
+            engine.pause()
+            engine.seekTo(1000)
+            engine.await("sub-text", PropertyType.Text, 10_000) { it == "Opened by hand" }
+            step("picked and on")
+            // US-40.2: another file, then this video again: the picked file is back and on.
+            openClip(Uri.fromFile(OnDevice.asset("wide.mkv")), tracks = 2)
+            engine.open(video)
+            engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+            engine.awaitAutoLoad()
+            engine.pause()
+            engine.seekTo(1000)
+            engine.await("sub-text", PropertyType.Text, 10_000) { it == "Opened by hand" }
+            shotTo("us40-picked-file-back")
+            evidence("US-40.1 picker opened in Movies/LanthornOpen, 'Picked by hand.srt' chosen and on; US-40.2 after another file, reopening Holiday.mkv brought it back on")
+        } finally {
+            PerFileChoices(OnDevice.context).forget(video.toString())
+            resolver.delete(video, null, null)
+            resolver.delete(srt, null, null)
+            resolver.persistedUriPermissions.forEach { resolver.releasePersistableUriPermission(it.uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        }
+    }
+
     /**
      * Shared storage under scoped storage: the video's folder is not listable until the viewer
      * allows it once in the system folder picker. Drives the real picker.
