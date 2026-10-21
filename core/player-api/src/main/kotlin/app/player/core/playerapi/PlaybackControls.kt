@@ -29,7 +29,7 @@ interface PlaybackControls {
      */
     fun attach(activity: ComponentActivity) {}
 
-    /** Called first from the player activity's dispatchKeyEvent. True when playback consumed it. */
+    /** Called first from the player activity's onKeyDown and onKeyUp. True when playback consumed it. */
     fun onKey(event: KeyEvent): Boolean = false
 
     val hasPrevious: StateFlow<Boolean> get() = OFF

@@ -80,8 +80,12 @@ class PlayerActivity : ComponentActivity() {
         lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.dispatchKeyEvent(event)
+    // Playback sees keys first: volume keys as brightness (US-77), keys while locked (US-28.3).
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.onKeyDown(keyCode, event)
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.onKeyUp(keyCode, event)
 
     override fun onStart() {
         super.onStart()
