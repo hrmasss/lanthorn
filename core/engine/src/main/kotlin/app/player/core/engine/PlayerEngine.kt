@@ -536,7 +536,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val SURFACE_TIMEOUT_MS = 2000L
         private const val SURFACE_WAIT_MS = 1000L
         private const val DECODER_SETTLE_STEP_MS = 100L
-        private const val DECODER_SETTLE_TRIES = 20
+        private const val DECODER_SETTLE_TRIES = 50
         private const val SCRUB_STALL_MS = 250L
         private const val SCRUB_REFINE_MS = 1500L
 

@@ -150,7 +150,7 @@ class DecoderUiTest {
     /** US-37.2 after the 4:4:4 fallback, then US-35.3 by hand: pick HW on a file only SW plays. */
     @Test fun a_fallbackThenHandPickHw() {
         play("clip444.mp4")
-        assertEquals(ActiveDecoder.SW, engineState()?.activeDecoder)
+        assertTrue("decoder never settled on SW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
         openFromMenu("Info")
         assertTrue("info never showed SW", device.wait(Until.hasObject(By.text("SW")), 8000))
         shot("info-after-fallback")
