@@ -49,6 +49,8 @@ class GestureTest {
         override var brightness = 0.5f
         override var volume = 0.5f
         override val volumeSteps = 15
+        override var boostOn = false
+        override var boost = 1f
         override fun setZoom(scale: Double) { zoomed = scale }
         override fun setPan(x: Double, y: Double) { pan = x to y }
         override fun toggleFitCrop() { fitCrop++ }
@@ -218,6 +220,41 @@ class GestureTest {
         rule.onNodeWithTag("v").performTouchInput { swipe(Offset(600f, 100f), Offset(600f, 300f), 300) }
         rule.waitForIdle()
         assertEquals(0.333f, fx.volume, 0.04f)
+    }
+
+    @Test fun `US-49_1 swipe up past maximum volume raises the boost to 200 percent`() {
+        fx.boostOn = true
+        fx.volume = 0.8f
+        c.dragStart(DragKind.Volume)
+        c.drag(DragKind.Volume, 0f, -500f, 1000f, 1000f) // up half the height: 80 -> 130
+        assertEquals(1f, fx.volume)
+        assertEquals(1.3f, fx.boost, 0.001f)
+        assertEquals(Readout.Level(LevelKind.Volume, 130), c.readout)
+        c.drag(DragKind.Volume, 0f, -2000f, 1000f, 1000f) // far past: stops at 200
+        assertEquals(2f, fx.boost)
+        assertEquals(Readout.Level(LevelKind.Volume, 200), c.readout)
+    }
+
+    @Test fun `US-49_1 swipe down lowers the boost to 100 percent before the system volume`() {
+        fx.boostOn = true
+        fx.volume = 1f
+        fx.boost = 1.2f
+        c.dragStart(DragKind.Volume)
+        c.drag(DragKind.Volume, 0f, 100f, 1000f, 1000f) // down 10%: 120 -> 110
+        assertEquals(1f, fx.volume)
+        assertEquals(1.1f, fx.boost, 0.001f)
+        c.drag(DragKind.Volume, 0f, 400f, 1000f, 1000f) // down 40%: 120 -> 80
+        assertEquals(1f, fx.boost)
+        assertEquals(0.8f, fx.volume, 0.04f)
+    }
+
+    @Test fun `US-49_1 boost off stops the swipe at the system maximum`() {
+        fx.volume = 0.8f
+        c.dragStart(DragKind.Volume)
+        c.drag(DragKind.Volume, 0f, -500f, 1000f, 1000f)
+        assertEquals(1f, fx.volume)
+        assertEquals(1f, fx.boost)
+        assertEquals(Readout.Level(LevelKind.Volume, 100), c.readout)
     }
 
     @Test fun `US-21_4 switched-off swipe does nothing and shows nothing`() {

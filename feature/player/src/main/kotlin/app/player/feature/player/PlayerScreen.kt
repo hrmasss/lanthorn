@@ -179,6 +179,7 @@ fun PlayerScreen(
     val currentControls by rememberUpdatedState(controls)
     val windowBrightness = brightness
     val currentPreview by rememberUpdatedState(preview)
+    val volumeBoost by rememberUpdatedState(extensions.firstNotNullOfOrNull { it.volumeBoost })
     val gestures = remember(engine) {
         GestureController(object : GestureEffects {
             override val positionMs get() = engine.state.value.positionMs
@@ -215,6 +216,10 @@ fun PlayerScreen(
                     audio?.let { it.setStreamVolume(AudioManager.STREAM_MUSIC, (v * it.getStreamMaxVolume(AudioManager.STREAM_MUSIC)).roundToInt(), 0) }
                 }
             override val volumeSteps get() = audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+            override val boostOn get() = volumeBoost?.enabled?.value == true
+            override var boost: Float
+                get() = volumeBoost?.gain?.value ?: 1f
+                set(v) { volumeBoost?.setGain(v) }
             override fun setZoom(scale: Double) = video.setZoom(scale)
             override fun setPan(x: Double, y: Double) = video.setPan(x, y)
             override fun toggleFitCrop() {

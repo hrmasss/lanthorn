@@ -116,6 +116,17 @@ private fun LevelReadout(level: Readout.Level, modifier: Modifier) {
                     .fillMaxHeight(level.percent.coerceIn(0, 100) / 100f)
                     .background(MaterialTheme.colorScheme.primary, CircleShape),
             )
+            // Boost past 100% in a second colour over the full bar (US-49.1).
+            if (level.percent > 100) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight((level.percent - 100).coerceAtMost(100) / 100f)
+                        .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                        .testTag("readout-level-boost"),
+                )
+            }
         }
         Text("${level.percent}", style = MaterialTheme.typography.displaySmall.tabular(), color = PlayerColors.Content)
     }

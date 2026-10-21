@@ -33,6 +33,14 @@ interface GestureEffects {
     /** Media volume steps, so a swipe lands on whole steps. */
     val volumeSteps: Int
 
+    /** Whether the volume swipe continues past the system maximum (US-49.1). */
+    val boostOn: Boolean get() = false
+
+    /** Player gain past the system maximum, 1.0 to 2.0 (US-49.1). */
+    var boost: Float
+        get() = 1f
+        set(_) {}
+
     /** Zoom relative to fit (1.0) and pan in fractions of the scaled picture. */
     fun setZoom(scale: Double)
     fun setPan(x: Double, y: Double)
@@ -171,7 +179,8 @@ class GestureController(private val fx: GestureEffects) {
                 seekTarget = seekFrom
             }
             DragKind.Brightness -> levelFrom = fx.brightness
-            DragKind.Volume -> levelFrom = fx.volume
+            // One scale for both: 0 to 1 is the system volume, 1 to 2 the boost (US-49.1).
+            DragKind.Volume -> levelFrom = fx.volume + if (fx.boostOn) fx.boost - 1f else 0f
         }
     }
 
@@ -190,9 +199,12 @@ class GestureController(private val fx: GestureEffects) {
                 readout = Readout.Level(LevelKind.Brightness, (v * 100).roundToInt())
             }
             DragKind.Volume -> {
-                val v = snapTo(level(levelFrom, dy, h), fx.volumeSteps)
+                val c = level(levelFrom, dy, h, max = if (fx.boostOn) 2f else 1f)
+                val v = snapTo(c.coerceAtMost(1f), fx.volumeSteps)
                 fx.volume = v
-                readout = Readout.Level(LevelKind.Volume, (v * 100).roundToInt())
+                // Down lowers the boost to 1.0 before the system volume moves.
+                if (fx.boostOn) fx.boost = c.coerceAtLeast(1f)
+                readout = Readout.Level(LevelKind.Volume, ((if (c > 1f) c else v) * 100).roundToInt())
             }
         }
     }
@@ -292,10 +304,10 @@ class GestureController(private val fx: GestureEffects) {
         fun seekDelta(dx: Float, width: Float, fullWidthSec: Int): Long =
             if (width <= 0f) 0 else (dx / width * fullWidthSec * 1000).toLong()
 
-        /** US-18: full height = 0 to 100%, up raises, 1% steps. */
-        fun level(from: Float, dy: Float, height: Float): Float {
+        /** US-18: full height = 0 to 100%, up raises, 1% steps. [max] 2 lets volume run into the boost (US-49.1). */
+        fun level(from: Float, dy: Float, height: Float, max: Float = 1f): Float {
             if (height <= 0f) return from
-            val v = (from - dy / height).coerceIn(0f, 1f)
+            val v = (from - dy / height).coerceIn(0f, max)
             return (v * 100).roundToInt() / 100f
         }
 
