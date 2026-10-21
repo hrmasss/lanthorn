@@ -4,7 +4,11 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.doublePreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -35,6 +39,7 @@ data class PlayerPrefs(
     val backTwice: Boolean = false,
     /** US-23.2: speed new videos start at, 0.25 to 4.0. */
     val defaultSpeed: Double = 1.0,
+    val gestures: GesturePrefs = GesturePrefs(),
 ) {
     companion object {
         const val MIN_DELAY_MS = 1_000L
@@ -75,6 +80,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
                 p[STATUS_KEEP] = next.keepStatusVisible
                 p[BACK_TWICE] = next.backTwice
                 p[DEFAULT_SPEED] = next.defaultSpeed.coerceIn(0.25, 4.0)
+                writeGestures(p, next.gestures)
             }
         }
     }
@@ -90,7 +96,60 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
             keepStatusVisible = this[STATUS_KEEP] ?: d.keepStatusVisible,
             backTwice = this[BACK_TWICE] ?: d.backTwice,
             defaultSpeed = this[DEFAULT_SPEED] ?: d.defaultSpeed,
+            gestures = readGestures(this),
         )
+    }
+
+    private fun readGestures(p: Preferences): GesturePrefs {
+        val d = GesturePrefs()
+        fun flag(name: String, default: Boolean) = p[booleanPreferencesKey("g_$name")] ?: default
+        return GesturePrefs(
+            seek = flag("seek", d.seek),
+            brightness = flag("brightness", d.brightness),
+            volume = flag("volume", d.volume),
+            doubleTapSkip = flag("dt_skip", d.doubleTapSkip),
+            doubleTapPause = flag("dt_pause", d.doubleTapPause),
+            doubleTapZoom = flag("dt_zoom", d.doubleTapZoom),
+            longPressFast = flag("long_press", d.longPressFast),
+            twoFingerSpeed = flag("two_finger_speed", d.twoFingerSpeed),
+            pinchZoom = flag("pinch", d.pinchZoom),
+            pan = flag("pan", d.pan),
+            subtitleSwipe = flag("sub_swipe", d.subtitleSwipe),
+            subtitleDrag = flag("sub_drag", d.subtitleDrag),
+            subtitlePinch = flag("sub_pinch", d.subtitlePinch),
+            touchAction = p[stringPreferencesKey("g_touch_action")]
+                ?.let { v -> TouchAction.entries.firstOrNull { it.name == v } } ?: d.touchAction,
+            seekFullWidthSec = p[intPreferencesKey("g_seek_full_width")] ?: d.seekFullWidthSec,
+            skipStepSec = p[intPreferencesKey("g_skip_step")] ?: d.skipStepSec,
+            fastSpeed = p[doublePreferencesKey("g_fast_speed")] ?: d.fastSpeed,
+            quickZoom = flag("quick_zoom", d.quickZoom),
+            rememberBrightness = flag("remember_brightness", d.rememberBrightness),
+            lastBrightness = p[floatPreferencesKey("g_last_brightness")] ?: d.lastBrightness,
+        )
+    }
+
+    private fun writeGestures(p: MutablePreferences, g: GesturePrefs) {
+        fun flag(name: String, value: Boolean) { p[booleanPreferencesKey("g_$name")] = value }
+        flag("seek", g.seek)
+        flag("brightness", g.brightness)
+        flag("volume", g.volume)
+        flag("dt_skip", g.doubleTapSkip)
+        flag("dt_pause", g.doubleTapPause)
+        flag("dt_zoom", g.doubleTapZoom)
+        flag("long_press", g.longPressFast)
+        flag("two_finger_speed", g.twoFingerSpeed)
+        flag("pinch", g.pinchZoom)
+        flag("pan", g.pan)
+        flag("sub_swipe", g.subtitleSwipe)
+        flag("sub_drag", g.subtitleDrag)
+        flag("sub_pinch", g.subtitlePinch)
+        p[stringPreferencesKey("g_touch_action")] = g.touchAction.name
+        p[intPreferencesKey("g_seek_full_width")] = g.seekFullWidthSec.coerceIn(10, 600)
+        p[intPreferencesKey("g_skip_step")] = g.skipStepSec.coerceIn(5, 60)
+        p[doublePreferencesKey("g_fast_speed")] = g.fastSpeed.coerceIn(1.5, 4.0)
+        flag("quick_zoom", g.quickZoom)
+        flag("remember_brightness", g.rememberBrightness)
+        p[floatPreferencesKey("g_last_brightness")] = g.lastBrightness
     }
 
     companion object {
