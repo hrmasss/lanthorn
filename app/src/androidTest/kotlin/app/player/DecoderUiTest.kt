@@ -12,6 +12,7 @@ import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import app.player.core.data.history.ResumePoints
 import app.player.core.engine.ActiveDecoder
 import app.player.core.engine.DecoderMode
 import app.player.core.playerapi.PlayerIntents
@@ -29,6 +30,7 @@ import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import app.player.core.testing.Ears
 import app.player.core.testing.evidenceShot
 
@@ -56,6 +58,8 @@ class DecoderUiTest {
     @Before fun setUp() {
         // The player is opened with file:// uris of the app's own files.
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
+        // Each test starts its file from 0: a row left by an earlier test resumes near the end.
+        runBlocking { ResumePoints(context).clear() }
     }
 
     private fun file(name: String): File = File(context.filesDir, name).also { f ->
