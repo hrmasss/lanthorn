@@ -8,7 +8,9 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerSessions
+import app.player.core.playerapi.PlayerIntents
 import app.player.core.testing.Ears
 import app.player.core.testing.evidenceShot
 import org.junit.After
@@ -49,11 +51,15 @@ class BackgroundPlayUiTest {
         if (!f.exists()) instr.context.assets.open(name).use { i -> f.outputStream().use { i.copyTo(it) } }
     }
 
-    private fun playerIntent(name: String, flags: Int) =
+    // Software decoding: the emulator's hardware decoder draws straight to the screen, and a
+    // screenshot of that layer comes out black, so the return shot would show nothing.
+    private fun playerIntent(name: String, flags: Int) = PlayerIntents.withDecoder(
         Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(file(name)), "video/mp4")
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .putExtra("app.player.background", true)
-            .addFlags(flags)
+            .addFlags(flags),
+        DecoderMode.SW,
+    )
 
     private fun state() = PlayerSessions.current.value?.state?.value
 
