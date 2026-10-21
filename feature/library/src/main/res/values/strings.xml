@@ -204,4 +204,29 @@
     <string name="folders_hidden">Hidden</string>
     <string name="folders_hidden_none">Nothing hidden.</string>
     <string name="folders_types">File types</string>
+    <!-- Playlists (US-12) -->
+    <string name="playlists_title">Playlists</string>
+    <string name="playlists_empty">No playlists yet. Select videos and add them to one, or start one here.</string>
+    <string name="playlist_new">New playlist</string>
+    <string name="playlist_create">Create</string>
+    <string name="playlist_name">Name</string>
+    <string name="playlist_empty">This playlist is empty. Add videos from the library or the player.</string>
+    <string name="playlist_missing">File is missing</string>
+    <string name="playlist_remove">Remove from playlist</string>
+    <string name="playlist_reorder">Drag to reorder</string>
+    <string name="playlist_move_up">Move up</string>
+    <string name="playlist_move_down">Move down</string>
+    <string name="playlist_delete_title">Delete playlist?</string>
+    <string name="playlist_delete_text">%1$s goes away. The videos stay on your device.</string>
+    <string name="playlist_add_title">Add to playlist</string>
+    <string name="action_add_to_playlist">Add to playlist</string>
+    <plurals name="playlist_added">
+        <item quantity="one">Added %1$d video to %2$s.</item>
+        <item quantity="other">Added %1$d videos to %2$s.</item>
+    </plurals>
+    <plurals name="playlist_skipped">
+        <item quantity="one">%d was already in it.</item>
+        <item quantity="other">%d were already in it.</item>
+    </plurals>
+    <string name="backup_playlists">Playlists</string>
 </resources>

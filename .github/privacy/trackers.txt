@@ -4,6 +4,12 @@ com.google.firebase
 com.google.android.gms:play-services-ads
 com.google.android.gms:play-services-analytics
 com.google.android.gms:play-services-measurement
+com.google.android.gms:play-services-ads-identifier
+com.google.android.gms:play-services-ads-lite
+com.google.android.gms:play-services-appset
+com.google.android.gms:play-services-tagmanager
+com.comscore
+com.scorecardresearch
 com.google.android.play:app-update
 com.google.android.play:review
 com.crashlytics

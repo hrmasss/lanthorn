@@ -358,7 +358,7 @@ private fun FolderThumb(folder: LibraryFolder, ctx: RowContext, modifier: Modifi
 
 /** Draws the cached bitmap at once if memory has it, otherwise loads it while the row is on screen. */
 @Composable
-private fun ThumbImage(video: LibraryVideo, loader: ThumbnailLoader) {
+internal fun ThumbImage(video: LibraryVideo, loader: ThumbnailLoader) {
     var bitmap by remember(video.id, video.modifiedSec) { mutableStateOf<Bitmap?>(loader.cached(video)) }
     if (bitmap == null) {
         LaunchedEffect(video.id, video.modifiedSec) { bitmap = loader.load(video) }
