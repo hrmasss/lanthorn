@@ -158,6 +158,16 @@ fun rememberFileActions(onChanged: () -> Unit): FileActions {
         pending = null
     }
     return remember(context, scope) {
-        FileActions(context, { request, then -> pending = then; launcher.launch(request) }, onChanged, scope)
+        FileActions(
+            context,
+            { request, then ->
+                // US-71.2: every system access prompt comes with the reason, in one line.
+                Toast.makeText(context, R.string.write_access_reason, Toast.LENGTH_LONG).show()
+                pending = then
+                launcher.launch(request)
+            },
+            onChanged,
+            scope,
+        )
     }
 }
