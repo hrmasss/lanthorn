@@ -55,10 +55,11 @@ ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=600:duration=300:sample_ra
 du -h "$SUB"/* "$AUD"/*
 
 # Wide 3.2:1 clip with a text subtitle: on a 20:9 phone it gets black bars of about 15% top and bottom,
-# so "keep inside the picture" (US-43.2) is visible.
+# so "keep inside the picture" (US-43.2) is visible. A keyframe each second: with one keyframe mpv
+# finds the index useless, and a paused track switch seeks to the end (P2.6).
 printf '1\n00:00:00,000 --> 00:00:10,000\nInside or outside the picture\n' > "$T/wide.srt"
 ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x200:rate=25:duration=10 -i "$T/wide.srt" \
-  -map 0:v -map 1:s -c:v libx264 -preset veryfast -crf 32 -pix_fmt yuv420p -c:s srt -metadata:s:s:0 language=eng "$SUB/wide.mkv"
+  -map 0:v -map 1:s -c:v libx264 -preset veryfast -crf 32 -g 25 -pix_fmt yuv420p -c:s srt -metadata:s:s:0 language=eng "$SUB/wide.mkv"
 # ASS that names a font only the file carries (DejaVu Sans Mono, Bitstream Vera licence, free to
 # redistribute), for "ignore embedded fonts" (US-42.4).
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf
