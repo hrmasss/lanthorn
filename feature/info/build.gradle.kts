@@ -9,6 +9,8 @@ android {
 
 dependencies {
     implementation(project(":core:settings-api"))
+    // InfoActivity: file properties launched by action (US-10.4).
+    implementation(libs.androidx.activity.compose)
 }
 
 dependencies {

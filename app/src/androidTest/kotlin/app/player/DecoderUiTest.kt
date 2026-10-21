@@ -13,6 +13,8 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.ActiveDecoder
+import app.player.core.engine.DecoderMode
+import app.player.core.playerapi.PlayerIntents
 import app.player.core.engine.PlayerSessions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -58,10 +60,11 @@ class DecoderUiTest {
         if (!f.exists()) instr.context.assets.open(name).use { i -> f.outputStream().use { i.copyTo(it) } }
     }
 
-    private fun play(name: String) {
+    private fun play(name: String, oneTime: DecoderMode? = null) {
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(file(name)), "video/mp4")
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        if (oneTime != null) PlayerIntents.withDecoder(intent, oneTime)
         context.startActivity(intent)
         val ok = waitFor { PlayerSessions.current.value?.state?.value?.let { it.video != null && it.uri?.endsWith(name) == true } == true }
         assertTrue("$name never showed video", ok)
@@ -216,5 +219,28 @@ class DecoderUiTest {
         assertTrue(device.wait(Until.hasObject(By.text("External")), 3000))
         shot("info-subtitles")
         close()
+    }
+
+    /** US-09.3 (library's "play with"): a one-time decoder for that launch, not remembered. */
+    @Test fun e_oneTimeDecoderNotRemembered() {
+        play("withsubs.mp4", oneTime = DecoderMode.SW)
+        assertTrue("one-time SW never ran, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
+        assertEquals(DecoderMode.SW, engineState()?.decoderMode)
+        close()
+        play("withsubs.mp4")
+        log("one-time SW, then a plain open: ${engineState()?.decoderMode} on ${engineState()?.activeDecoder?.label}")
+        assertTrue("plain open did not go back to HW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.HW })
+        close()
+    }
+
+    /** US-10.4: file properties from anywhere, by action, with nothing playing. */
+    @Test fun f_infoScreenForAFile() {
+        context.startActivity(PlayerIntents.showInfo(context, Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        assertTrue("info screen never showed the codec", device.wait(Until.hasObject(By.text("H.264")), 20_000))
+        assertTrue(device.hasObject(By.text("MP4")))
+        assertTrue(device.hasObject(By.text("AAC")))
+        assertEquals(null, PlayerSessions.current.value)
+        shot("info-screen-for-a-file")
+        device.pressBack()
     }
 }
