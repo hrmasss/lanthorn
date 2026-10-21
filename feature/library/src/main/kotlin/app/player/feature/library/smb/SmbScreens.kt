@@ -181,7 +181,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
                         } else {
                             SmbClient.forget(server.id)
                             store.remove(server.id)
-                            error = resources.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason().orEmpty())
+                            error = resources.getString(smbFailure(result.exceptionOrNull()).message)
                         }
                     }
                 },
@@ -233,7 +233,7 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
             when {
                 l == null -> LoadingIndicator(Modifier.align(Alignment.Center))
                 l.isFailure -> Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.smb_connect_failed, l.exceptionOrNull()?.reason().orEmpty()), modifier = Modifier.testTag("smb-error"))
+                    Text(stringResource(smbFailure(l.exceptionOrNull()).message), modifier = Modifier.testTag("smb-error"))
                     TextButton(onClick = { server?.let { SmbClient.forget(it.id) }; attempt++ }) { Text(stringResource(R.string.stream_retry)) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize().testTag("smb-list")) {
@@ -264,13 +264,6 @@ private fun Hint(text: Int) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
-}
-
-/** The viewer-facing part of a connection error, without stack or class names. */
-private fun Throwable.reason(): String {
-    var t: Throwable? = this
-    while (t?.cause != null && t.cause !== t) t = t.cause
-    return (t?.message ?: this.message ?: javaClass.simpleName).take(160)
 }
 
 /** Servers advertised by mDNS, live while the screen shows. Phones see Samba, macOS and NAS boxes. */
