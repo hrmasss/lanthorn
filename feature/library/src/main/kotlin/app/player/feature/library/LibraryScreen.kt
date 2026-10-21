@@ -88,6 +88,8 @@ import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.BrandPolygon
 import app.player.feature.library.network.StreamDialog
+import app.player.feature.library.smb.SmbBrowseScreen
+import app.player.feature.library.smb.SmbServersScreen
 import app.player.feature.library.settings.SettingsGroupScreen
 import app.player.feature.library.settings.SettingsHome
 
@@ -135,6 +137,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
                 onSettings = { nav.navigate("settings") },
+                onShares = { nav.navigate("smb") },
                 onSearch = { nav.navigate("search") },
             )
         }
@@ -151,6 +154,28 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
                 key, state, vm, loaders, onPlay,
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onSearch = { nav.navigate("search") },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable("smb") {
+            SmbServersScreen(
+                onOpen = { nav.navigate("smb/${it.id}") },
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable(
+            "smb/{id}?path={path}",
+            listOf(
+                navArgument("id") { type = NavType.StringType },
+                navArgument("path") { type = NavType.StringType; defaultValue = "" },
+            ),
+        ) { entry ->
+            val id = entry.arguments?.getString("id").orEmpty()
+            SmbBrowseScreen(
+                id,
+                entry.arguments?.getString("path").orEmpty(),
+                onFolder = { nav.navigate("smb/$id?path=" + Uri.encode(it)) },
+                onPlay = onPlay,
                 onBack = { nav.popBackStack() },
             )
         }
@@ -190,6 +215,7 @@ private fun LibraryHome(
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
     onSettings: () -> Unit,
+    onShares: () -> Unit,
     onSearch: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -223,6 +249,7 @@ private fun LibraryHome(
                         onFolderSettings.takeIf { state is LibraryUiState.Content },
                         onSettings,
                         onStream = { streamOpen = true },
+                        onShares = onShares,
                     )
                 },
                 scrollBehavior = scroll,
@@ -446,7 +473,7 @@ private val Field.label
 
 /** Top bar overflow menu. */
 @Composable
-private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit, onStream: () -> Unit) {
+private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit, onStream: () -> Unit, onShares: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("library-overflow")) {
@@ -460,6 +487,14 @@ private fun OverflowMenu(onFolderSettings: (() -> Unit)?, onSettings: () -> Unit
                     onStream()
                 },
                 modifier = Modifier.testTag("open-stream"),
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.smb_title)) },
+                onClick = {
+                    open = false
+                    onShares()
+                },
+                modifier = Modifier.testTag("open-shares"),
             )
             if (onFolderSettings != null) {
                 DropdownMenuItem(
