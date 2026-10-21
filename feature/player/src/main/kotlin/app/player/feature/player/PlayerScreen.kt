@@ -421,14 +421,17 @@ fun PlayerScreen(
         // Extension overlays (network state and the like): over the video, under the controls.
         extensions.forEach { it.Overlay(host) }
         // Gesture readouts linger 300 ms after the finger lifts, then fade (docs/design.md).
+        // The last readout is kept for the fade-out; it is updated in an effect, never written
+        // during composition (that corrupted the slot table on the hosted emulator).
+        val readoutNow = gestures.readout
         var lastReadout by remember { mutableStateOf<Readout?>(null) }
-        gestures.readout?.let { lastReadout = it }
+        LaunchedEffect(readoutNow) { if (readoutNow != null) lastReadout = readoutNow }
         AnimatedVisibility(
-            gestures.readout != null,
+            readoutNow != null,
             enter = fadeIn(snap()),
             exit = fadeOut(PlayerMotion.readoutOut()),
         ) {
-            GestureReadout(lastReadout, gestures::resetSpeed)
+            GestureReadout(readoutNow ?: lastReadout, gestures::resetSpeed)
         }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         state.error?.let {
