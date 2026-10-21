@@ -13,6 +13,7 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,22 +39,23 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -69,6 +71,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -87,17 +91,24 @@ import app.player.core.data.library.childrenOf
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.BrandPolygon
+import app.player.core.engine.DecoderMode
 import app.player.feature.library.network.StreamDialog
-import app.player.feature.library.smb.SmbBrowseScreen
-import app.player.feature.library.smb.SmbServersScreen
 import app.player.feature.library.settings.SettingsGroupScreen
 import app.player.feature.library.settings.SettingsHome
+import app.player.feature.library.smb.SmbBrowseScreen
+import app.player.feature.library.smb.SmbServersScreen
 
 private const val PERF_TAG = "LibraryPerf"
 
 /** The library: entry screen of the app. [onPlay] opens the player; the app module wires it. */
 @Composable
-fun LibraryRoute(onPlay: (Uri) -> Unit) {
+fun LibraryRoute(
+    onPlay: (Uri) -> Unit,
+    /** Opens [uris] as the player's queue at [index] (US-09.2, US-24.1). */
+    onPlayQueue: (uris: List<Uri>, index: Int) -> Unit = { uris, i -> onPlay(uris[i]) },
+    /** Opens [uris] as the queue with one decoder for this launch (US-09.3). */
+    onPlayWith: (uris: List<Uri>, decoder: DecoderMode) -> Unit = { uris, _ -> onPlayQueue(uris, 0) },
+) {
     val context = LocalContext.current
     val nav = rememberNavController()
     val vm: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -132,7 +143,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
     NavHost(nav, startDestination = "home") {
         composable("home") {
             LibraryHome(
-                state, vm, loaders, onPlay,
+                state, vm, loaders, onPlay, onPlayQueue, onPlayWith,
                 onAccessResult = { permanentlyDenied = it },
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
@@ -151,7 +162,7 @@ fun LibraryRoute(onPlay: (Uri) -> Unit) {
         composable("folder?key={key}", listOf(navArgument("key") { type = NavType.StringType })) { entry ->
             val key = entry.arguments?.getString("key").orEmpty()
             FolderScreen(
-                key, state, vm, loaders, onPlay,
+                key, state, vm, loaders, onPlay, onPlayQueue, onPlayWith,
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onSearch = { nav.navigate("search") },
                 onBack = { nav.popBackStack() },
@@ -211,6 +222,8 @@ private fun LibraryHome(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
+    onPlayWith: (List<Uri>, DecoderMode) -> Unit,
     onAccessResult: (permanentlyDenied: Boolean) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
@@ -238,11 +251,32 @@ private fun LibraryHome(
     val gridState = rememberLazyGridState()
     var streamOpen by rememberSaveable { mutableStateOf(false) }
     if (streamOpen) StreamDialog(onPlay = { onPlay(it.toUri()) }, onDismiss = { streamOpen = false })
+    val content = state as? LibraryUiState.Content
+    val allMode = content?.prefs?.viewMode == ViewMode.AllVideos
+    val shownFolders = if (allMode || content == null) emptyList() else content.folders
+    val shownVideos = if (allMode && content != null) content.videos else emptyList()
+    var selection by rememberSelection()
+    BackHandler(selection.isNotEmpty()) { selection = emptySet() }
+    val actions = rememberFileActions(onChanged = vm::refresh)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        floatingActionButton = {
+            val last = (state as? LibraryUiState.Content)?.lastPlayed
+            if (last != null && selection.isEmpty()) ResumeButton { onPlayQueue(listOf(last.uri.toUri()), 0) }
+        },
         topBar = {
-            TopAppBar(
+            if (selection.isNotEmpty() && content != null) {
+                SelectionBar(
+                    count = selection.size,
+                    videos = selectedVideos(selection, shownFolders, shownVideos, content.videos),
+                    actions = actions,
+                    onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onPlayWith = { vs, mode -> onPlayWith(vs.map { it.uri.toUri() }, mode) },
+                    onSelectAll = { selection = shownFolders.map(SelectionKey::of).toSet() + shownVideos.map(SelectionKey::of) },
+                    onClear = { selection = emptySet() },
+                )
+            } else TopAppBar(
                 title = { Text(stringResource(R.string.library_title)) },
                 actions = {
                     OverflowMenu(
@@ -272,12 +306,13 @@ private fun LibraryHome(
                         if (state.partial) PartialBanner(onChooseMore = { request.launch(mediaPermissions()) })
                         when {
                             state.videos.isNotEmpty() -> PullToRefreshBox(state.scanning, vm::refresh) {
-                                val allVideos = state.prefs.viewMode == ViewMode.AllVideos
                                 LibraryItems(
-                                    folders = if (allVideos) emptyList() else state.folders,
-                                    videos = if (allVideos) state.videos else emptyList(),
+                                    folders = shownFolders,
+                                    videos = shownVideos,
                                     layout = state.prefs.layout,
-                                    ctx = rowContext(state, vm, loaders, onFolder, onPlay),
+                                    ctx = rowContext(state, vm, loaders, onFolder, shownVideos, onPlayQueue, selection, actions = actions) { k ->
+                                        selection = if (k in selection) selection - k else selection + k
+                                    },
                                     listState = listState,
                                     gridState = gridState,
                                 )
@@ -304,6 +339,8 @@ private fun FolderScreen(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
+    onPlayWith: (List<Uri>, DecoderMode) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onSearch: () -> Unit,
     onBack: () -> Unit,
@@ -315,11 +352,28 @@ private fun FolderScreen(
     val scroll = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    var selection by rememberSelection()
+    BackHandler(selection.isNotEmpty()) { selection = emptySet() }
+    val actions = rememberFileActions(onChanged = vm::refresh)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
+        floatingActionButton = {
+            val last = (state as? LibraryUiState.Content)?.lastPlayed
+            if (last != null && selection.isEmpty()) ResumeButton { onPlayQueue(listOf(last.uri.toUri()), 0) }
+        },
         topBar = {
-            TopAppBar(
+            if (selection.isNotEmpty() && content != null) {
+                SelectionBar(
+                    count = selection.size,
+                    videos = selectedVideos(selection, subfolders, videos, content.videos),
+                    actions = actions,
+                    onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onPlayWith = { vs, mode -> onPlayWith(vs.map { it.uri.toUri() }, mode) },
+                    onSelectAll = { selection = subfolders.map(SelectionKey::of).toSet() + videos.map(SelectionKey::of) },
+                    onClear = { selection = emptySet() },
+                )
+            } else TopAppBar(
                 title = { Text(name.ifEmpty { stringResource(R.string.library_storage_root) }, maxLines = 1) },
                 navigationIcon = { BackButton(onBack) },
                 scrollBehavior = scroll,
@@ -333,7 +387,9 @@ private fun FolderScreen(
                         folders = subfolders,
                         videos = videos,
                         layout = content.prefs.layout,
-                        ctx = rowContext(content, vm, loaders, onFolder, onPlay),
+                        ctx = rowContext(content, vm, loaders, onFolder, videos, onPlayQueue, selection, actions = actions) { k ->
+                            selection = if (k in selection) selection - k else selection + k
+                        },
                         listState = listState,
                         gridState = gridState,
                     )
@@ -350,22 +406,36 @@ internal fun rowContext(
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onFolder: (LibraryFolder) -> Unit,
-    onPlay: (Uri) -> Unit,
-) = remember(state.prefs.fields, state.volumes, loaders) {
+    /** The videos as listed: tapping one plays this list from there, so next and previous follow it. */
+    queue: List<LibraryVideo>,
+    onPlayQueue: (List<Uri>, Int) -> Unit,
+    selection: Set<String> = emptySet(),
+    /** Share and properties in each video's row menu (US-74.1, US-10.4). */
+    actions: FileActions? = null,
+    onSelect: ((String) -> Unit)? = null,
+) = remember(state.prefs.fields, state.volumes, loaders, queue, selection, actions, state.marks) {
     RowContext(
         loader = loaders.first,
         fps = loaders.second::fps,
         fields = state.prefs.fields,
         volumeLabel = state::volumeLabel,
         onFolder = onFolder,
-        onVideo = { v: LibraryVideo -> onPlay(v.uri.toUri()) },
+        onVideo = { v: LibraryVideo ->
+            val playable = queue.filter { it.available }
+            onPlayQueue(playable.map { it.uri.toUri() }, playable.indexOfFirst { it.id == v.id }.coerceAtLeast(0))
+        },
         folderActions = listOf(
             RowAction(R.string.action_hide) { f -> vm.setHidden(f.key, true) },
             RowAction(R.string.action_exclude) { f -> vm.setExcluded(f.key, true) },
         ),
-        videoActions = listOf(
+        videoActions = listOfNotNull(
+            actions?.let { a -> RowAction(R.string.action_share) { v: LibraryVideo -> a.share(listOf(v)) } },
+            actions?.let { a -> RowAction(R.string.action_properties) { v: LibraryVideo -> a.properties(v) } },
             RowAction(R.string.action_hide) { v -> vm.setHidden(v.uri, true) },
         ),
+        selection = selection,
+        onSelect = onSelect,
+        marks = state.marks,
     )
 }
 
@@ -657,5 +727,19 @@ private fun Context.openAppSettings() {
     startActivity(
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+}
+
+/** US-08: one tap back into the last played video; the player resumes it at its resume point. */
+@Composable
+internal fun ResumeButton(onClick: () -> Unit) {
+    val label = stringResource(R.string.resume_last)
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        icon = { Icon(LanthornIcons.Play, contentDescription = null) },
+        text = { Text(label) },
+        // Above the floating view toolbar. The label is also set on the button itself: on API 36 the
+        // accessibility tree showed the button with an empty text node (P1.21 evidence).
+        modifier = Modifier.padding(bottom = 72.dp).testTag("resume-last").semantics { contentDescription = label },
     )
 }

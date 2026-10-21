@@ -1,5 +1,7 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.evidenceShot
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
@@ -40,6 +42,7 @@ class ComplexScriptsOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-44.3")
     @Test fun complexScriptsDrawnForComparison_US44_3() = runBlocking {
         engine.open(Uri.fromFile(OnDevice.asset("complex.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
@@ -57,8 +60,6 @@ class ComplexScriptsOnDeviceTest {
     }
 
     private fun shot(name: String) {
-        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
-        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 }

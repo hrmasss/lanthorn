@@ -1,5 +1,6 @@
 package app.player.feature.audio
 
+import app.player.core.testing.Ears
 import android.net.Uri
 import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
@@ -47,6 +48,7 @@ class AudioOnDeviceTest {
         engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }
     }
 
+    @Ears("US-47.1", "US-51.2")
     @Test fun listAndSwitchWithoutSeek_US47_1_US51_2() = runBlocking {
         openTracks()
         val tracks = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "audio" }
@@ -71,6 +73,7 @@ class AudioOnDeviceTest {
         assertWithin("AudioOnDeviceTest", took, 500)
     }
 
+    @Ears("US-48.1")
     @Test fun delayAppliesWithin200ms_US48_1() = runBlocking {
         openTracks()
         val t0 = SystemClock.elapsedRealtime()
@@ -83,6 +86,7 @@ class AudioOnDeviceTest {
         assertWithin("AudioOnDeviceTest", took, 200)
     }
 
+    @Ears("US-49.2", "US-49.3", "US-50.2")
     @Test fun effectsOnOurSession_US49_2_US49_3_US50_2() = runBlocking {
         openTracks()
         val session = engine.get("audiotrack-session-id", PropertyType.Int64)
@@ -127,6 +131,7 @@ class AudioOnDeviceTest {
      * tone: no boost (shows the Visualizer hears us), boost 200% with the limiter off (shows it
      * hears after the effect), boost 200% with the limiter on (the claim).
      */
+    @Ears("US-49.2")
     @Test fun limiterKeepsPeakUnder0dBFS_US49_2() = runBlocking {
         OnDevice.instrumentation.uiAutomation.grantRuntimePermission(OnDevice.context.packageName, android.Manifest.permission.RECORD_AUDIO)
         // The Visualizer reads after the stream volume: at full volume its peak is the output's dBFS.
@@ -170,6 +175,7 @@ class AudioOnDeviceTest {
         }
     }
 
+    @Ears("US-51.1")
     @Test fun monoWithin200ms_US51_1() = runBlocking {
         engine.set("msg-level", "all=warn,af=v,ao=v,audio=v")
         openTracks()
@@ -193,6 +199,7 @@ class AudioOnDeviceTest {
         assertWithin("AudioOnDeviceTest", tookMs, 200)
     }
 
+    @Ears("US-47.3")
     @Test fun externalAudioStaysInSync_US47_3() = runBlocking {
         if (!longRun()) return@runBlocking
         engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))

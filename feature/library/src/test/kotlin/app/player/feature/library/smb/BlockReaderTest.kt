@@ -1,12 +1,13 @@
 package app.player.feature.library.smb
 
+import app.player.core.testing.Ears
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 class BlockReaderTest {
     private val file = ByteArray(10 * 16 + 5) { it.toByte() }
@@ -30,6 +31,7 @@ class BlockReaderTest {
         r.close()
     }
 
+    @Ears("US-62.2")
     @Test fun `us_62_2 blocks ahead are fetched before they are asked for`() {
         // Copy-on-write: the read-ahead thread keeps adding while the test reads the list.
         val reads = CopyOnWriteArrayList<Long>()

@@ -19,6 +19,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.toFolders
 import app.player.core.designsystem.theme.LanthornTheme
+import app.player.core.testing.Ears
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +45,7 @@ class LibraryItemsTest {
         onVideo = {},
     )
 
+    @Ears("US-02.1")
     @Test fun us_02_1_name_without_extension_and_length_over_thumbnail() {
         rule.setContent {
             LanthornTheme {
@@ -56,6 +58,7 @@ class LibraryItemsTest {
         rule.onAllNodesWithTag("video-fields").assertCountEquals(0)
     }
 
+    @Ears("US-02.2")
     @Test fun us_02_2_fields_menu_choices_show_under_the_name() {
         rule.setContent {
             LanthornTheme {
@@ -71,6 +74,7 @@ class LibraryItemsTest {
         }
     }
 
+    @Ears("US-02.3")
     @Test fun us_02_3_rows_have_fixed_height_while_thumbnails_are_missing() {
         rule.setContent {
             LanthornTheme {
@@ -83,6 +87,7 @@ class LibraryItemsTest {
         rule.onAllNodesWithTag("video-row").onFirst().assertHeightIsEqualTo(88.dp)
     }
 
+    @Ears("US-03.2")
     @Test fun us_03_2_list_to_grid_within_one_frame() {
         var layout by mutableStateOf(Layout.List)
         val videos = (1L..20L).map { video(it, "v$it.mp4") }
@@ -100,6 +105,7 @@ class LibraryItemsTest {
         rule.onNodeWithTag("library-list").assertDoesNotExist()
     }
 
+    @Ears("US-80.3")
     @Test fun us_80_3_unavailable_video_is_marked() {
         rule.setContent {
             LanthornTheme {

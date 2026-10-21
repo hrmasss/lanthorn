@@ -39,6 +39,46 @@
     <string name="more_options">More options</string>
     <string name="row_menu">More options for %1$s</string>
     <string name="action_hide">Hide</string>
+    <string name="mark_new">New</string>
+    <string name="mark_finished">Watched</string>
+    <string name="mark_last_played">Last played</string>
+    <string name="resume_last">Resume</string>
+    <string name="setting_new_days">Mark as new for</string>
+    <string name="setting_mark_last">Mark last played</string>
+    <string name="setting_mark_last_summary">Highlight the last played video in each folder</string>
+    <string name="setting_resume_button">Resume button</string>
+    <string name="setting_resume_button_summary">A button on lists that plays the last video from where it stopped</string>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string name="action_play">Play</string>
+    <string name="action_share">Share</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_properties">Properties</string>
+    <string name="write_access_reason">Android asks before Lanthorn changes a video another app added.</string>
+    <string name="play_with_hw">Play with HW</string>
+    <string name="play_with_hw_plus">Play with HW+</string>
+    <string name="play_with_sw">Play with SW</string>
+    <string name="properties_unavailable">File details are not available in this build.</string>
+    <string name="selection_clear">Clear selection</string>
+    <string name="selection_all">Select all</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="confirm_delete">
+        <item quantity="one">Delete %d video? This cannot be undone.</item>
+        <item quantity="other">Delete %d videos? This cannot be undone.</item>
+    </plurals>
+    <string name="rename_hint">The extension stays. Android may ask you to allow the change.</string>
+    <string name="renamed">Renamed</string>
+    <string name="rename_failed">Could not rename this video.</string>
+    <string name="rename_denied">Not renamed: changing this video was not allowed.</string>
+    <string name="deleted">Deleted</string>
+    <string name="delete_failed">Could not delete every video.</string>
+    <string name="delete_denied">Not deleted: deleting was not allowed.</string>
     <string name="action_unhide">Show again</string>
     <string name="action_exclude">Don\'t scan this folder</string>
 
