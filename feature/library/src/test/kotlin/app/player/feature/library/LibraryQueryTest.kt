@@ -2,6 +2,7 @@ package app.player.feature.library
 
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.toFolders
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,12 +15,14 @@ private fun v(
     name, size, ms, w, h, modified, "video/mp4")
 
 class LibraryQueryTest {
+    @Ears("US-04.2")
     @Test fun `us_04_2 names sort naturally`() {
         val names = listOf("Episode 10.mp4", "episode 2.mp4", "Episode 1.mp4", "Épisode 3.mp4", "Episode 02b.mp4")
         val sorted = names.mapIndexed { i, n -> v(i.toLong(), n) }.sortedFor(Sort()).map { it.name }
         assertEquals(listOf("Episode 1.mp4", "episode 2.mp4", "Episode 02b.mp4", "Épisode 3.mp4", "Episode 10.mp4"), sorted)
     }
 
+    @Ears("US-04.1")
     @Test fun `us_04_1 every key and direction`() {
         val a = v(1, "a.mp4", size = 300, ms = 10, w = 640, h = 360, modified = 3)
         val b = v(2, "b.mp4", size = 100, ms = 30, w = 3840, h = 2160, modified = 1)
@@ -34,6 +37,7 @@ class LibraryQueryTest {
         assertEquals(listOf(2L, 3L, 1L), order(SortKey.Resolution, true))
     }
 
+    @Ears("US-04.1")
     @Test fun `us_04_1 folders follow the same key`() {
         val videos = listOf(
             v(1, "x.mp4", "external_primary/Big/", size = 900),
@@ -45,6 +49,7 @@ class LibraryQueryTest {
         assertEquals(listOf("Small", "Big"), folders.sortedFor(Sort(SortKey.Name, true), videos).map { it.name })
     }
 
+    @Ears("US-05.1")
     @Test fun `us_05_1 excluded folder takes its subfolders with it`() {
         val f = LibraryFilter(excludedFolders = setOf("external_primary/Movies/"))
         assertFalse(f.accepts(v(1, "a.mp4", "external_primary/Movies/")))
@@ -52,12 +57,14 @@ class LibraryQueryTest {
         assertTrue(f.accepts(v(3, "a.mp4", "external_primary/MoviesOld/")))
     }
 
+    @Ears("US-05.4")
     @Test fun `us_05_4 extension switched off`() {
         val f = LibraryFilter(disabledExtensions = setOf("avi"))
         assertFalse(f.accepts(v(1, "old.AVI")))
         assertTrue(f.accepts(v(2, "new.mkv")))
     }
 
+    @Ears("US-15.1")
     @Test fun `us_15_1 hidden folder and hidden video`() {
         val video = v(1, "a.mp4")
         assertFalse(LibraryFilter(hidden = setOf(video.uri)).accepts(video))
@@ -65,6 +72,7 @@ class LibraryQueryTest {
         assertTrue(LibraryFilter(hidden = setOf("external_primary/Movies/")).accepts(v(2, "b.mp4", "external_primary/Movies/Sub/")))
     }
 
+    @Ears("US-06.1")
     @Test fun `us_06_1 search ignores case and accents and finds folders`() {
         val videos = listOf(v(1, "Café Paris.mp4"), v(2, "Other.mkv", "external_primary/Cafe Days/"))
         val r = search("CAFE", videos.toFolders(), videos)
@@ -73,6 +81,7 @@ class LibraryQueryTest {
         assertTrue(search("  ", videos.toFolders(), videos).videos.isEmpty())
     }
 
+    @Ears("US-06.1")
     @Test fun `us_06_1 search of 1000 videos well under 100 ms`() {
         val videos = (1L..1000L).map { v(it, "Holiday clip number $it, été édition.mp4", "external_primary/F${it % 20}/") }
         val folders = videos.toFolders()
@@ -84,6 +93,7 @@ class LibraryQueryTest {
         assertTrue("fastest took ${times.first()} ms", times.first() < 100)
     }
 
+    @Ears("US-06.2")
     @Test fun `us_06_2 recent searches keep 10, newest first, no duplicates`() {
         var recent = emptyList<String>()
         (1..12).forEach { recent = recent.withSearch("q$it") }

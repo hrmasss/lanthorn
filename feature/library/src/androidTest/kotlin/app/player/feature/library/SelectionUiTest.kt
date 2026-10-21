@@ -16,8 +16,9 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.data.library.LibraryVideo
-import app.player.core.engine.DecoderMode
 import app.player.core.designsystem.theme.LanthornTheme
+import app.player.core.engine.DecoderMode
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -33,6 +34,7 @@ class SelectionUiTest {
         null, "Clip $id.mp4", 1000, 60_000, 1920, 1080, id, "video/mp4",
     )
 
+    @Ears("US-09.1")
     @Test fun us_09_1_long_press_selects_and_taps_then_toggle() {
         val videos = (1L..3L).map(::video)
         var selection by mutableStateOf(emptySet<String>())
@@ -60,6 +62,7 @@ class SelectionUiTest {
         assertEquals("taps in selection mode never open the player", 0, opened)
     }
 
+    @Ears("US-09.1")
     @Test fun us_09_1_selection_bar_shows_the_count() {
         rule.setContent {
             LanthornTheme {
@@ -73,6 +76,7 @@ class SelectionUiTest {
         assertEquals(0, rule.onAllNodesWithTag("selection-rename").fetchSemanticsNodes().size)
     }
 
+    @Ears("US-09.3")
     @Test fun us_09_3_play_with_passes_the_chosen_decoder() {
         var played: Pair<List<Long>, DecoderMode>? = null
         rule.setContent {
