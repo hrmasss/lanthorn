@@ -42,11 +42,17 @@ cold() { # package -> "p50 p90" over 10 cold starts
 
 drops() { # package file fps -> sf-drops line, the app playing the file through a VIEW intent
   adb shell am force-stop "$1"
-  adb shell am start -a android.intent.action.VIEW -d "file://$MEDIA/$2" -t video/* -p "$1" > /dev/null
+  adb shell "am start -a android.intent.action.VIEW -d 'file://$MEDIA/$2' -t 'video/*' -p $1" > /dev/null
   sleep 5
-  # The video's own layer: that package's SurfaceView, its BLAST buffer layer where there is one.
-  local all layer; all=$(adb shell dumpsys SurfaceFlinger --list | tr -d '\r' | grep "SurfaceView\[$1" || true)
-  layer=$(echo "$all" | grep BLAST | tail -1); [ -n "$layer" ] || layer=$(echo "$all" | tail -1)
+  # The video's own layer: that package's SurfaceView, the BLAST buffer layer first, the first one
+  # that reports frames. Android 16 lists names as RequestedLayerState{<name> parentId=...}.
+  local layer="" l n
+  while read -r l; do
+    n=$(adb shell "dumpsys SurfaceFlinger --latency '$l'" < /dev/null | tail -n +2 | awk '$2 > 0 && $2 < 9e18' | wc -l)
+    [ "$n" -gt 0 ] && { layer=$l; break; }
+  done < <(adb shell dumpsys SurfaceFlinger --list | tr -d '\r' \
+             | sed -E 's/^RequestedLayerState\{//; s/ (parentId|relativeParentId|z)=.*$//; s/\}$//' \
+             | grep "SurfaceView\[$1" | awk '/BLAST/ {print; next} {rest[NR] = $0} END {for (i in rest) print rest[i]}')
   [ -n "$layer" ] || { echo "no video layer found"; return; }
   ./sf-drops.sh "$layer" "$SECS" "$3"
   adb shell am force-stop "$1"

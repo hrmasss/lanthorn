@@ -39,8 +39,8 @@ for f in h264-1080p60.mp4 hevc8-1080p60.mp4 hevc10-2160p60.mp4 av1-2160p60.mp4 a
 done
 [ -z "$missing" ] || { echo "missing media:$missing (run perf/gen-media.sh)"; exit 2; }
 warnings=""
-battery=$(adb shell dumpsys battery | tr -d '\r' | awk '/ level:/ {print $2}')
-temp=$(adb shell dumpsys battery | tr -d '\r' | awk '/ temperature:/ {print $2 / 10}')
+battery=$(adb shell dumpsys battery | tr -d '\r' | awk '$1 == "level:" {print $2; exit}')
+temp=$(adb shell dumpsys battery | tr -d '\r' | awk '$1 == "temperature:" {print $2 / 10; exit}')
 plane=$(adb shell settings get global airplane_mode_on | tr -d '\r')
 [ "${battery:-0}" -ge 50 ] || warnings="$warnings battery ${battery:-?}% (want 50% or more);"
 [ "$plane" = 1 ] || warnings="$warnings airplane mode off;"
