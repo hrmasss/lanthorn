@@ -23,3 +23,5 @@ One line each: id, owner, why. Add your own; keep the reason concrete.
 | US-54.1 | player-ui | Every ratio is drawn and measured on the emulator; "within one frame" needs the phone's frame timing. |
 | US-57.1 | player-ui | Mirror and flip are pixel-checked on the emulator; "within one frame" needs the phone's frame timing. |
 | US-57.3 | player-ui | Range, steps and the identical frame at zero on the emulator; the 100 ms bound is the phone's. |
+| NF-9 | library | 1000 videos listed within 1.5 s of a cold scan: the phone's MediaStore query and storage speed. The emulator times a fake 1000-row scan to the list (LibraryHomeTest) for regressions only. The 35 MB arm64 APK limit is read from CI's "APK sizes" step. |
+| US-80.2 | library | Mounting or removing an SD card or USB drive needs real hardware; the emulator cannot. The rescan on the system's volume broadcast is unit-tested (LibraryViewModelTest). |

@@ -83,7 +83,7 @@ class FileActions internal constructor(
         val uris = videos.map { it.uri.toUri() }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val request = MediaStore.createDeleteRequest(context.contentResolver, uris)
-            launchSender(IntentSenderRequest.Builder(request.intentSender).build()) { ok ->
+            ask(IntentSenderRequest.Builder(request.intentSender).build()) { ok ->
                 if (ok) done(R.string.deleted) else failed(R.string.delete_denied)
             }
         } else if (confirmedOnQ) {
@@ -98,7 +98,7 @@ class FileActions internal constructor(
             }
             if (failure is RecoverableSecurityException) {
                 // Android 10 asks per file; continue from this one once allowed.
-                launchSender(IntentSenderRequest.Builder(failure.userAction.actionIntent.intentSender).build()) { granted ->
+                ask(IntentSenderRequest.Builder(failure.userAction.actionIntent.intentSender).build()) { granted ->
                     if (granted) scope.launch { deleteOneByOne(uris.drop(i)) } else failed(R.string.delete_denied)
                 }
                 return
@@ -121,7 +121,7 @@ class FileActions internal constructor(
                 result.isSuccess -> done(R.string.renamed)
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && error is SecurityException -> {
                     val request = MediaStore.createWriteRequest(context.contentResolver, listOf(uri))
-                    launchSender(IntentSenderRequest.Builder(request.intentSender).build()) { ok ->
+                    ask(IntentSenderRequest.Builder(request.intentSender).build()) { ok ->
                         if (ok) scope.launch {
                             val retry = withContext(Dispatchers.IO) { runCatching { update(uri, newName) } }
                             if (retry.isSuccess) done(R.string.renamed) else failed(R.string.rename_failed)
@@ -130,7 +130,7 @@ class FileActions internal constructor(
                         }
                     }
                 }
-                error is RecoverableSecurityException -> launchSender(
+                error is RecoverableSecurityException -> ask(
                     IntentSenderRequest.Builder(error.userAction.actionIntent.intentSender).build(),
                 ) { ok -> if (ok) rename(video, newName) else failed(R.string.rename_denied) }
                 else -> failed(R.string.rename_failed)
@@ -142,6 +142,12 @@ class FileActions internal constructor(
         write?.let { return it(uri, name) }
         val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, name) }
         if (context.contentResolver.update(uri, values, null, null) != 1) error("not renamed")
+    }
+
+    /** US-71.2: every system access prompt comes with the reason, in one line. */
+    private fun ask(request: IntentSenderRequest, then: (Boolean) -> Unit) {
+        notify(R.string.write_access_reason)
+        launchSender(request, then)
     }
 
     private fun done(message: Int) {
@@ -166,8 +172,6 @@ fun rememberFileActions(onChanged: () -> Unit): FileActions {
         FileActions(
             context,
             { request, then ->
-                // US-71.2: every system access prompt comes with the reason, in one line.
-                Toast.makeText(context, R.string.write_access_reason, Toast.LENGTH_LONG).show()
                 pending = then
                 launcher.launch(request)
             },

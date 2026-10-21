@@ -45,7 +45,7 @@ class NoTrafficUiTest {
         return false
     }
 
-    @Ears("NF-8")
+    @Ears("NF-8", "US-72.3")
     @Test fun localUseSendsAndReceivesNothing() {
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         val uid = Process.myUid()

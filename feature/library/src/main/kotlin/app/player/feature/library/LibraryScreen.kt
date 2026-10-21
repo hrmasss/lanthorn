@@ -230,7 +230,7 @@ fun LibraryRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LibraryHome(
+internal fun LibraryHome(
     state: LibraryUiState,
     vm: LibraryViewModel,
     loaders: Pair<ThumbnailLoader, VideoProbe>,
