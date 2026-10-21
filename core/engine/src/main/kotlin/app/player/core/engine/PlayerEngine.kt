@@ -535,7 +535,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val SURFACE_WAIT_MS = 1000L
         // A newer seek cancels the one in flight, so replacing slow seeks early means no frame ever
         // lands on a slow decoder. Wait this long for a seek to finish before giving up on it.
-        private const val SCRUB_STALL_MS = 1500L
+        private const val SCRUB_STALL_MS = 5000L
         private const val SCRUB_REFINE_MS = 1500L
 
         /**
