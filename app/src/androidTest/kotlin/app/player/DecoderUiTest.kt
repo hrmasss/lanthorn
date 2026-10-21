@@ -102,9 +102,12 @@ class DecoderUiTest {
             showControls()
             retrying { device.findObject(By.desc("More options"))?.click() }
             // On smaller screens the entry can sit below the fold of the menu.
-            val entry = device.wait(Until.findObject(By.text(label)), 1500)
-                ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
-            if (entry != null && retrying { entry.click() } != null) {
+            val entry = retrying {
+                device.wait(Until.findObject(By.text(label)), 1500)
+                    ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
+            }
+            // Find it again on each try: a recomposed menu leaves the old node stale.
+            if (entry != null && retrying { (device.findObject(By.text(label)) ?: entry).click() } != null) {
                 SystemClock.sleep(1200)
                 return
             }

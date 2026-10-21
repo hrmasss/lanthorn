@@ -86,6 +86,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect ${{ matrix.audio && ' ' || '-noaudio' }} -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            adb logcat -G 16M || true
             adb logcat -c || true
             # A fresh AVD shows a one-time "Viewing full screen" prompt over the player that takes the taps.
             adb shell settings put secure immersive_mode_confirmations confirmed || true
