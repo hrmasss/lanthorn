@@ -11,8 +11,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: instrumented-${{ github.ref }}
-  cancel-in-progress: true
+  # Same rule as CI: every main commit runs to completion, branch pushes cancel older runs.
+  group: instrumented-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'branch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   instrumented:
