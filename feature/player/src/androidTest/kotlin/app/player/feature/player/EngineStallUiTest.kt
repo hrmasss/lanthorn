@@ -150,7 +150,7 @@ class EngineStallUiTest {
     }
 
     private companion object {
-        /** The watchdog's 3 s bound plus the hand-over to the new engine. */
-        const val REPLACED_WITHIN_MS = 6_000L
+        /** From the stall: the watchdog's 3 s bound, the UI checks above, and the hand-over. */
+        const val REPLACED_WITHIN_MS = 10_000L
     }
 }

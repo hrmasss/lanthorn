@@ -516,14 +516,17 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         if (ms < STALL_MS) return
         val s = _state.value
         val stack = engineThread?.stackTrace?.take(12)?.joinToString("\n") { "  at $it" }
-        if (s.uri == null || (s.activeDecoder != ActiveDecoder.HW && s.activeDecoder != ActiveDecoder.HW_PLUS)) {
+        // Hardware runs, or was just asked for (a live switch can stall while MediaCodec opens).
+        val onHardware = s.activeDecoder == ActiveDecoder.HW || s.activeDecoder == ActiveDecoder.HW_PLUS
+        if (s.uri == null || (!onHardware && s.decoderMode == DecoderMode.SW)) {
             // Software decoding has no other decoder to fall to: say so once.
             if (!swStallLogged) Log.w(TAG, "engine thread busy $ms ms on ${s.activeDecoder.label}, no fallback; at:\n$stack")
             swStallLogged = true
             return
         }
-        Log.w(TAG, "engine stalled $ms ms on ${s.activeDecoder.label} at ${s.positionMs} ms: recovering on SW; engine thread at:\n$stack")
-        _stalled.value = Stall(s.uri, s.positionMs, s.paused, s.activeDecoder)
+        Log.w(TAG, "engine stalled $ms ms on ${s.activeDecoder.label} (chosen ${s.decoderMode}) at ${s.positionMs} ms: recovering on SW; engine thread at:\n$stack")
+        val decoder = if (onHardware) s.activeDecoder else s.decoderMode.intended ?: ActiveDecoder.HW
+        _stalled.value = Stall(s.uri, s.positionMs, s.paused, decoder)
     }
 
     /**
