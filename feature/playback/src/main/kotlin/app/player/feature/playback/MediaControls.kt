@@ -25,6 +25,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
 import app.player.core.engine.PlaybackService
 import app.player.core.engine.PlayerEngine
 import kotlinx.coroutines.CoroutineScope
@@ -108,7 +109,7 @@ internal class MediaControls(
             // Keys from a headset or Bluetooth while the player is not in front (in front, the
             // activity sees them first through Playback.onKey).
             override fun onMediaButtonEvent(intent: Intent): Boolean {
-                val key = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
+                val key = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_KEY_EVENT, KeyEvent::class.java) ?: return false
                 return Playback.mediaKey(key)
             }
         }, main)
