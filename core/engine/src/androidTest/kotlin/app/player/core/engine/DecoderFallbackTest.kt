@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -100,34 +101,48 @@ class DecoderFallbackTest {
     /** A live switch to HW+: if it comes up, no notice at any point while mpv tries it; if not, notice and badge agree (P1.9 finding). */
     @Ears("US-35.3")
     @Test fun switchToHwPlusNoticeMatchesBadge_US35_3(): Unit = runBlocking {
-        engine.open(asset("clip.mp4"), decoder = DecoderMode.SW)
-        withTimeout(10_000) { engine.state.first { it.video != null } }
+        // The hosted emulator's MediaCodec can stop answering after the switch, and mpv then holds
+        // the engine thread: neither outcome can show. Try once more on a fresh engine before
+        // giving up on this run.
+        if (hwPlusSwitch(engine)) return@runBlocking
+        val second = PlayerEngine(context)
+        try {
+            if (hwPlusSwitch(second)) return@runBlocking
+        } finally {
+            second.release()
+        }
+        // The watchdog caught both (in the app, PlayerSessions then replaces the engine on SW:
+        // EngineStallUiTest). The notice judgement itself is not tested on this run, so the test
+        // is skipped, with a warning, not passed.
+        assumeTrue("WARNING: HW+ decoder stalled after the switch twice; the watchdog caught it", false)
+    }
+
+    /** One SW to HW+ switch on [e]. False when the decoder stalled, so nothing could be judged. */
+    private suspend fun hwPlusSwitch(e: PlayerEngine): Boolean = coroutineScope {
+        e.open(asset("clip.mp4"), decoder = DecoderMode.SW)
+        withTimeout(10_000) { e.state.first { it.video != null } }
         // Every state the switch passes through, so a failure says what mpv did.
         val seen = CopyOnWriteArrayList<String>()
         val watch = launch(Dispatchers.Default) {
-            engine.state.collect { s -> "${s.activeDecoder.label}/${s.decoderNotice}".let { if (seen.lastOrNull() != it) seen += it } }
+            e.state.collect { s -> "${s.activeDecoder.label}/${s.decoderNotice}".let { if (seen.lastOrNull() != it) seen += it } }
         }
-        engine.setDecoder(DecoderMode.HW_PLUS)
-        val cameUp = withTimeoutOrNull(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.HW_PLUS } } != null
+        e.setDecoder(DecoderMode.HW_PLUS)
+        val cameUp = withTimeoutOrNull(10_000) { e.state.first { it.activeDecoder == ActiveDecoder.HW_PLUS } } != null
         delay(2000)
         watch.cancel()
         Log.i("P1.1", "switch SW to HW+: $seen")
-        val notice = engine.state.value.decoderNotice
+        val notice = e.state.value.decoderNotice
         if (cameUp) {
             assertEquals("a notice showed though HW+ came up: $seen", emptyList<String>(), seen.filterNot { it.endsWith("/null") })
-        } else if (notice == null && engine.get("pause", PropertyType.Flag) == null) {
-            // The hosted emulator's MediaCodec can stop answering after the switch, and mpv then
-            // holds the engine thread: neither outcome can show here. The watchdog must have caught
-            // it (in the app, PlayerSessions then replaces the engine on SW: EngineStallUiTest).
-            // The notice judgement itself is not tested on this run, so the test is skipped, with a
-            // warning, not passed.
-            withTimeout(PlayerEngine.STALL_MS + 2_000) { engine.stalled.first { it != null } }
-            Log.w("P1.1", "WARNING skipped: HW+ decoder stalled after the switch, watchdog reported ${engine.stalled.value}; states $seen")
-            assumeTrue("WARNING: HW+ decoder stalled after the switch; the watchdog caught it: $seen", false)
+        } else if (notice == null && e.get("pause", PropertyType.Flag) == null) {
+            withTimeout(PlayerEngine.OPEN_STALL_MS + 2_000) { e.stalled.first { it != null } }
+            Log.w("P1.1", "WARNING: HW+ decoder stalled after the switch, watchdog reported ${e.stalled.value}; states $seen")
+            return@coroutineScope false
         } else {
             // HW+ cannot play this file here: then the notice must say so and the badge must agree.
             assertEquals("states $seen", "HW+ cannot play this video. Playing with SW.", notice)
-            assertEquals("states $seen", ActiveDecoder.SW, engine.state.value.activeDecoder)
+            assertEquals("states $seen", ActiveDecoder.SW, e.state.value.activeDecoder)
         }
+        true
     }
 }
