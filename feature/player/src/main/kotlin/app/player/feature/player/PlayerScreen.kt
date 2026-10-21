@@ -105,6 +105,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
+private val Main = Dispatchers.Main.immediate
+
 /** The player's own panels. Feature panels use their own ids. */
 internal object OwnPanel {
     const val MENU = "player-menu"
@@ -145,11 +147,14 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
+    // Engine flows change on mpv's thread. Collecting on Main keeps the resumed collector, and any
+    // frame it triggers, off that thread (under the test clock a frame ran there and broke the
+    // slot table).
     // Engine's paused flag is right after open since 9004c23; read it as it is.
-    val state by engine.state.collectAsStateWithLifecycle()
-    val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
+    val state by engine.state.collectAsStateWithLifecycle(context = Main)
+    val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle(context = Main)
     val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
-        .collectAsStateWithLifecycle()
+        .collectAsStateWithLifecycle(context = Main)
     val talkBack = rememberTalkBackOn()
     var controls by controlsState
     var openPanel by remember { mutableStateOf<String?>(null) }
@@ -161,10 +166,10 @@ fun PlayerScreen(
     var screenshotRequests by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<Note?>(null) }
     val tools = remember(engine) { PlaybackTools(engine) }
-    val sleep by SleepTimer.running.collectAsStateWithLifecycle()
-    val abA by remember(engine) { tools.abA }.collectAsStateWithLifecycle()
-    val abB by remember(engine) { tools.abB }.collectAsStateWithLifecycle()
-    val chapterCount by remember(engine) { tools.chapterCount }.collectAsStateWithLifecycle()
+    val sleep by SleepTimer.running.collectAsStateWithLifecycle(context = Main)
+    val abA by remember(engine) { tools.abA }.collectAsStateWithLifecycle(context = Main)
+    val abB by remember(engine) { tools.abB }.collectAsStateWithLifecycle(context = Main)
+    val chapterCount by remember(engine) { tools.chapterCount }.collectAsStateWithLifecycle(context = Main)
     val chapters by produceState(emptyList<Chapter>(), state.uri, chapterCount, state.loaded) { value = tools.chapters() }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
     val video = remember(engine) { VideoTools(engine, context) }
@@ -257,18 +262,18 @@ fun PlayerScreen(
     val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
     val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
     val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
-    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
-    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
-    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle()
-    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle()
+    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle(context = Main)
+    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle(context = Main)
+    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle(context = Main)
+    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle(context = Main)
     // While locked, playback's Overlay owns every touch and the controls stay hidden (US-28).
-    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle()
+    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle(context = Main)
     LaunchedEffect(locked) { if (locked) { controls = false; openPanel = null } }
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
-    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle()
+    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle(context = Main)
     val hasChapters = chapters.isNotEmpty()
     val items = remember(entries, hasChapters) {
         val own = listOfNotNull(
@@ -594,7 +599,7 @@ private val FitMode.label get() = when (this) {
 /** "Sleep timer", or "Sleep timer · 12:30 left" while one runs (US-26.3). */
 @Composable
 private fun sleepLabel(): String {
-    val running by SleepTimer.running.collectAsStateWithLifecycle()
+    val running by SleepTimer.running.collectAsStateWithLifecycle(context = Main)
     return running?.let { stringResource(R.string.tool_sleep_left, SleepTimer.format(rememberLeft(it))) }
         ?: stringResource(R.string.tool_sleep)
 }
