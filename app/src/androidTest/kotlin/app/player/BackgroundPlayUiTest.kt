@@ -98,7 +98,8 @@ class BackgroundPlayUiTest {
         val back = state()!!
         log("video back after ${back.videoBackMs} ms at ${back.positionMs} ms")
         // The picture itself, not only the engine's word: the screen's middle shows a frame.
-        assertTrue("no picture on the screen after coming back", waitFor(3_000) { pictureShown() })
+        // Two looks 500 ms apart, so a frame that flashes up before the video is set up does not count.
+        assertTrue("no picture on the screen after coming back", waitFor(5_000) { pictureShown() && SystemClock.sleep(500).let { pictureShown() } })
         evidenceShot("back-in-player")
         assertTrue("engine replaced on return", PlayerSessions.current.value === engine)
         assertTrue("reloaded from the start: ${back.positionMs} ms", back.positionMs >= away.positionMs)
@@ -107,22 +108,23 @@ class BackgroundPlayUiTest {
         if (!lenient) assertTrue("video back after ${back.videoBackMs} ms", back.videoBackMs!! <= 500)
     }
 
-    /** True when the middle third of the screen has more than a few non-black pixels. */
+    /** True when the middle third of the screen shows a picture: many different colours, not one flat fill. */
     private fun pictureShown(): Boolean {
         val taken = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return false
         // Screenshots can come as hardware bitmaps, which cannot be read pixel by pixel.
         val shot = if (taken.config == android.graphics.Bitmap.Config.HARDWARE) taken.copy(android.graphics.Bitmap.Config.ARGB_8888, false).also { taken.recycle() } else taken
         try {
-            var lit = 0
-            var seen = 0
+            val colours = mutableSetOf<Int>()
             for (x in shot.width / 3 until shot.width * 2 / 3 step 16) for (y in shot.height / 3 until shot.height * 2 / 3 step 16) {
-                val c = shot.getPixel(x, y)
-                if (((c shr 16) and 0xff) + ((c shr 8) and 0xff) + (c and 0xff) > 60) lit++
-                seen++
+                // Coarse buckets, 4 levels a channel, so noise does not count as colour.
+                colours += shot.getPixel(x, y).let { c -> (((c shr 22) and 3) shl 4) or (((c shr 14) and 3) shl 2) or ((c shr 6) and 3) }
             }
-            return lit * 10 > seen
+            return colours.size >= PICTURE_COLOURS
         } finally {
             shot.recycle()
         }
     }
 }
+
+/** Distinct colour buckets in the middle third that make a picture (the test clip has a colour pattern). */
+private const val PICTURE_COLOURS = 4
