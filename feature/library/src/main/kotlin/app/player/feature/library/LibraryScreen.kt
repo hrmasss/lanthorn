@@ -140,7 +140,7 @@ fun LibraryRoute(
     NavHost(nav, startDestination = "home") {
         composable("home") {
             LibraryHome(
-                state, vm, loaders, onPlay, onPlayQueue,
+                state, vm, loaders, onPlay, onPlayQueue, onPlayWith,
                 onAccessResult = { permanentlyDenied = it },
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onFolderSettings = { nav.navigate("folder-settings") },
@@ -159,7 +159,7 @@ fun LibraryRoute(
         composable("folder?key={key}", listOf(navArgument("key") { type = NavType.StringType })) { entry ->
             val key = entry.arguments?.getString("key").orEmpty()
             FolderScreen(
-                key, state, vm, loaders, onPlay, onPlayQueue,
+                key, state, vm, loaders, onPlay, onPlayQueue, onPlayWith,
                 onFolder = { nav.navigate("folder?key=" + Uri.encode(it.key)) },
                 onSearch = { nav.navigate("search") },
                 onBack = { nav.popBackStack() },
@@ -220,6 +220,7 @@ private fun LibraryHome(
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
     onPlayQueue: (List<Uri>, Int) -> Unit,
+    onPlayWith: (List<Uri>, DecoderMode) -> Unit,
     onAccessResult: (permanentlyDenied: Boolean) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onFolderSettings: () -> Unit,
@@ -332,6 +333,7 @@ private fun FolderScreen(
     loaders: Pair<ThumbnailLoader, VideoProbe>,
     onPlay: (Uri) -> Unit,
     onPlayQueue: (List<Uri>, Int) -> Unit,
+    onPlayWith: (List<Uri>, DecoderMode) -> Unit,
     onFolder: (LibraryFolder) -> Unit,
     onSearch: () -> Unit,
     onBack: () -> Unit,
