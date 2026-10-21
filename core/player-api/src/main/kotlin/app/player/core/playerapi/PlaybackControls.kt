@@ -1,6 +1,8 @@
 package app.player.core.playerapi
 
 import android.content.Intent
+import android.view.KeyEvent
+import androidx.activity.ComponentActivity
 import android.net.Uri
 import android.os.Build
 import app.player.core.engine.PlayerEngine
@@ -20,6 +22,15 @@ interface PlaybackControls {
      * list" on (US-24.5). Returns false when the intent has nothing to play.
      */
     fun open(engine: PlayerEngine, intent: Intent, onClose: () -> Unit): Boolean
+
+    /**
+     * Called once by the player activity in onCreate, after [open]. Playback registers what it needs
+     * through ComponentActivity's listeners: orientation, picture-in-picture, the leave hint.
+     */
+    fun attach(activity: ComponentActivity) {}
+
+    /** Called first from the player activity's dispatchKeyEvent. True when playback consumed it. */
+    fun onKey(event: KeyEvent): Boolean = false
 
     val hasPrevious: StateFlow<Boolean> get() = OFF
     val hasNext: StateFlow<Boolean> get() = OFF

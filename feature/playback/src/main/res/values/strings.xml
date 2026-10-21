@@ -44,4 +44,27 @@
     <string name="setting_step_buttons">Step buttons</string>
     <string name="setting_step_buttons_summary">Back and forward buttons beside play</string>
     <string name="setting_show_previous_next">Previous and next buttons</string>
+
+    <string name="pip_play">Play</string>
+    <string name="pip_pause">Pause</string>
+    <string name="pip_back">Back 10 seconds</string>
+    <string name="pip_forward">Forward 10 seconds</string>
+    <string name="unlock">Unlock</string>
+    <string name="kids_lock_hint">Kids lock. Tap the four corners clockwise from top left to unlock.</string>
+
+    <string name="settings_section_screen">Screen</string>
+    <string name="setting_lock_mode">Lock button</string>
+    <string name="lock_mode_lock">Lock, unlock with a button</string>
+    <string name="lock_mode_kids">Kids lock, unlock by tapping the four corners</string>
+    <string name="setting_orientation">Orientation</string>
+    <string name="orientation_follow">Follow the video</string>
+    <string name="orientation_landscape">Landscape</string>
+    <string name="orientation_reverse">Reverse landscape</string>
+    <string name="orientation_sensor_landscape">Landscape, turns with the phone</string>
+    <string name="orientation_sensor">Turns with the phone</string>
+    <string name="orientation_system">As the system is set</string>
+    <string name="setting_on_leave">On leaving the app</string>
+    <string name="on_leave_pip">Keep playing in a small window</string>
+    <string name="on_leave_background">Keep playing the sound</string>
+    <string name="on_leave_stop">Pause</string>
 </resources>

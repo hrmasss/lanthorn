@@ -9,10 +9,17 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import android.os.SystemClock
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -58,6 +65,9 @@ object PlaybackExtension : PlayerExtension {
         },
     )
 
+    /** How long "Unlock" stays after a touch while locked (US-28.1). */
+    const val UNLOCK_SHOWN_MS = 3_000L
+
     /** How long a skip note stays (US-75.2). */
     const val NOTE_MS = 2_000L
 
@@ -66,6 +76,12 @@ object PlaybackExtension : PlayerExtension {
 
     @Composable
     override fun Overlay(host: PanelHost) {
+        val locked by Playback.locked.collectAsState()
+        val settings by Playback.settings.collectAsState()
+        if (locked) {
+            LockLayer(kids = settings.lockMode == LockMode.Kids)
+            return
+        }
         val ask by Playback.ask.collectAsState()
         val startOver by Playback.startOver.collectAsState()
         ask?.takeIf { it.engine === host.engine }?.let { a ->
@@ -194,6 +210,58 @@ private object QueuePanel : PlayerPanel {
                 trailingContent = { Switch(s.shuffle, onCheckedChange = null) },
                 modifier = Modifier.toggleable(s.shuffle, role = Role.Switch) { Playback.setShuffle(it) }.testTag("shuffle"),
             )
+        }
+    }
+}
+
+/**
+ * While locked (US-28): every touch lands here and nothing reaches the video or the controls. Lock
+ * shows "Unlock" for 3 s after each touch (US-28.1); kids lock shows nothing and unlocks after the
+ * four corners, clockwise from top left, within 5 s (US-28.2).
+ */
+@Composable
+private fun LockLayer(kids: Boolean) {
+    var touchedAt by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var showUnlock by remember { mutableStateOf(!kids) }
+    val corners = remember { KidsUnlock() }
+    LaunchedEffect(touchedAt, kids) {
+        showUnlock = !kids
+        delay(PlaybackExtension.UNLOCK_SHOWN_MS)
+        showUnlock = false
+    }
+    val hint = stringResource(if (kids) R.string.kids_lock_hint else R.string.unlock)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .testTag("lock-layer")
+            .semantics { contentDescription = hint }
+            .pointerInput(kids) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                    val now = SystemClock.elapsedRealtime()
+                    if (kids) {
+                        if (corners.tap(down.position.x / size.width, down.position.y / size.height, now)) Playback.unlock()
+                    } else {
+                        touchedAt = now
+                    }
+                }
+            },
+    ) {
+        if (showUnlock) {
+            Surface(
+                onClick = { Playback.unlock() },
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.6f),
+                contentColor = Color.White,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp).testTag("unlock"),
+            ) {
+                Text(stringResource(R.string.unlock), Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            }
         }
     }
 }

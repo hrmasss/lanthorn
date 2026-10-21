@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -48,6 +49,7 @@ class PlayerActivity : ComponentActivity() {
         // For automation and until P1.15's setting lands: --ez app.player.background true.
         if (intent.hasExtra(EXTRA_BACKGROUND)) PlayerSessions.keepPlayingInBackground = intent.getBooleanExtra(EXTRA_BACKGROUND, false)
         if (savedInstanceState == null) open(intent)
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.attach(this)
         setContent {
             LanthornPlayerTheme {
                 PlayerScreen(engine, extensions = extensions, settings = PlayerSettings.get(this), onDecoderPicked = { mode ->
@@ -77,6 +79,9 @@ class PlayerActivity : ComponentActivity() {
         val uri = intent.data ?: return
         lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        playerExtensions.firstNotNullOfOrNull { it.playback }?.onKey(event) == true || super.dispatchKeyEvent(event)
 
     override fun onStart() {
         super.onStart()
