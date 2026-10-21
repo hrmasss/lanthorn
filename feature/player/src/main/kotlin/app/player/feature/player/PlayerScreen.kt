@@ -173,6 +173,7 @@ fun PlayerScreen(
     val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
     val currentControls by rememberUpdatedState(controls)
     val windowBrightness = brightness
+    val currentPreview by rememberUpdatedState(preview)
     val gestures = remember(engine) {
         GestureController(object : GestureEffects {
             override val positionMs get() = engine.state.value.positionMs
@@ -180,7 +181,22 @@ fun PlayerScreen(
             override val paused get() = engine.state.value.paused
             override val speed get() = engine.observe("speed", PropertyType.Real).value ?: 1.0
             override val controlsShown get() = currentControls
-            override fun seek(ms: Long, exact: Boolean) = engine.seekTo(ms, exact)
+            // A swipe uses the seek bar's path: scrub while the finger moves (the preview frame
+            // shows when it is on, US-17.3, US-30.1), one exact seek on release (US-17.2).
+            override fun seek(ms: Long, exact: Boolean) {
+                if (exact) {
+                    if (scrubbing) {
+                        scrubbing = false
+                        engine.endScrub(ms)
+                    } else {
+                        engine.seekTo(ms, exact = true)
+                    }
+                } else {
+                    scrubbing = true
+                    scrubTargetMs = ms
+                    if (currentPreview == null) engine.scrub(ms)
+                }
+            }
             override fun togglePause() = engine.togglePause()
             override fun pause() = engine.pause()
             override fun setSpeed(speed: Double) = tools.setSpeed(speed)
