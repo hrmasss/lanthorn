@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Test only: the fake subtitle service on 127.0.0.1 speaks plain HTTP. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- The real-settings test starts the app (package visibility, Android 11+). -->
     <queries>
         <package android:name="app.player" />
     </queries>
     <!-- Test only: puts a video in shared storage through MediaStore, as the library finds them. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <application>
+    <application android:usesCleartextTraffic="true">
         <activity android:name="app.player.feature.subtitles.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
         <activity android:name="app.player.feature.subtitles.SettingsTestActivity" android:exported="false" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
