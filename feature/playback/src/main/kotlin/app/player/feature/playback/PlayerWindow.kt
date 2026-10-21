@@ -21,12 +21,13 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import app.player.core.engine.PlayerEngine
-import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -41,7 +42,10 @@ internal class PlayerWindow(
 ) {
     /** Set by the rotate button and held until the player closes (US-56.2). */
     private var rotated: Int? = null
-    private var inPip = false
+    var inPip = false
+        private set
+    /** Paused by the covered check, cleared when the player is in front again. */
+    private var coveredCheck: Job? = null
 
     fun start() {
         activity.lifecycleScope.launch {
@@ -53,12 +57,9 @@ internal class PlayerWindow(
                         .collect { (video, r, mode) -> applyOrientation(mode, video?.width ?: 0, video?.height ?: 0, r.toInt()) }
                 }
                 launch {
-                    combine(engine.state, settings) { s, set -> PipKey(s.paused, s.video?.width ?: 0, s.video?.height ?: 0, set.onLeave) }
+                    combine(engine.state, settings, Playback.backgroundPlay) { s, set, bg -> PipKey(s.paused, s.video?.width ?: 0, s.video?.height ?: 0, leaveMode(set, bg)) }
                         .distinctUntilChanged()
                         .collect { updatePip(it) }
-                }
-                launch {
-                    settings.collect { PlayerSessions.keepPlayingInBackground = it.onLeave == OnLeave.Background }
                 }
             }
         }
@@ -71,6 +72,26 @@ internal class PlayerWindow(
             if (Build.VERSION.SDK_INT < 31 && wantsPip()) enterPip()
         }
         activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // Pause when covered (US-60.2): another window on top pauses the activity without
+            // stopping it. Checked a moment later, once PiP has started if leaving starts it.
+            // Background play keeps going when covered, as it does when the player is left.
+            override fun onPause(owner: LifecycleOwner) {
+                if (!settings.value.pauseWhenCovered || activity.isFinishing || activity.isChangingConfigurations) return
+                coveredCheck = activity.lifecycleScope.launch {
+                    delay(COVERED_CHECK_MS)
+                    val covered = !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                        !inPip && !activity.isInPictureInPictureMode && !activity.isFinishing
+                    if (covered && leaveMode() != OnLeave.Background && !engine.state.value.paused) {
+                        engine.pause()
+                        Log.i(TAG, "covered by another window, paused")
+                    }
+                }
+            }
+
+            override fun onResume(owner: LifecycleOwner) {
+                coveredCheck?.cancel()
+            }
+
             override fun onStop(owner: LifecycleOwner) {
                 // The PiP window was closed: stop (the activity pauses and saves the position) and
                 // close the player, so it does not linger in recents (US-58.4).
@@ -120,9 +141,16 @@ internal class PlayerWindow(
         }
     }
 
+    /** What leaving does now: the setting, unless background play was switched from the menu (US-59.1). */
+    private fun leaveMode(set: PlaybackSettings = settings.value, background: Boolean = Playback.backgroundPlay.value): OnLeave = when {
+        background -> OnLeave.Background
+        set.onLeave == OnLeave.Background -> OnLeave.Stop
+        else -> set.onLeave
+    }
+
     private data class PipKey(val paused: Boolean, val width: Int, val height: Int, val onLeave: OnLeave)
 
-    private fun wantsPip() = settings.value.onLeave == OnLeave.Pip && !engine.state.value.paused && engine.state.value.video != null
+    private fun wantsPip() = leaveMode() == OnLeave.Pip && !engine.state.value.paused && engine.state.value.video != null
 
     private fun updatePip(key: PipKey) {
         if (!activity.packageManager.hasSystemFeature("android.software.picture_in_picture")) return
@@ -132,7 +160,7 @@ internal class PlayerWindow(
     /** Enters PiP now, for the leave hint and the player's PiP button. False when refused. */
     fun enterPip(): Boolean {
         val s = engine.state.value
-        return runCatching { activity.enterPictureInPictureMode(params(PipKey(s.paused, s.video?.width ?: 0, s.video?.height ?: 0, settings.value.onLeave))) }
+        return runCatching { activity.enterPictureInPictureMode(params(PipKey(s.paused, s.video?.width ?: 0, s.video?.height ?: 0, leaveMode()))) }
             .onFailure { Log.w(TAG, "picture-in-picture refused", it) }
             .getOrDefault(false)
     }
@@ -188,6 +216,8 @@ internal class PlayerWindow(
         const val PLAY = 1
         const val PAUSE = 2
         const val BACK = 3
+        /** Long enough for PiP to start when leaving starts it. */
+        const val COVERED_CHECK_MS = 300L
         const val FORWARD = 4
         const val STEP_MS = 10_000L
         const val MIN_ASPECT = 1 / 2.39f

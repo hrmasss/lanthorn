@@ -74,4 +74,16 @@
     <string name="on_leave_pip">Keep playing in a small window</string>
     <string name="on_leave_background">Keep playing the sound</string>
     <string name="on_leave_stop">Pause</string>
+    <string name="setting_pause_when_covered">Pause when covered</string>
+    <string name="setting_pause_when_covered_summary">Pause when another window covers the player</string>
+    <string name="setting_volume_keys">Volume keys change</string>
+    <string name="volume_keys_volume">Volume</string>
+    <string name="volume_keys_brightness">Brightness</string>
+    <string name="setting_next_previous_seek">Next and previous keys seek</string>
+    <string name="setting_next_previous_seek_summary">Headset and media keys skip forward and back by the step instead of changing video</string>
+    <string name="media_channel">Playback</string>
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_previous">Previous</string>
+    <string name="media_next">Next</string>
 </resources>

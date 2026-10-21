@@ -25,3 +25,4 @@ One line each: id, owner, why. Add your own; keep the reason concrete.
 | US-54.1 | player-ui | Every ratio is drawn and measured on the emulator; "within one frame" needs the phone's frame timing. |
 | US-57.1 | player-ui | Mirror and flip are pixel-checked on the emulator; "within one frame" needs the phone's frame timing. |
 | US-57.3 | player-ui | Range, steps and the identical frame at zero on the emulator; the 100 ms bound is the phone's. |
+| US-31.2 | player-ui | Pause within 200 ms of a headset or Bluetooth disconnect: the emulator has nothing to unplug, and only the system may send the "becoming noisy" broadcast. |

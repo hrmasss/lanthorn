@@ -34,6 +34,9 @@ interface PlaybackControls {
     /** Called first from the player activity's onKeyDown and onKeyUp. True when playback consumed it. */
     fun onKey(event: KeyEvent): Boolean = false
 
+    /** Called once by the player screen with what it offers playback: brightness steps, the seek step. */
+    fun attachChrome(chrome: PlayerChrome) {}
+
     val hasPrevious: StateFlow<Boolean> get() = OFF
     val hasNext: StateFlow<Boolean> get() = OFF
     fun previous() {}
@@ -117,4 +120,13 @@ object PlayerIntents {
         .setPackage(context.packageName).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
     const val ACTION_SHOW_INFO = "app.player.action.SHOW_INFO"
+}
+
+/** What the player screen (player-ui) offers playback (P1.15). */
+interface PlayerChrome {
+    /** Window brightness one step (5%) up or down, with the brightness level bar (US-77.1). */
+    fun stepBrightness(up: Boolean)
+
+    /** The step of the back and forward buttons (US-29.2), for next and previous keys as seeks (US-31.4). */
+    val seekStepMs: Long
 }
