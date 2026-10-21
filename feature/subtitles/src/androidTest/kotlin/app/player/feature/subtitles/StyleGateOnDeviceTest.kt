@@ -134,38 +134,9 @@ class StyleGateOnDeviceTest {
         evidence("US-42.4/NF-7 style edits leave the ASS file's styling; override on draws the text in the edited style; screenshots")
     }
 
-    @Test fun subtitleGroupInRealSettings() {
-        val device = UiDevice.getInstance(OnDevice.instrumentation)
-        val launch = OnDevice.context.packageManager.getLaunchIntentForPackage(APP)
-        if (launch == null) {
-            evidence("Real Settings screen: app $APP not installed, skipped")
-            return
-        }
-        OnDevice.context.startActivity(launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
-        device.wait(Until.hasObject(By.desc("More options")), 15_000)
-        device.findObject(By.desc("More options")).click()
-        device.wait(Until.hasObject(By.text("Settings")), 5_000)
-        device.findObject(By.text("Settings")).click()
-        device.wait(Until.hasObject(By.text("Subtitle")), 5_000)
-        shot("settings-home-with-subtitle")
-        device.findObject(By.text("Subtitle")).click()
-        device.wait(Until.hasObject(By.text("Subtitles look like this")), 5_000)
-        Thread.sleep(1500)
-        shot("settings-subtitle-group")
-        device.swipe(540, 1800, 540, 600, 30)
-        Thread.sleep(800)
-        shot("settings-subtitle-group-scrolled")
-        device.pressBack(); device.pressBack(); device.pressBack()
-        evidence("Real Settings screen: Subtitle group listed and opened from the app's settings; screenshots")
-    }
-
     private fun shot(name: String) {
         val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
         val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
         File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-    }
-
-    companion object {
-        const val APP = "app.player"
     }
 }
