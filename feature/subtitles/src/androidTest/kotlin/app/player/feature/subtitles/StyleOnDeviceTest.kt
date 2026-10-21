@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.evidenceShot
 import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
@@ -146,8 +147,6 @@ class StyleOnDeviceTest {
 
     /** Why text on the wide clip drew tiny: dump what mpv thinks, compare with the 16:9 clip. */
     private fun shot(name: String) {
-        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
-        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 }
