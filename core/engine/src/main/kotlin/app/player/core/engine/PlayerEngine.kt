@@ -116,9 +116,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             lib.setOptionString("pause", "yes")
             lib.setOptionString("vd-lavc-skiploopfilter", "all")
             lib.setOptionString("vd-lavc-fast", "yes")
-            // Copy-back decoding: the preview surface comes and goes with the finger, and the
-            // zero-copy path would lose HW whenever the file loads before the surface exists.
-            lib.setOptionString("hwdec", DecoderMode.HW_PLUS.hwdec)
+            // Software decoding: an exact seek decodes every frame from the keyframe before the
+            // target, and copying each one back from a hardware decoder made that the slow part.
+            lib.setOptionString("hwdec", DecoderMode.SW.hwdec)
             lib.setOptionString("demuxer-max-bytes", "${8 * 1024 * 1024}")
             lib.setOptionString("demuxer-max-back-bytes", "0")
         }
