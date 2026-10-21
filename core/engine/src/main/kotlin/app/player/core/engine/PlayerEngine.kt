@@ -421,13 +421,18 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private fun mpvCommand(vararg args: String) = mpv?.command(arrayOf(*args))
     private fun setProperty(name: String, value: String) = mpv?.setPropertyString(name, value)
 
-    private fun refreshVideo() {
+    private fun refreshVideo(triesLeft: Int = DECODER_SETTLE_TRIES) {
         val lib = mpv ?: return
-        if (reattachedAt > 0) {
+        if (reattachedAt > 0 && triesLeft == DECODER_SETTLE_TRIES) {
             Log.i(TAG, "video shown again ${SystemClock.elapsedRealtime() - reattachedAt} ms after the surface came back, at ${_state.value.positionMs} ms")
             reattachedAt = 0
         }
-        val codec = lib.getPropertyString("video-format") ?: return
+        // VIDEO_RECONFIG can come before mpv knows the format, and no second one may follow: read
+        // again until it does (or give up: no video track, or video turned off).
+        val codec = lib.getPropertyString("video-format") ?: run {
+            if (triesLeft > 0) thread.schedule({ if (!released) refreshVideo(triesLeft - 1) }, DECODER_SETTLE_STEP_MS, TimeUnit.MILLISECONDS)
+            return
+        }
         val info = VideoInfo(
             codec = codec,
             width = lib.getPropertyInt("video-params/w") ?: 0,
