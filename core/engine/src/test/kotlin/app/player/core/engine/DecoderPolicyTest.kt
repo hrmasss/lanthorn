@@ -15,7 +15,6 @@ class DecoderPolicyTest {
     }
 
     @Ears("US-36.1")
-
     @Test fun orderIsFileThenExtensionThenPreferSoftware() { // US-36.1
         val all = DecoderPrefs(preferSoftware = true, byExtension = mapOf("mkv" to DecoderMode.HW_PLUS))
         assertEquals(DecoderMode.HW, DecoderPolicy.pick(uri, all, remembered = DecoderMode.HW))
@@ -24,7 +23,6 @@ class DecoderPolicyTest {
     }
 
     @Ears("US-36.4")
-
     @Test fun extensionAppliesToEveryFileWithIt() { // US-36.4
         val prefs = DecoderPrefs(byExtension = mapOf("avi" to DecoderMode.SW))
         assertEquals(DecoderMode.SW, DecoderPolicy.pick("file:///sdcard/a.avi", prefs))
@@ -41,7 +39,6 @@ class DecoderPolicyTest {
     }
 
     @Ears("US-36.2")
-
     @Test fun hardwareModesFallThroughInOrder() { // US-36.2: HW, then HW+, then SW
         assertEquals("mediacodec,mediacodec-copy", DecoderMode.HW.hwdec)
         assertEquals("mediacodec-copy", DecoderMode.HW_PLUS.hwdec)
@@ -49,7 +46,6 @@ class DecoderPolicyTest {
     }
 
     @Ears("US-35.4")
-
     @Test fun featuresNeedingCpuFramesAreOffOnHw() { // US-35.4
         assertFalse(DecoderFeature.VideoFilters.runsOn(ActiveDecoder.HW))
         assertTrue(DecoderFeature.VideoFilters.runsOn(ActiveDecoder.HW_PLUS))
@@ -58,7 +54,6 @@ class DecoderPolicyTest {
     }
 
     @Ears("US-35.3")
-
     @Test fun fallbackNoticeOnlyWhenTheChosenDecoderIsNotRunning() { // US-35.3
         assertNull(fallbackNotice(DecoderMode.AUTO, ActiveDecoder.SW))
         assertNull(fallbackNotice(DecoderMode.HW, ActiveDecoder.HW))
