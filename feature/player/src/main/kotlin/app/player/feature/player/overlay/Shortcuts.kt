@@ -117,14 +117,15 @@ internal fun ShortcutsGrid(shown: List<Shortcut>, modifier: Modifier = Modifier,
 @Composable
 internal fun ShortcutsSettings(shown: List<Shortcut>, set: (List<Shortcut>) -> Unit) {
     val order = shown + Shortcut.entries.filter { it !in shown }
-    order.forEachIndexed { i, s ->
+    Column { order.forEach { s ->
         val on = s in shown
+        val name = stringResource(s.label)
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 24.dp, end = 8.dp).testTag("sc-set-${s.name}"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(s.label), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            val up = stringResource(R.string.sc_move_up, stringResource(s.label))
+            Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            val up = stringResource(R.string.sc_move_up, name)
             IconButton(
                 onClick = { set(shown.toMutableList().apply { val j = indexOf(s); removeAt(j); add(j - 1, s) }) },
                 enabled = on && shown.indexOf(s) > 0,
@@ -133,8 +134,9 @@ internal fun ShortcutsSettings(shown: List<Shortcut>, set: (List<Shortcut>) -> U
             Switch(
                 checked = on,
                 onCheckedChange = { v -> set(if (v) shown + s else shown - s) },
-                modifier = Modifier.testTag("sc-on-${s.name}"),
+                // TalkBack reads the shortcut's name on its switch (US-69.1).
+                modifier = Modifier.semantics { contentDescription = name }.testTag("sc-on-${s.name}"),
             )
         }
-    }
+    } }
 }

@@ -1,8 +1,12 @@
 package app.player.feature.player.overlay
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -43,7 +47,12 @@ class MenusTest {
 
     @Test fun `US-32_2 choose and reorder shortcuts`() {
         var shown by mutableStateOf(listOf(Shortcut.Speed, Shortcut.Loop, Shortcut.Mute))
-        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { ShortcutsSettings(shown) { shown = it } } }
+        // Inside a scrolling column, as in the Player settings sheet.
+        rule.setContent {
+            LanthornPlayerTheme(dynamicColor = false) {
+                Column(Modifier.verticalScroll(rememberScrollState())) { ShortcutsSettings(shown) { shown = it } }
+            }
+        }
         rule.onNodeWithTag("sc-up-Loop").performClick()
         assertEquals(listOf(Shortcut.Loop, Shortcut.Speed, Shortcut.Mute), shown)
         rule.onNodeWithTag("sc-on-Mute").performClick()
