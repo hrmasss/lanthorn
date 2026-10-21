@@ -28,7 +28,6 @@ import app.player.core.data.history.ResumePoints
 import app.player.core.engine.PlaybackService
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerSessions
-import app.player.core.playerapi.PlayerChrome
 import app.player.core.playerapi.PlayerIntents
 import app.player.core.testing.Ears
 import app.player.core.testing.evidenceShot
@@ -38,6 +37,7 @@ import app.player.feature.playback.PlaybackPrefs
 import app.player.feature.playback.VolumeKeys
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import kotlin.math.roundToInt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -146,6 +146,8 @@ class BackgroundMediaUiTest {
         SystemClock.sleep(3_000)
         device.pressHome()
         assertTrue("not paused after leaving", waitFor(5_000) { state()?.paused == true })
+        // The last position update can land just after the pause flag.
+        SystemClock.sleep(500)
         val at = state()!!.positionMs
         var row = runBlocking { ResumePoints(context).get(uri.toString()) }
         waitFor(3_000) { row = runBlocking { ResumePoints(context).get(uri.toString()) }; row != null }
@@ -247,19 +249,20 @@ class BackgroundMediaUiTest {
     @Test fun g_volumeKeysChangeBrightnessWhenSetSystemInPip() {
         runBlocking { prefs.setVolumeKeys(VolumeKeys.Brightness) }
         play(listOf("clip420.mp4"))
-        val steps = mutableListOf<Boolean>()
-        // player-ui's chrome draws the level bar; this one records the steps it is asked for.
-        instr.runOnMainSync {
-            Playback.attachChrome(object : PlayerChrome {
-                override fun stepBrightness(up: Boolean) { steps += up }
-                override val seekStepMs = 10_000L
-            })
+        // The player screen's own chrome moves the window brightness 5% a key (the level bar: GestureTest, shot here).
+        fun brightness(): Int {
+            var b = -1f
+            instr.runOnMainSync { b = player()!!.window.attributes.screenBrightness }
+            return (b * 100).roundToInt()
         }
+        instr.runOnMainSync { player()!!.window.attributes = player()!!.window.attributes.apply { screenBrightness = 0.5f } }
         val volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
         key(KeyEvent.KEYCODE_VOLUME_UP)
+        assertTrue("volume up did not step brightness to 55%, at ${brightness()}", waitFor(2_000) { brightness() == 55 })
+        shot("07-volume-key-brightness")
         key(KeyEvent.KEYCODE_VOLUME_DOWN)
-        SystemClock.sleep(500)
-        assertEquals("volume keys did not step brightness", listOf(true, false), steps)
+        key(KeyEvent.KEYCODE_VOLUME_DOWN)
+        assertTrue("volume down did not step brightness to 45%, at ${brightness()}", waitFor(2_000) { brightness() == 45 })
         assertEquals("media volume changed", volume, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
 
         // In PiP the keys are the system's (US-77.2).
@@ -269,7 +272,7 @@ class BackgroundMediaUiTest {
         val down = before > 0
         device.pressKeyCode(if (down) KeyEvent.KEYCODE_VOLUME_DOWN else KeyEvent.KEYCODE_VOLUME_UP)
         assertTrue("volume key in PiP did not change the volume", waitFor(3_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) != before })
-        assertEquals("brightness stepped in PiP", 2, steps.size)
+        assertEquals("brightness stepped in PiP", 45, brightness())
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
     }
 
