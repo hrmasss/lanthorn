@@ -2,6 +2,7 @@ package app.player.feature.playback
 
 import app.player.core.data.PlaybackPosition
 import app.player.core.engine.PlaybackState
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
