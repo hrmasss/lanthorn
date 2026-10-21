@@ -45,15 +45,16 @@ class GestureUiTest {
         val before = engine.state.value.positionMs
         compose.onNodeWithTag("video").performTouchInput {
             down(Offset(width * 0.3f, height * 0.5f))
-            repeat(10) { moveBy(Offset(width * 0.03f, 0f)) }
+            // 10% of the width: about 9 s on the 90 s full-width scale, inside the 20 s clip.
+            repeat(10) { moveBy(Offset(width * 0.01f, 0f)) }
         }
         compose.waitUntil(1_000) { shown("readout-seek") }
         shot("p110-seek-readout")
         compose.onNodeWithTag("video").performTouchInput { up() }
         SystemClock.sleep(800)
         val after = engine.state.value.positionMs
-        log("seek swipe 30% of width: $before -> $after ms (expect about +27 s)")
-        assertTrue(after - before in 20_000..34_000 || after >= engine.state.value.durationMs - 1_000)
+        log("seek swipe 10% of width: $before -> $after ms (expect about +9 s plus playback meanwhile)")
+        assertTrue(after - before in 7_000..13_000)
     }
 
     @Test fun seekBarDragElapsedFollowsFinger() {
