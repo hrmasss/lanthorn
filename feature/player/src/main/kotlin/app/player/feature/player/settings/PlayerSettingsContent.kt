@@ -6,14 +6,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.player.core.data.choice.RememberPerFile
 import app.player.feature.player.R
 import app.player.feature.player.overlay.Shortcut
 import app.player.feature.player.overlay.ShortcutsSettings
 import app.player.feature.player.tools.PlaybackTools
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /**
  * The Player settings group. Shown inside the player (US-65.3) and, once the library's settings
@@ -50,6 +57,18 @@ fun PlayerSettingsContent(prefs: PlayerPrefs, update: ((PlayerPrefs) -> PlayerPr
             74,
             { v -> update { it.copy(defaultSpeed = PlaybackTools.snapSpeed(v.toDouble())) } },
             modifier = Modifier.testTag("set-default-speed"),
+        )
+        // Shared with engine and subs-audio (decoder, tracks, delays); player-ui writes it.
+        val context = LocalContext.current
+        val perFile = remember(context) { RememberPerFile(context) }
+        val rememberOn by perFile.enabled.collectAsStateWithLifecycle(initialValue = true)
+        val scope = rememberCoroutineScope()
+        SwitchRow(
+            stringResource(R.string.settings_remember_choices),
+            rememberOn,
+            { on -> scope.launch { perFile.set(on) } },
+            summary = stringResource(R.string.settings_remember_choices_summary),
+            modifier = Modifier.testTag("set-remember-choices"),
         )
         SwitchRow(
             stringResource(R.string.settings_show_remaining),

@@ -35,7 +35,7 @@ internal fun FitAspectContent(video: VideoState) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp).testTag("fit-panel")) {
         SectionHeader(stringResource(R.string.player_fit))
         FitMode.entries.forEach { m ->
-            RadioRow(stringResource(m.label), video.fit == m, { video.setFit(m) }, Modifier.testTag("fit-${m.name}"))
+            RadioRow(stringResource(m.label), video.fit == m, { video.chooseFit(m) }, Modifier.testTag("fit-${m.name}"))
         }
         SectionHeader(stringResource(R.string.video_aspect))
         val presets = VideoTools.ASPECTS

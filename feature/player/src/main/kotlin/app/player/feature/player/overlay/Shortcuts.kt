@@ -79,7 +79,7 @@ class ShortcutState(val active: Boolean, val onClick: (() -> Unit)?)
 
 /** The shortcuts grid (US-32.1): one round toggle per shortcut, its state shown by its fill. */
 @Composable
-internal fun ShortcutsGrid(shown: List<Shortcut>, state: (Shortcut) -> ShortcutState, modifier: Modifier = Modifier) {
+internal fun ShortcutsGrid(shown: List<Shortcut>, modifier: Modifier = Modifier, state: (Shortcut) -> ShortcutState) {
     FlowRow(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("shortcuts"),
         horizontalArrangement = Arrangement.spacedBy(4.dp),

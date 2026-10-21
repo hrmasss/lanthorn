@@ -94,6 +94,7 @@ import app.player.feature.player.gesture.Readout
 import app.player.feature.player.gesture.playerGestures
 import android.media.AudioManager
 import androidx.compose.animation.core.snap
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
@@ -107,10 +108,13 @@ import app.player.feature.player.overlay.SleepContent
 import app.player.feature.player.overlay.SpeedContent
 import app.player.feature.player.overlay.rememberLeft
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import app.player.core.data.choice.PerFileChoices
 import app.player.feature.player.tools.Deinterlace
 import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private val Main = Dispatchers.Main.immediate
@@ -135,6 +139,9 @@ internal data class Note(val text: String, val durationMs: Long, val action: Pai
 private const val SEEK_STEP_MS = 10_000L
 private const val NOTE_MS = 2_000L
 private const val FIT_NOTE_MS = 1_000L
+
+/** Per-file choice key for the fit mode (docs/specs/03_architecture.md, per-file choices). */
+internal const val FIT_CHOICE = "video.fit"
 private const val SHOT_NOTE_MS = 4_000L
 
 /**
@@ -235,7 +242,7 @@ fun PlayerScreen(
             override fun setZoom(scale: Double) = videoTools.setZoom(scale)
             override fun setPan(x: Double, y: Double) = videoTools.setPan(x, y)
             override fun toggleFitCrop() {
-                video.setFit(if (video.fit == FitMode.Crop) FitMode.Fit else FitMode.Crop)
+                video.chooseFit(if (video.fit == FitMode.Crop) FitMode.Fit else FitMode.Crop)
             }
         })
     }
@@ -337,6 +344,20 @@ fun PlayerScreen(
         }
     }
 
+    // US-53.2: a fit the viewer picks is kept for the file and comes back on its next open,
+    // while "remember choices" is on (the store ignores reads and writes when it is off).
+    val choices = remember(context) { PerFileChoices(context) }
+    val currentUri by rememberUpdatedState(state.uri)
+    val scope = rememberCoroutineScope()
+    video.onFitChosen = { mode -> currentUri?.let { uri -> scope.launch { choices.put(uri, FIT_CHOICE, mode.name) } } }
+    LaunchedEffect(state.uri, state.loaded) {
+        val uri = state.uri
+        if (uri != null && state.loaded) {
+            val saved = choices.get(uri, FIT_CHOICE)
+            FitMode.entries.firstOrNull { it.name == saved }?.let(video::setFit)
+        }
+    }
+
     // US-33: grab the frame, then offer to share it.
     val savedText = stringResource(R.string.tool_screenshot_saved)
     val failedText = stringResource(R.string.tool_screenshot_failed)
@@ -393,7 +414,7 @@ fun PlayerScreen(
             stepForward = { engine.seekTo(currentState.positionMs + SEEK_STEP_MS) },
             fit = {
                 // US-53.1: cycle and name the mode for 1 s.
-                video.setFit(video.fit.next())
+                video.chooseFit(video.fit.next())
                 note = Note(fitNames.getValue(video.fit), FIT_NOTE_MS)
             },
         )
@@ -535,19 +556,24 @@ fun PlayerScreen(
             KeptStatus(time(state.positionMs), status, Modifier.align(Alignment.TopCenter))
         }
 
+        // Snackbar look: opaque, above the bottom controls, clear of the video's centre.
         note?.let { n ->
             Row(
                 Modifier
-                    .align(Alignment.Center)
+                    .align(Alignment.BottomCenter)
                     .padding(bottom = 160.dp)
-                    .background(PlayerColors.Scrim, CircleShape)
-                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                    .background(MaterialTheme.colorScheme.inverseSurface, MaterialTheme.shapes.small)
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
                     .testTag("note"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(n.text, color = PlayerColors.Content, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 6.dp))
+                Text(n.text, color = MaterialTheme.colorScheme.inverseOnSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(vertical = 10.dp))
                 n.action?.let { (label, run) ->
-                    TextButton(onClick = { run(); note = null }, modifier = Modifier.testTag("note-action")) { Text(label) }
+                    TextButton(
+                        onClick = { run(); note = null },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.inversePrimary),
+                        modifier = Modifier.testTag("note-action"),
+                    ) { Text(label) }
                 }
             }
         }

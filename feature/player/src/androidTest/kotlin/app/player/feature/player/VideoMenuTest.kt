@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import app.player.core.data.choice.PerFileChoices
+import app.player.core.data.choice.RememberPerFile
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
@@ -21,87 +23,127 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
-/** P1.16 menus on a real engine (emulator). */
+/**
+ * P1.16 menus on a real engine (emulator). Waits go through the compose rule, so its frame clock
+ * keeps running and the screen recomposes; a sleep loop would freeze it.
+ */
 class VideoMenuTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context: Context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private lateinit var scenario: ActivityScenario<PlayerActivity>
     private lateinit var engine: PlayerEngine
+    private val clip by lazy { copy("clip.mp4") }
 
     private fun open() {
-        scenario = ActivityScenario.launch(PlayerActivity.intent(context, copy("clip.mp4")))
-        waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 300 }
+        scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip))
+        compose.waitUntil(15_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 300 }
         engine = PlayerSessions.current.value!!
     }
 
-    @After fun close() = scenario.close()
-
-    private fun menu() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("more") }
-        compose.onNodeWithTag("more").performClick()
-        compose.waitUntil(2_000) { shown("shortcuts") }
+    @After fun close() {
+        scenario.close()
+        runBlocking { RememberPerFile(context).set(true) }
     }
 
-    @Test fun shortcutsInMenu_US32_1() = runBlocking {
+    /** Taps until the controls show: a slow emulator can drop the first tap while the player starts. */
+    private fun menu() {
+        repeat(3) {
+            if (!shown("more")) {
+                compose.onNodeWithTag("video").performClick()
+                runCatching { compose.waitUntil(3_000) { shown("more") } }
+            }
+        }
+        compose.onNodeWithTag("more").performClick()
+        compose.waitUntil(3_000) { shown("shortcuts") }
+    }
+
+    private fun <T : Any> prop(name: String, type: PropertyType<T>): T? = runBlocking { engine.get(name, type) }
+
+    @Test fun shortcutsInMenu_US32_1() {
         open()
         menu()
         shot("p116-menu-shortcuts")
         compose.onNodeWithTag("sc-Mute").performClick()
-        waitUntil(1_000) { runBlocking { engine.get("mute", PropertyType.Flag) } == true }
+        compose.waitUntil(3_000) { prop("mute", PropertyType.Flag) == true }
         compose.onNodeWithTag("sc-Loop").performClick()
-        waitUntil(1_000) { runBlocking { engine.get("loop-file", PropertyType.Text) } == "inf" }
-        SystemClock.sleep(300)
+        compose.waitUntil(3_000) { prop("loop-file", PropertyType.Text) == "inf" }
+        compose.waitForIdle()
         shot("p116-shortcuts-on")
     }
 
-    @Test fun pictureMenu_US57() = runBlocking {
+    @Test fun pictureMenu_US57() {
         open()
         menu()
         compose.onNodeWithTag("menu-picture").performScrollTo().performClick()
-        compose.waitUntil(2_000) { shown("picture-panel") }
+        compose.waitUntil(3_000) { shown("picture-panel") }
         compose.onNodeWithTag("pic-night").performClick()
         compose.onNodeWithTag("pic-mirror").performClick()
-        SystemClock.sleep(500)
-        val shaders = engine.get("glsl-shaders", PropertyType.Text)
-        log("picture menu: glsl-shaders $shaders")
-        assertTrue(shaders!!.contains("lanthorn-night") && shaders.contains("lanthorn-mirror"))
+        compose.waitUntil(3_000) {
+            val shaders = prop("glsl-shaders", PropertyType.Text)
+            shaders != null && shaders.contains("lanthorn-night") && shaders.contains("lanthorn-mirror")
+        }
+        log("picture menu: glsl-shaders ${prop("glsl-shaders", PropertyType.Text)}")
         shot("p116-picture-panel")
     }
 
-    @Test fun fitAspectMenu_US53_US54() = runBlocking {
+    @Test fun fitAspectMenu_US53_US54() {
         open()
         menu()
         compose.onNodeWithTag("menu-fit-aspect").performScrollTo().performClick()
-        compose.waitUntil(2_000) { shown("fit-panel") }
+        compose.waitUntil(3_000) { shown("fit-panel") }
         compose.onNodeWithTag("aspect-4:3").performScrollTo().performClick()
-        SystemClock.sleep(400)
-        val aspect = engine.get("video-out-params/aspect", PropertyType.Real)
+        compose.waitUntil(3_000) { (prop("video-out-params/aspect", PropertyType.Real) ?: 0.0).let { kotlin.math.abs(it - 4.0 / 3) < 0.01 } }
+        val aspect = prop("video-out-params/aspect", PropertyType.Real)!!
         log("aspect menu 4:3 -> video-out-params/aspect $aspect")
-        assertEquals(4.0 / 3, aspect!!, 0.01)
+        assertEquals(4.0 / 3, aspect, 0.01)
         shot("p116-fit-panel")
+    }
+
+    /** Picks crop in the fit panel, leaves, resets mpv's panscan, opens the same file again. */
+    private fun pickCropAndReopen(): Double {
+        runBlocking { PerFileChoices(context).forget(clip.toString()) }
+        open()
+        menu()
+        compose.onNodeWithTag("menu-fit-aspect").performScrollTo().performClick()
+        compose.waitUntil(3_000) { shown("fit-panel") }
+        compose.onNodeWithTag("fit-Crop").performScrollTo().performClick()
+        compose.waitUntil(3_000) { prop("panscan", PropertyType.Real) == 1.0 }
+        // The choice is written off the main thread; give it a moment before leaving.
+        compose.waitUntil(3_000) { runBlocking { RememberPerFile(context).isEnabled() } == false || runBlocking { PerFileChoices(context).get(clip.toString(), FIT_CHOICE) } == "Crop" }
+        scenario.close()
+        runCatching { PlayerSessions.current.value?.set("panscan", 0.0) }
+        open()
+        // Remembered: crop comes back with the load. Not remembered: it never does.
+        runCatching { compose.waitUntil(3_000) { prop("panscan", PropertyType.Real) == 1.0 } }
+        return prop("panscan", PropertyType.Real) ?: -1.0
+    }
+
+    @Test fun fitRememberedPerFile_US53_2() {
+        runBlocking { RememberPerFile(context).set(true) }
+        val panscan = pickCropAndReopen()
+        log("remember choices on: crop picked, reopened -> panscan $panscan")
+        assertEquals(1.0, panscan, 0.0)
+    }
+
+    @Test fun fitNotRememberedWhenOff_US53_2() {
+        runBlocking { RememberPerFile(context).set(false) }
+        val panscan = pickCropAndReopen()
+        log("remember choices off: crop picked, reopened -> panscan $panscan")
+        assertEquals(0.0, panscan, 0.0)
     }
 
     @Test fun settingsInsidePlayer_US65_3() {
         open()
         menu()
         compose.onNodeWithTag("menu-player-settings").performScrollTo().performClick()
-        compose.waitUntil(2_000) { shown("player-settings") }
+        compose.waitUntil(3_000) { shown("player-settings") }
         compose.onNodeWithTag("set-back-twice").performScrollTo().performClick()
-        SystemClock.sleep(300)
+        compose.waitForIdle()
         assertTrue("still playing", !engine.state.value.paused)
         shot("p116-settings-in-player")
     }
 
     private fun shown(tag: String) = compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
-
-    private fun waitUntil(ms: Long, check: () -> Boolean) {
-        val end = SystemClock.elapsedRealtime() + ms
-        while (!check()) {
-            if (SystemClock.elapsedRealtime() > end) throw AssertionError("timed out after $ms ms")
-            SystemClock.sleep(20)
-        }
-    }
 
     private fun copy(asset: String): Uri {
         val file = File(context.cacheDir, asset)

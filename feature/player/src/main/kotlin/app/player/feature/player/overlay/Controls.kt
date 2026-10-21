@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -290,7 +291,7 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
 
 /**
  * Chapter ticks and the A-B range over the seek bar. Draws only; touches go through to the bar.
- * Ticks are black 60% so they read on both the track and the progress.
+ * Ticks are a light line inside a dark outline, so they read over bright and dark video alike.
  */
 @Composable
 private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifier) {
@@ -299,9 +300,11 @@ private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifi
         val cy = size.height / 2
         val tick = 2.dp.toPx()
         val tall = 12.dp.toPx()
+        val outline = 1.dp.toPx()
         marks.forEach { f ->
             val x = size.width * f.coerceIn(0f, 1f)
-            drawRect(PlayerColors.Scrim, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
+            drawRect(Color.Black, Offset(x - tick / 2 - outline, cy - tall / 2 - outline), Size(tick + outline * 2, tall + outline * 2))
+            drawRect(Color.White, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
         }
         if (a != null) {
             val xa = size.width * a.coerceIn(0f, 1f)

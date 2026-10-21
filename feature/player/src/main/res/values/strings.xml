@@ -154,4 +154,6 @@
     <string name="sc_on">On</string>
     <string name="sc_off">Off</string>
     <string name="sc_move_up">Move %1$s up</string>
+    <string name="settings_remember_choices">Remember choices per file</string>
+    <string name="settings_remember_choices_summary">Fit, decoder, tracks and delays come back when a file opens again</string>
 </resources>
