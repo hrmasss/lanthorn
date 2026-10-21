@@ -27,7 +27,7 @@ class GesturesOnDeviceTest {
     private val holder = Any()
     private val gestures = SubtitlesExtension.subtitleGestures
 
-    @Before fun open() = runBlocking {
+    @Before fun open(): Unit = runBlocking {
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
