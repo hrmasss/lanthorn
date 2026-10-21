@@ -51,10 +51,15 @@ internal class SubtitleController(private val mpv: Mpv) {
         redrawIfPaused()
     }
 
-    /** Adds a subtitle file mpv can read by path and turns it on. */
-    fun addFile(path: String, title: String?) {
-        if (title != null) mpv.command("sub-add", path, "select", title) else mpv.command("sub-add", path, "select")
-        redrawIfPaused()
+    /** Adds a subtitle file mpv can read by path; turns it on unless [select] is false. */
+    fun addFile(path: String, title: String?, lang: String? = null, select: Boolean = true) {
+        val flag = if (select) "select" else "auto"
+        when {
+            title != null && lang != null -> mpv.command("sub-add", path, flag, title, lang)
+            title != null -> mpv.command("sub-add", path, flag, title)
+            else -> mpv.command("sub-add", path, flag)
+        }
+        if (select) redrawIfPaused()
     }
 
     /** Re-reads an external track from disk, after its file was rewritten in a new encoding. */

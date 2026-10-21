@@ -61,7 +61,7 @@ class StyleOnDeviceTest {
         assertEquals("#FFFFFFFF", engine.get("sub-color", PropertyType.Text))
         assertEquals(true, engine.get("sub-bold", PropertyType.Flag))
         assertEquals(0.0, engine.get("sub-border-size", PropertyType.Real)!!, 0.0)
-        assertEquals(2.0, engine.get("sub-shadow-offset", PropertyType.Real)!!, 0.0)
+        assertEquals(3.0, engine.get("sub-shadow-offset", PropertyType.Real)!!, 0.0)
         shot("us42-defaults")
         assertEquals(46.0, engine.get("sub-font-size", PropertyType.Real)!!, 0.0)
         // Event-timed: mpv pushes the change, no polling round trip in the number.
@@ -81,7 +81,7 @@ class StyleOnDeviceTest {
         engine.await("sub-border-style", PropertyType.Text) { it == "background-box" }
         delay(300)
         shot("us42-box-monospace")
-        evidence("US-42.2 defaults: white #FFFFFFFF, size 46, bold, border 0, shadow 2")
+        evidence("US-42.2 defaults: white #FFFFFFFF, size 46, bold, border 0, shadow 3 at #E0000000")
         evidence("US-42.3 colour, outline, font, size change applied to mpv in $took ms (limit 100); screenshots before/after")
         assertTrue("took $took ms", took < 100)
     }
@@ -93,13 +93,16 @@ class StyleOnDeviceTest {
         delay(300)
         shot("us43-left-margin25")
         OnDevice.main { styles.update { it.copy(align = SubAlign.Centre, bottomMarginPercent = 0f, fitToVideo = true) } }
-        engine.await("sub-margin-y", PropertyType.Int64) { it == 0L }
+        // Margin 0 still keeps the line above the navigation handle (gate fix), so not 0 here.
+        engine.await("sub-margin-y", PropertyType.Int64) { it != null && it in 1L..80L }
         delay(300)
         shot("us43-fit-on")
+        evidence("US-43.2 fit on: osd ${engine.get("osd-dimensions", PropertyType.Text)}")
         OnDevice.main { styles.update { it.copy(fitToVideo = false) } }
         engine.await("sub-use-margins", PropertyType.Flag) { it == true }
         delay(300)
         shot("us43-fit-off")
+        evidence("US-43.2 fit off: margin ${engine.get("sub-margin-y", PropertyType.Int64)} of 720 (kept above the navigation handle)")
         evidence("US-43.1 left alignment and 25% margin (sub-margin-y 180 of 720) applied; screenshot")
         evidence("US-43.2 fit on keeps text in the picture, fit off puts it in the bottom bar; screenshots")
     }
