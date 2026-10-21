@@ -130,6 +130,7 @@ object GeneralSettings : SettingsGroup {
     private const val THUMBS = "clear_thumbnails"
     private const val RESET = "reset"
     private const val AGENT = "user_agent"
+    private const val URL_HISTORY = "keep_url_history"
 
     override val entries = listOf(
         SettingsEntry(THEME, R.string.setting_theme),
@@ -142,6 +143,7 @@ object GeneralSettings : SettingsGroup {
         SettingsEntry(CLEAR, R.string.setting_clear_history, R.string.setting_clear_history_summary),
         SettingsEntry(THUMBS, R.string.setting_clear_thumbnails, R.string.setting_clear_thumbnails_summary),
         SettingsEntry(AGENT, R.string.setting_user_agent, R.string.setting_user_agent_summary),
+        SettingsEntry(URL_HISTORY, R.string.setting_url_history, R.string.setting_url_history_summary),
         SettingsEntry(RESET, R.string.setting_reset, R.string.setting_reset_summary),
     )
 
@@ -157,6 +159,7 @@ object GeneralSettings : SettingsGroup {
         val paused by history.paused.collectAsStateWithLifecycle(false)
         val network = remember { NetworkPrefs(context) }
         val userAgent by network.userAgent.collectAsStateWithLifecycle("")
+        val keepUrls by network.keepHistory.collectAsStateWithLifecycle(true)
         var confirm by remember { mutableStateOf<String?>(null) }
         var imported by remember { mutableStateOf<JSONObject?>(null) }
         var report by remember { mutableStateOf<String?>(null) }
@@ -174,7 +177,7 @@ object GeneralSettings : SettingsGroup {
             }
         }
 
-        val order = listOf("h1", THEME, BLACK, DYNAMIC, LANGUAGE, "h2", EXPORT, IMPORT, "h3", PAUSE, CLEAR, THUMBS, "h5", AGENT, "h4", RESET)
+        val order = listOf("h1", THEME, BLACK, DYNAMIC, LANGUAGE, "h2", EXPORT, IMPORT, "h3", PAUSE, CLEAR, THUMBS, "h5", AGENT, URL_HISTORY, "h4", RESET)
         SettingsPage(highlight, order) {
             item("h1") { SettingsHeader(stringResource(R.string.settings_section_look)) }
             item(THEME) {
@@ -273,6 +276,14 @@ object GeneralSettings : SettingsGroup {
                     highlighted = highlight == AGENT,
                 )
             }
+            item(URL_HISTORY) {
+                SettingsSwitch(
+                    stringResource(R.string.setting_url_history), keepUrls,
+                    { scope.launch { network.setKeepHistory(it) } },
+                    summary = stringResource(R.string.setting_url_history_summary),
+                    highlighted = highlight == URL_HISTORY,
+                )
+            }
             item("h4") { SettingsHeader(stringResource(R.string.settings_section_reset)) }
             item(RESET) {
                 SettingsAction(
@@ -316,16 +327,21 @@ object GeneralSettings : SettingsGroup {
     }
 
     override suspend fun reset(context: Context) {
-        AppearancePrefs(context).store.edit { it.clear() }
+        // Everything in the General file but the URL history, which is history, not a setting.
+        AppearancePrefs(context).store.edit { prefs ->
+            prefs.asMap().keys.filter { it.name != "url_history" }.forEach { prefs.remove(it) }
+        }
         HistoryPrefs(context).setPaused(false)
     }
 
     override suspend fun export(context: Context): JSONObject = JSONObject()
-        .put("appearance", PreferencesJson.export(AppearancePrefs(context).store.data.first()))
+        .put("appearance", PreferencesJson.export(AppearancePrefs(context).store.data.first(), skip = setOf("url_history")))
         .put("pause_history", HistoryPrefs(context).isPaused())
 
     override suspend fun import(context: Context, data: JSONObject) {
-        data.optJSONObject("appearance")?.let { a -> AppearancePrefs(context).store.edit { PreferencesJson.import(a, it) } }
+        data.optJSONObject("appearance")?.let { a ->
+            AppearancePrefs(context).store.edit { PreferencesJson.import(a, it, skip = setOf("url_history")) }
+        }
         if (data.has("pause_history")) HistoryPrefs(context).setPaused(data.optBoolean("pause_history"))
     }
 }
@@ -334,6 +350,7 @@ object GeneralSettings : SettingsGroup {
 internal suspend fun clearHistory(context: Context) {
     ResumePoints(context).clear()
     LibraryPrefsStore(context).clearSearches()
+    NetworkPrefs(context).clearHistory()
 }
 
 /** US-66.2: pick settings, history or both, then report what came back. */

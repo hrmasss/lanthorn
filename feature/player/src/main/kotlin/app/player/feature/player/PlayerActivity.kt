@@ -20,6 +20,8 @@ import app.player.core.playerapi.PlayerIntents
 import app.player.core.playerapi.playerExtensions
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.tools.PlaybackTools
+import app.player.feature.player.tools.Deinterlace
+import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.launch
 
 /** Plays the uri it was started with. Also the target for "open with" from other apps. */
@@ -37,6 +39,8 @@ class PlayerActivity : ComponentActivity() {
         val extensions = playerExtensions
         engine = PlayerSessions.acquire(this, this) { created ->
             PlaybackTools(created).applyDefaults()
+            // US-38.1: deinterlace defaults to auto (mpv's own default is off).
+            VideoTools(created, applicationContext).setDeinterlace(Deinterlace.Auto)
             extensions.forEach { it.onEngineCreated(applicationContext, created) }
         }
         PlaybackService.openPlayer = { ctx ->

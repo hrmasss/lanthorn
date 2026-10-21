@@ -88,8 +88,8 @@ class LibmpvBuildTest {
         engine.set("sub-codepage", "cp1251")
         engine.command("sub-add", srt.path, "select")
         engine.seekTo(1000)
-        delay(1500)
-        val shown = engine.get("sub-text", PropertyType.Text)
+        var shown: String? = null
+        withTimeout(8000) { while (shown.isNullOrEmpty()) { delay(200); shown = engine.get("sub-text", PropertyType.Text) } }
         Log.i("P1.33", "named cp1251 sub-text = $shown")
         assertEquals(text, shown)
     }
@@ -102,8 +102,9 @@ class LibmpvBuildTest {
         engine.set("sub-codepage", "auto")
         engine.command("sub-add", srt.path, "select")
         engine.seekTo(1000)
-        delay(1500)
-        val shown = engine.get("sub-text", PropertyType.Text)
+        // Poll: a slow emulator (CI) takes longer than a fixed wait to load and show the line.
+        var shown: String? = null
+        withTimeout(8000) { while (shown.isNullOrEmpty()) { delay(200); shown = engine.get("sub-text", PropertyType.Text) } }
         Log.i("P1.33", "sub-text = $shown")
         assertEquals(text, shown)
     }

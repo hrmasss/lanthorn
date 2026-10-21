@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test host only: the library's test APK has no app theme, so the player would get a default
+     window title bar in every screenshot. The app itself sets its theme on the application. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity
+            android:name="app.player.feature.player.PlayerActivity"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            tools:node="merge" />
+    </application>
+</manifest>

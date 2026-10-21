@@ -1,5 +1,6 @@
 package app.player.feature.player.overlay
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -65,6 +69,15 @@ data class ControlsUi(
     val hasPrevious: Boolean,
     val hasNext: Boolean,
     val canLock: Boolean,
+    /** Chapter starts as fractions of the duration, drawn as ticks (US-27.1). */
+    val marks: List<Float> = emptyList(),
+    /** A-B points as fractions, drawn while set (US-25.2). */
+    val abA: Float? = null,
+    val abB: Float? = null,
+    /** False hides previous and next (US-29.3, playback's setting). */
+    val showPreviousNext: Boolean = true,
+    /** Back and forward step buttons beside play/pause (US-29.2, playback's setting). */
+    val stepButtons: Boolean = false,
 )
 
 @Immutable
@@ -86,11 +99,13 @@ class ControlsActions(
     val next: () -> Unit,
     val rotate: () -> Unit,
     val fit: () -> Unit,
+    val stepBack: () -> Unit = {},
+    val stepForward: () -> Unit = {},
 )
 
 /**
- * The player overlay (US-16.1): top bar, seek row, bottom bar, placed where MX users expect them
- * (recon/ux-map.md, Player) with the look from docs/design.md. Stateless.
+ * The player overlay (US-16.1): top bar, seek row, bottom bar, in the layout users of other Android
+ * players already know, with the look from docs/design.md. Stateless.
  */
 @Composable
 fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modifier) {
@@ -123,10 +138,15 @@ fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modi
 
 @Composable
 private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier) {
+    val narrow = LocalConfiguration.current.screenWidthDp < 600
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         OverlayIconButton(LanthornIcons.Back, stringResource(R.string.player_back), actions.back, Modifier.testTag("back"))
-        OverlayTitle(ui.title, Modifier.weight(1f).padding(horizontal = 4.dp).testTag("title"))
-        ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
+        // Narrow (portrait): battery and clock go under the title so the name keeps the room.
+        Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+            OverlayTitle(ui.title, Modifier.testTag("title"))
+            if (narrow) ui.status?.let { StatusText(it) }
+        }
+        if (!narrow) ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
         ui.speed?.let {
             val desc = stringResource(R.string.player_speed_badge, it)
             Text(
@@ -140,12 +160,14 @@ private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier)
             )
         }
         val decoderDesc = stringResource(R.string.player_decoder_badge, ui.decoder)
-        OverlayChip(
+        // No badge until a decoder runs ("-"), so the chip never shows an empty circle.
+        if (ui.decoder != "-") OverlayChip(
             ui.decoder,
             selected = false,
             onClick = actions.openDecoder,
             modifier = Modifier
                 .minimumInteractiveComponentSize()
+                .widthIn(min = 64.dp)
                 .semantics { contentDescription = decoderDesc }
                 .testTag("decoder-badge"),
         )
@@ -185,13 +207,16 @@ private fun SeekRow(ui: ControlsUi, actions: ControlsActions) {
             style = MaterialTheme.typography.labelLarge.tabular(),
             modifier = Modifier.semantics { contentDescription = elapsedDesc }.testTag("elapsed"),
         )
-        SeekBar(
-            position = ui.positionMs.toFloat() / duration,
-            onScrub = actions.scrub,
-            onSeek = actions.seek,
-            contentDescription = stringResource(R.string.player_seek_bar),
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp).testTag("seek-bar"),
-        )
+        Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            SeekBar(
+                position = ui.positionMs.toFloat() / duration,
+                onScrub = actions.scrub,
+                onSeek = actions.seek,
+                contentDescription = stringResource(R.string.player_seek_bar),
+                modifier = Modifier.testTag("seek-bar"),
+            )
+            if (ui.marks.isNotEmpty() || ui.abA != null) SeekMarks(ui.marks, ui.abA, ui.abB, Modifier.matchParentSize())
+        }
         val endDesc = stringResource(
             if (ui.showRemaining) R.string.player_remaining else R.string.player_total,
             ui.endTime,
@@ -223,12 +248,18 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
         )
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            OverlayIconButton(
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipPrevious,
                 stringResource(R.string.player_previous),
                 actions.previous,
                 Modifier.testTag("previous"),
                 enabled = ui.hasPrevious,
+            )
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Back10,
+                stringResource(R.string.a11y_seek_back),
+                actions.stepBack,
+                Modifier.testTag("step-back"),
             )
             PlayPauseButton(
                 playing = ui.playing,
@@ -237,7 +268,13 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
                 size = 56.dp,
                 modifier = Modifier.testTag("play-pause"),
             )
-            OverlayIconButton(
+            if (ui.stepButtons) OverlayIconButton(
+                PlayerIcons.Forward10,
+                stringResource(R.string.a11y_seek_forward),
+                actions.stepForward,
+                Modifier.testTag("step-forward"),
+            )
+            if (ui.showPreviousNext) OverlayIconButton(
                 PlayerIcons.SkipNext,
                 stringResource(R.string.player_next),
                 actions.next,
@@ -248,5 +285,30 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
         Spacer(Modifier.weight(1f))
         OverlayIconButton(PlayerIcons.Rotate, stringResource(R.string.player_rotate), actions.rotate, Modifier.testTag("rotate"))
         OverlayIconButton(PlayerIcons.Fit, stringResource(R.string.player_fit), actions.fit, Modifier.testTag("fit"))
+    }
+}
+
+/**
+ * Chapter ticks and the A-B range over the seek bar. Draws only; touches go through to the bar.
+ * Ticks are black 60% so they read on both the track and the progress.
+ */
+@Composable
+private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifier) {
+    val accent = MaterialTheme.colorScheme.tertiary
+    Canvas(modifier.testTag("seek-marks")) {
+        val cy = size.height / 2
+        val tick = 2.dp.toPx()
+        val tall = 12.dp.toPx()
+        marks.forEach { f ->
+            val x = size.width * f.coerceIn(0f, 1f)
+            drawRect(PlayerColors.Scrim, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
+        }
+        if (a != null) {
+            val xa = size.width * a.coerceIn(0f, 1f)
+            val xb = b?.let { size.width * it.coerceIn(0f, 1f) }
+            if (xb != null) drawRect(accent.copy(alpha = 0.5f), Offset(xa, cy - tall / 2), Size(xb - xa, tall))
+            drawRect(accent, Offset(xa - tick, cy - tall), Size(tick * 2, tall * 2))
+            if (xb != null) drawRect(accent, Offset(xb - tick, cy - tall), Size(tick * 2, tall * 2))
+        }
     }
 }

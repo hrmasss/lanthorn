@@ -69,6 +69,10 @@
     <string name="setting_user_agent">User agent</string>
     <string name="setting_user_agent_summary">Name the player sends to stream servers</string>
     <string name="setting_user_agent_default">Default</string>
+    <string name="setting_url_history">Keep URL history</string>
+    <string name="setting_url_history_summary">List played stream addresses in the open stream dialog</string>
+    <string name="stream_history">Recent</string>
+    <string name="stream_history_remove">Remove %1$s from recent</string>
 
     <string name="stream_title">Open network stream</string>
     <string name="stream_url">URL</string>
@@ -104,13 +108,13 @@
     <string name="setting_pause_history">Pause history</string>
     <string name="setting_pause_history_summary">Keep no resume points, last played marks or searches</string>
     <string name="setting_clear_history">Clear history</string>
-    <string name="setting_clear_history_summary">Delete resume points, last played marks and search history</string>
+    <string name="setting_clear_history_summary">Delete resume points, last played marks, search and URL history</string>
     <string name="setting_clear_thumbnails">Clear thumbnail cache</string>
     <string name="setting_clear_thumbnails_summary">Delete stored thumbnails; they are made again when needed</string>
     <string name="setting_reset">Reset settings</string>
     <string name="setting_reset_summary">Put every setting back to its default</string>
 
-    <string name="confirm_clear_history">Delete all resume points, last played marks and search history? This cannot be undone.</string>
+    <string name="confirm_clear_history">Delete all resume points, last played marks, search and URL history? This cannot be undone.</string>
     <string name="confirm_reset">Put every setting back to its default? History, hidden items and playlists stay.</string>
     <string name="action_clear">Clear</string>
     <string name="action_reset">Reset</string>
@@ -128,6 +132,27 @@
         <item quantity="one">settings of %d group</item>
         <item quantity="other">settings of %d groups</item>
     </plurals>
+
+    <string name="smb_title">Network shares</string>
+    <string name="smb_saved">Saved</string>
+    <string name="smb_saved_none">No shares saved yet.</string>
+    <string name="smb_found">On this network</string>
+    <string name="smb_found_none">Looking for SMB servers. Not every server announces itself; add one by address.</string>
+    <string name="smb_add">Add a share</string>
+    <string name="smb_remove">Remove</string>
+    <string name="smb_address">Address (host or host:port)</string>
+    <string name="smb_share">Share</string>
+    <string name="smb_user">User (empty for guest)</string>
+    <string name="smb_password">Password</string>
+    <string name="smb_name">Name (optional)</string>
+    <string name="smb_connect">Connect</string>
+    <string name="smb_connecting">Connecting</string>
+    <string name="smb_err_login">The user name or password is wrong.</string>
+    <string name="smb_err_share">The server has no share by that name.</string>
+    <string name="smb_err_denied">This user may not open that share.</string>
+    <string name="smb_err_unreachable">The server did not answer. Check the address and that you are on the same network.</string>
+    <string name="smb_err_other">Could not open the share.</string>
+    <string name="smb_empty">No folders or videos here.</string>
 
     <string name="folders_title">Folders</string>
     <string name="folders_scanned">Scanned storage</string>

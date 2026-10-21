@@ -5,8 +5,10 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Every main commit gets its own run (hosted runners run in parallel, and a waiting main run must
+  # not be replaced by the next push); branch pushes cancel their older runs.
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'branch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -55,6 +57,16 @@ jobs:
 
       - name: APK sizes
         run: find app/build/outputs/apk -name '*.apk' -printf '%s\t%p\n' | sort -n | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # NF-8 and the privacy audit: every library the release app ships, as Gradle resolved it.
+      - name: Release dependencies
+        run: ./gradlew :app:dependencies --configuration releaseRuntimeClasspath --console=plain > release-dependencies.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-dependencies
+          path: release-dependencies.txt
+          retention-days: 90
 
       - uses: actions/upload-artifact@v7
         with:

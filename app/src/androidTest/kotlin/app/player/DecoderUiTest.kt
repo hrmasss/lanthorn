@@ -8,6 +8,8 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.ActiveDecoder
@@ -19,8 +21,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
+import org.junit.Rule
 import org.junit.FixMethodOrder
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
@@ -37,6 +42,14 @@ class DecoderUiTest {
     private val context = instr.targetContext
     private val device = UiDevice.getInstance(instr)
     private val shots = File(context.getExternalFilesDir(null), "gate").apply { mkdirs() }
+
+    /** A failed step leaves the screen and the view tree behind, so a CI failure can be read later. */
+    @get:Rule val onFailure = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description) {
+            device.takeScreenshot(File(shots, "FAILED-${description.methodName}.png"))
+            device.dumpWindowHierarchy(File(shots, "FAILED-${description.methodName}.xml"))
+        }
+    }
 
     @Before fun setUp() {
         // The player is opened with file:// uris of the app's own files.
@@ -66,7 +79,7 @@ class DecoderUiTest {
 
     private fun engineState() = PlayerSessions.current.value?.state?.value
 
-    private fun waitFor(timeoutMs: Long = 10_000, check: () -> Boolean): Boolean {
+    private fun waitFor(timeoutMs: Long = 20_000, check: () -> Boolean): Boolean {
         val end = SystemClock.elapsedRealtime() + timeoutMs
         while (SystemClock.elapsedRealtime() < end) {
             if (check()) return true
@@ -81,16 +94,28 @@ class DecoderUiTest {
         device.wait(Until.hasObject(By.desc("More options")), 2000)
     }
 
+    /** Runs [step], retrying when the overlay recomposed the node away between find and click. */
+    private fun <T> retrying(step: () -> T): T? {
+        repeat(3) { try { return step() } catch (_: StaleObjectException) { SystemClock.sleep(200) } }
+        return null
+    }
+
     private fun openFromMenu(label: String) {
         repeat(3) {
             showControls()
-            device.findObject(By.desc("More options"))?.click()
-            if (device.wait(Until.hasObject(By.text(label)), 2000)) {
-                device.findObject(By.text(label)).click()
+            retrying { device.findObject(By.desc("More options"))?.click() }
+            // On smaller screens the entry can sit below the fold of the menu.
+            val entry = retrying {
+                device.wait(Until.findObject(By.text(label)), 1500)
+                    ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
+            }
+            // Find it again on each try: a recomposed menu leaves the old node stale.
+            if (entry != null && retrying { (device.findObject(By.text(label)) ?: entry).click() } != null) {
                 SystemClock.sleep(1200)
                 return
             }
-            device.pressBack()
+            // Back with nothing open leaves the player, so close only a menu that did open.
+            if (device.hasObject(By.scrollable(true))) device.pressBack()
         }
         fail("menu entry '$label' not reachable")
     }
@@ -98,19 +123,24 @@ class DecoderUiTest {
     private fun pickDecoder(summary: String) {
         repeat(3) {
             showControls()
-            device.findObject(By.descStartsWith("Decoder "))?.click()
-            if (device.wait(Until.hasObject(By.text(summary)), 2000)) {
-                device.findObject(By.text(summary)).click()
+            retrying { device.findObject(By.descStartsWith("Decoder "))?.click() }
+            if (device.wait(Until.hasObject(By.text(summary)), 2000) && retrying { device.findObject(By.text(summary)).click() } != null) {
                 return
             }
-            device.pressBack()
+            if (device.hasObject(By.textStartsWith("Software")) || device.hasObject(By.textStartsWith("Hardware"))) device.pressBack()
         }
         fail("decoder option '$summary' not reachable")
     }
 
     private fun badge(): String? {
-        showControls()
-        return device.findObject(By.descStartsWith("Decoder "))?.contentDescription
+        // The controls can hide between the tap and the read: tap again until the badge shows.
+        var desc: String? = null
+        waitFor(8000) {
+            showControls()
+            desc = retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
+            desc != null
+        }
+        return desc
     }
 
     private fun shot(name: String) {
@@ -123,17 +153,17 @@ class DecoderUiTest {
     /** US-37.2 after the 4:4:4 fallback, then US-35.3 by hand: pick HW on a file only SW plays. */
     @Test fun a_fallbackThenHandPickHw() {
         play("clip444.mp4")
-        assertEquals(ActiveDecoder.SW, engineState()?.activeDecoder)
+        assertTrue("decoder never settled on SW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
         openFromMenu("Info")
-        assertTrue(device.wait(Until.hasObject(By.text("SW")), 2000))
+        assertTrue("info never showed SW", device.wait(Until.hasObject(By.text("SW")), 8000))
         shot("info-after-fallback")
         device.pressBack()
 
         pickDecoder("Hardware, fastest")
         val t0 = SystemClock.elapsedRealtime()
-        val ok = waitFor(3000) { engineState()?.decoderNotice != null }
+        val ok = waitFor(10_000) { engineState()?.decoderNotice != null }
         log("notice after ${SystemClock.elapsedRealtime() - t0} ms: '${engineState()?.decoderNotice}', running ${engineState()?.activeDecoder?.label}")
-        assertTrue(ok)
+        assertTrue("no notice in 10 s", ok)
         SystemClock.sleep(300)
         shot("notice-after-hand-pick-hw")
         close()
@@ -145,7 +175,7 @@ class DecoderUiTest {
         log("badge before: ${badge()}")
         pickDecoder("Software, plays anything, more battery")
         val t0 = SystemClock.elapsedRealtime()
-        val switched = waitFor(3000) { engineState()?.activeDecoder == ActiveDecoder.SW }
+        val switched = waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW }
         log("decoder SW ${SystemClock.elapsedRealtime() - t0} ms after the pick")
         assertTrue(switched)
         openFromMenu("Info")

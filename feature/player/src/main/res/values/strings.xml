@@ -69,6 +69,32 @@
     <string name="fit_crop">Crop</string>
     <string name="fit_original">100%</string>
 
+    <!-- Playback tools (P1.13) -->
+    <string name="tool_speed">Speed</string>
+    <string name="tool_speed_value">%1$sx</string>
+    <string name="tool_speed_reset">Reset to 1x</string>
+    <string name="tool_ab">A-B repeat</string>
+    <string name="tool_ab_set_a">Set A</string>
+    <string name="tool_ab_set_b">Set B</string>
+    <string name="tool_ab_clear">Clear</string>
+    <string name="tool_ab_point">%1$s · %2$s</string>
+    <string name="tool_ab_unset">not set</string>
+    <string name="tool_sleep">Sleep timer</string>
+    <string name="tool_sleep_left">Sleep timer · %1$s left</string>
+    <string name="tool_sleep_minutes">%1$d min</string>
+    <string name="tool_sleep_custom">Custom</string>
+    <string name="tool_sleep_start">Start</string>
+    <string name="tool_sleep_cancel">Cancel timer</string>
+    <string name="tool_sleep_finish">Finish current video</string>
+    <string name="tool_sleep_finish_summary">Pause at the end of the video playing when time runs out</string>
+    <string name="tool_sleep_running">%1$s left</string>
+    <string name="tool_chapters">Chapters</string>
+    <string name="tool_chapter_untitled">Chapter %1$d</string>
+    <string name="tool_screenshot">Screenshot</string>
+    <string name="tool_screenshot_saved">Screenshot saved</string>
+    <string name="tool_screenshot_failed">Could not take a screenshot</string>
+    <string name="tool_share">Share</string>
+    <string name="settings_default_speed">Default speed</string>
     <!-- Deinterlace (US-38.2, US-35.4) -->
     <string name="video_deinterlace">Deinterlace</string>
     <string name="video_deint_auto">Auto, only interlaced videos</string>

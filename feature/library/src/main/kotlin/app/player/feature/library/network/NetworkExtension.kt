@@ -1,6 +1,8 @@
 package app.player.feature.library.network
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.player.core.engine.PlayerEngine
@@ -8,6 +10,9 @@ import androidx.compose.runtime.Composable
 import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.feature.library.settings.generalStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -25,8 +30,40 @@ class NetworkPrefs(context: Context) {
         if (value.isBlank()) it.remove(USER_AGENT) else it[USER_AGENT] = value.trim()
     }
 
+    /** "Keep URL history" (US-61.3), default on. Off keeps none and clears what was kept. */
+    val keepHistory: Flow<Boolean> = store.data.map { it[KEEP_HISTORY] ?: true }
+
+    /** Played URLs, newest first (US-61.3). */
+    val history: Flow<List<String>> = store.data.map { recent(it) }
+
+    suspend fun setKeepHistory(keep: Boolean) = store.edit {
+        it[KEEP_HISTORY] = keep
+        if (!keep) it.remove(HISTORY)
+    }
+
+    /** Records a played URL unless history is off or paused (US-73.2). */
+    suspend fun addToHistory(url: String, paused: Boolean) = store.edit {
+        if (paused || it[KEEP_HISTORY] == false) return@edit
+        it[HISTORY] = (listOf(url) + recent(it).filterNot { u -> u == url }).take(MAX_HISTORY).joinToString("\n")
+    }
+
+    suspend fun removeFromHistory(url: String) = store.edit {
+        it[HISTORY] = (recent(it) - url).joinToString("\n")
+    }
+
+    suspend fun clearHistory() = store.edit { it.remove(HISTORY) }
+
     internal companion object {
+        /** For writes that must outlive the screen that starts them (a dialog that closes on Play). */
+        val writes = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
         val USER_AGENT = stringPreferencesKey("user_agent")
+        val KEEP_HISTORY = booleanPreferencesKey("keep_url_history")
+        /** History, not a setting: backups put it under history, resets leave it. */
+        val HISTORY = stringPreferencesKey("url_history")
+        const val MAX_HISTORY = 50
+
+        fun recent(p: Preferences) = p[HISTORY]?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
     }
 }
 

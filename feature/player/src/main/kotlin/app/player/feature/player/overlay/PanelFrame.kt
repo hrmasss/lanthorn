@@ -57,6 +57,8 @@ internal fun PanelFrame(
                     .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClose),
             )
         }
+        // Side sheet: clear of the navigation bar and a side cutout. Bottom sheet: navigation bar
+        // only; a top camera cutout is no reason to pad its content.
         val insets = WindowInsets.navigationBars.union(WindowInsets.displayCutout)
         if (landscape) {
             AnimatedVisibility(
@@ -91,7 +93,7 @@ internal fun PanelFrame(
                         .heightIn(max = maxHeight * 0.5f)
                         .testTag("panel-${panelId ?: ""}"),
                 ) {
-                    Box(Modifier.windowInsetsPadding(insets)) { content() }
+                    Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) { content() }
                 }
             }
         }
