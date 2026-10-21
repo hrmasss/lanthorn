@@ -88,7 +88,7 @@ class BackgroundMediaUiTest {
     @After fun tearDown() {
         device.pressBack()
         // A background test leaves the service holding the engine: let it go too.
-        PlaybackService.stop(context)
+        instr.runOnMainSync { PlaybackService.stop(context) }
         closePlayer()
         runBlocking { prefs.reset() }
         device.unfreezeRotation()

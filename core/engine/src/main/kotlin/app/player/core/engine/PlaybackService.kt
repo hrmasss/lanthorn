@@ -26,36 +26,31 @@ class PlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val engine = PlayerSessions.current.value
+        // Android 14+ ends the app when a service started for the foreground stops before it gets
+        // there, so it goes to the foreground first, whatever it does next.
+        val notification = engine?.let { notificationFactory?.invoke(this, it) } ?: basicNotification(engine)
+        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         if (engine == null || intent?.action == ACTION_STOP) {
             stopSelf()
             return START_NOT_STICKY
         }
         if (intent?.action == ACTION_TOGGLE) engine.togglePause()
-        if (!holding) {
-            PlayerSessions.acquire(this, this)
-            holding = true
-            Log.i(TAG, "holding the engine at ${engine.state.value.positionMs} ms")
-        }
-        val notification = notificationFactory?.invoke(this, engine) ?: basicNotification(engine)
-        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        // [start] already joined as [Hold]; joining again is a no-op and covers a restart.
+        PlayerSessions.acquire(this, Hold)
+        Log.i(TAG, "holding the engine at ${engine.state.value.positionMs} ms")
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        if (holding) {
-            PlayerSessions.release(this)
-            holding = false
-            Log.i(TAG, "released the engine")
-        }
+        PlayerSessions.release(Hold)
+        Log.i(TAG, "released the engine")
         super.onDestroy()
     }
 
-    private var holding = false
-
-    private fun basicNotification(engine: PlayerEngine): Notification {
+    private fun basicNotification(engine: PlayerEngine?): Notification {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Playback", NotificationManager.IMPORTANCE_LOW))
-        val title = engine.state.value.uri?.let { Uri.parse(it).lastPathSegment } ?: "Playing"
+        val title = engine?.state?.value?.uri?.let { Uri.parse(it).lastPathSegment } ?: "Playing"
         val open = openPlayer?.invoke(this)?.let {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         }
@@ -87,15 +82,21 @@ class PlaybackService : Service() {
         /** P1.15's media notification. Null: the basic one above. */
         var notificationFactory: ((Context, PlayerEngine) -> Notification)? = null
 
+        /** The service's place among the engine's holders, taken in [start] so no release in between drops the engine. */
+        private object Hold
+
         /** Starts holding the live engine in the foreground. Call when the player leaves the screen. */
         fun start(context: Context) {
             if (PlayerSessions.current.value == null) return
+            PlayerSessions.acquire(context, Hold)
             context.startForegroundService(Intent(context, PlaybackService::class.java))
         }
 
         /** Lets go of the engine. Call when the player is back on screen. */
         fun stop(context: Context) {
             context.stopService(Intent(context, PlaybackService::class.java))
+            // A service stopped before it was created never runs onDestroy.
+            PlayerSessions.release(Hold)
         }
     }
 }
