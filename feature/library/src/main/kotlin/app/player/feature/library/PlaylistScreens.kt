@@ -270,8 +270,9 @@ internal fun PlaylistScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (item.durationMs != null) {
-                                VideoThumbnail(duration = formatDuration(item.durationMs), modifier = Modifier.width(112.dp)) {
+                            val length = item.durationMs
+                            if (length != null) {
+                                VideoThumbnail(duration = formatDuration(length), modifier = Modifier.width(112.dp)) {
                                     if (video != null && item.present) ThumbImage(video, loader)
                                 }
                             } else {
