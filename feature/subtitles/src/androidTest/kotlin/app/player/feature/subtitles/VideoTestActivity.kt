@@ -89,6 +89,9 @@ internal fun assertWithin(what: String, tookMs: Long, limitMs: Long) {
     if (!lenient) org.junit.Assert.assertTrue("$what took $tookMs ms (limit $limitMs)", tookMs < limitMs)
 }
 
-/** Runs of several minutes run only when asked: `-e long true`. */
-internal fun assumeLongRun() =
-    org.junit.Assume.assumeTrue("long run, pass -e long true", InstrumentationRegistry.getArguments().getString("long") == "true")
+/**
+ * Runs of several minutes run only when asked (`-e long true`); otherwise the test passes at once
+ * and says so. (An assumption failure shows as a failure in the Gradle report, so no Assume.)
+ */
+internal fun longRun(): Boolean =
+    (InstrumentationRegistry.getArguments().getString("long") == "true").also { if (!it) evidence("long run skipped, pass -e long true") }

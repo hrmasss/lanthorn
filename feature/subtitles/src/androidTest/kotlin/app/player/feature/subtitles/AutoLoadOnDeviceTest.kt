@@ -106,7 +106,8 @@ class AutoLoadOnDeviceTest {
             assets.open("formats/nosubs.mkv").use { input -> File(dir, "Clip.mkv").outputStream().use { input.copyTo(it) } }
             c.files.forEach { (from, to) -> assets.open("formats/$from").use { input -> File(dir, to).outputStream().use { input.copyTo(it) } } }
             engine.open(Uri.fromFile(File(dir, "Clip.mkv")))
-            engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+            // The clip has video only; the subtitle file is the second track once auto-load adds it.
+            engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 1 }
             engine.awaitAutoLoad()
             val external = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" && it.external }
             assertEquals("${c.label}: external tracks ${external.map { it.title to it.codec }}", 1, external.size)
@@ -215,7 +216,10 @@ class AutoLoadOnDeviceTest {
             val after = loader.lastResult!!
             assertTrue(after.folderGranted)
             assertEquals(listOf("Grant.srt"), after.found.map { it.name })
-            engine.await("sub-text", PropertyType.Text, 5_000) { it == "Found through the folder grant" }
+            // The picker took time; the 10 s clip may have played past its line. Look at 1 s.
+            engine.pause()
+            engine.seekTo(1000)
+            engine.await("sub-text", PropertyType.Text, 10_000) { it == "Found through the folder grant" }
             engine.pause()
             delay(1500)
             shotTo("us39-grant-srt-drawn")

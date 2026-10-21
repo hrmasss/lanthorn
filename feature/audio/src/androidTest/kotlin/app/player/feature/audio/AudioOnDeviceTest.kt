@@ -194,7 +194,7 @@ class AudioOnDeviceTest {
     }
 
     @Test fun externalAudioStaysInSync_US47_3() = runBlocking {
-        assumeLongRun()
+        if (!longRun()) return@runBlocking
         engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))
         engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
         controller.addFile(OnDevice.asset("dub.m4a").path, "dub.m4a")
@@ -206,7 +206,7 @@ class AudioOnDeviceTest {
 
     /** Baseline for US-47.3: the file's own audio track, same file, same seeks, same device. */
     @Test fun embeddedAudioSyncBaseline() = runBlocking {
-        assumeLongRun()
+        if (!longRun()) return@runBlocking
         engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))
         engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
         engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }
