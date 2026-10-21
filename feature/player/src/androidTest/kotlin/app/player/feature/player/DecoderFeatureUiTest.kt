@@ -14,6 +14,8 @@ import app.player.core.engine.ActiveDecoder
 import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -29,6 +31,7 @@ class DecoderFeatureUiTest {
 
     @After fun close() = scenario.close()
 
+    @Ears("US-35.4")
     @Test fun deinterlaceDisabledOnHwWithSwitch_US35_4() {
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, copy("interlaced.mp4")))
         waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 300 }
@@ -85,11 +88,10 @@ class DecoderFeatureUiTest {
         return Uri.fromFile(file)
     }
 
+    /** Saved per test by core/testing, so the EARS report links it to the criterion. */
     private fun shot(name: String) {
         SystemClock.sleep(400)
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 
     private fun log(line: String) {

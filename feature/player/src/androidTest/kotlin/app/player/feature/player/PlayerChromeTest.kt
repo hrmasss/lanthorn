@@ -8,10 +8,13 @@ import android.view.WindowInsets
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.ActiveDecoder
 import app.player.core.engine.PlayerSessions
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import org.junit.After
@@ -45,6 +48,7 @@ class PlayerChromeTest {
         scenario.close()
     }
 
+    @Ears("US-16.3")
     @Test fun controlsHideAfterThreeSecondsWhilePlaying_US16_3() {
         compose.onNodeWithTag("video").performClick()
         // The hosted emulator can drop the first tap while the player is still starting: tap again.
@@ -68,6 +72,7 @@ class PlayerChromeTest {
         shot("02-hidden")
     }
 
+    @Ears("US-16.3")
     @Test fun controlsStayWhilePaused_US16_3() {
         showControls("back")
         compose.onNodeWithTag("play-pause").performClick()
@@ -83,6 +88,7 @@ class PlayerChromeTest {
         shot("03-paused")
     }
 
+    @Ears("US-16.5")
     @Test fun systemBarsFollowControls_US16_5() {
         showControls("back")
         SystemClock.sleep(500)
@@ -93,6 +99,7 @@ class PlayerChromeTest {
         assertFalse("bars hidden without controls", barsVisible())
     }
 
+    @Ears("US-60.1")
     @Test fun screenOnWhilePlayingAndPaused_US60_1() {
         // Read from the window manager (dumpsys), the state the system acts on.
         fun step(name: String, want: Boolean) {
@@ -117,6 +124,7 @@ class PlayerChromeTest {
         step("paused, setting on", true)
     }
 
+    @Ears("US-69.2")
     @Test fun talkBackActions_US69_2() {
         val engine = PlayerSessions.current.value!!
         val audio = context.getSystemService(android.media.AudioManager::class.java)
@@ -159,6 +167,7 @@ class PlayerChromeTest {
         assertTrue(b1 in 0f..1f && b2 in 0f..1f && b1 - b2 > 0.05f)
     }
 
+    @Ears("US-16.4")
     @Test fun remainingTimeSurvivesReopen_US16_4() {
         repeat(3) { if (!shown("end-time")) { compose.onNodeWithTag("video").performClick(); runCatching { compose.waitUntil(3_000) { shown("end-time") } } } }
         compose.onNodeWithTag("end-time").performClick()
@@ -181,6 +190,7 @@ class PlayerChromeTest {
         shot("09-remaining-after-reopen")
     }
 
+    @Ears("US-78.2")
     @Test fun backCallbackOnlyWithTheSetting_US78_2() {
         var enabled = true
         scenario.onActivity { enabled = it.onBackPressedDispatcher.hasEnabledCallbacks() }
@@ -195,6 +205,7 @@ class PlayerChromeTest {
         assertTrue(enabled)
     }
 
+    @Ears("US-35.2")
     @Test fun decoderSwitchKeepsPosition_US35_2() {
         val engine = PlayerSessions.current.value!!
         SystemClock.sleep(2_000)
@@ -225,10 +236,11 @@ class PlayerChromeTest {
         val after = engine.state.value.positionMs
         SystemClock.sleep(500)
         log("decoder switch to $target: playback restarted after $switchMs ms, position $before -> $after (difference ${after - before} ms), now running ${engine.state.value.activeDecoder}")
-        assertTrue("switch took $switchMs ms", switchMs <= 1_000)
+        assertWithin("decoder switch", switchMs, 1_000)
         assertTrue("position moved by ${after - before} ms", kotlin.math.abs(after - before) <= 500)
     }
 
+    @Ears("US-78.1")
     @Test fun backTwiceToLeave_US78_1() {
         PlayerSettings.get(context).update { it.copy(backTwice = true) }
         waitUntil(2_000) { PlayerSettings.get(context).prefs.value.backTwice }
@@ -262,12 +274,14 @@ class PlayerChromeTest {
         assertTrue("second back within the window left the player", left)
     }
 
+    @Ears("US-78")
     @Test fun backOnceLeavesByDefault_US78() {
         back()
         SystemClock.sleep(800)
         assertEquals(androidx.lifecycle.Lifecycle.State.DESTROYED, scenario.state)
     }
 
+    @Ears("US-60.4")
     @Test fun keepStatusVisibleWhenHidden_US60_4() {
         // Controls are hidden on open.
         PlayerSettings.get(context).update { it.copy(keepStatusVisible = true) }
@@ -276,12 +290,13 @@ class PlayerChromeTest {
         shot("06-kept-status")
     }
 
+    @Ears("US-65.3")
     @Test fun menuOpensSideSheetWithSettings_US65_3() {
         showControls("more")
         compose.onNodeWithTag("more").performClick()
         compose.waitUntil(2_000) { shown("menu-player-settings") }
         shot("07-menu")
-        compose.onNodeWithTag("menu-player-settings").performClick()
+        compose.onNodeWithTag("menu-player-settings").performScrollTo().performClick()
         compose.waitUntil(2_000) { shown("player-settings") }
         shot("08-player-settings")
         assertTrue("playback continued", PlayerSessions.current.value?.state?.value?.paused == false)
@@ -343,11 +358,10 @@ class PlayerChromeTest {
         return Uri.fromFile(file)
     }
 
+    /** Saved per test by core/testing, so the EARS report links it to the criterion. */
     private fun shot(name: String) {
         SystemClock.sleep(400)
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 
     private fun log(line: String) {
