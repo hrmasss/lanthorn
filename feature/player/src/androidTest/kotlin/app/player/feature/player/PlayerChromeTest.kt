@@ -89,10 +89,14 @@ class PlayerChromeTest {
         }
         SystemClock.sleep(1_000)
         step("playing", true)
+        // Preconditions, logged so a failure says which side is wrong.
+        waitUntil(3_000) { !PlayerSettings.get(context).prefs.value.keepScreenOnPaused }
         // Pause the way a viewer does: the play/pause button.
         compose.onNodeWithTag("video").performClick()
         compose.waitUntil(2_000) { shown("play-pause") }
         compose.onNodeWithTag("play-pause").performClick()
+        waitUntil(3_000) { mpvPaused() == true }
+        log("US-60.1 after the pause tap: mpv pause=${mpvPaused()}, setting keepScreenOnPaused=${PlayerSettings.get(context).prefs.value.keepScreenOnPaused}")
         step("paused, setting off", false)
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
         step("paused, setting on", true)
@@ -268,6 +272,9 @@ class PlayerChromeTest {
     }
 
     /** KEEP_SCREEN_ON on the player's window, as the window manager reports it. */
+    private fun mpvPaused(): Boolean? =
+        kotlinx.coroutines.runBlocking { PlayerSessions.current.value?.get("pause", app.player.core.engine.PropertyType.Flag) }
+
     private fun keepScreenOn(): Boolean = Regex("fl=[^ ]*KEEP_SCREEN_ON").containsMatchIn(windowBlock())
 
     /** The player window's entry in `dumpsys window windows`, from its header to the next window. */
