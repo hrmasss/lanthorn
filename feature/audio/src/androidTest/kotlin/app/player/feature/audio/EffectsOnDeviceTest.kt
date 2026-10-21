@@ -30,7 +30,7 @@ class EffectsOnDeviceTest {
     private var holder = Any()
     private val store = AudioPrefsStore(OnDevice.context)
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         store.reset()
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { AudioExtension.onEngineCreated(OnDevice.context, it) }
@@ -40,7 +40,7 @@ class EffectsOnDeviceTest {
         engine.await("audio-out-params/channel-count", PropertyType.Int64, 15_000) { it != null }
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         if (!::scenario.isInitialized) return@runBlocking
         runCatching { scenario.onActivity { it.surface.engine = null } }
         OnDevice.release(holder)

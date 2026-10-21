@@ -36,7 +36,7 @@ class OnlineSearchOnDeviceTest {
     private val device get() = UiDevice.getInstance(OnDevice.instrumentation)
     private val video get() = File(OnDevice.context.cacheDir, "online/Clip.mkv")
 
-    @Before fun start() = runBlocking {
+    @Before fun start(): Unit = runBlocking {
         accounts.reset()
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         OnlineSearchPanel.baseUrl = fake.baseUrl
@@ -51,7 +51,7 @@ class OnlineSearchOnDeviceTest {
         Unit
     }
 
-    @After fun close() = runBlocking {
+    @After fun close(): Unit = runBlocking {
         accounts.reset()
         SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true)
         OnlineSearchPanel.baseUrl = OpenSubtitles.BASE_URL
