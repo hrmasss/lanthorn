@@ -27,4 +27,22 @@ object Failures {
             else -> FailureReason.Damaged
         }
     }
+
+    /** "Long.mp4" from "primary:Movies/PB/Single/Long.mp4" or "/sdcard/x/Long.mp4"; null for a bare number. */
+    fun nameFromPath(segment: String): String? {
+        val name = segment.substringAfterLast('/').substringAfterLast(':').trim()
+        return name.takeIf { it.isNotEmpty() && !it.all(Char::isDigit) }
+    }
+
+    /** The codec mpv could not decode, from its log, for the codec reason's text. */
+    fun codecOf(lines: List<EngineMessage>): String? = lines.firstNotNullOfOrNull { m ->
+        Regex("""codec '([\w-]+)'|for: ([\w-]+)""").find(m.text)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() }
+    }
+
+    /** Technical lines for "Info": the engine's error and mpv's errors, each a capitalised sentence, no repeats. */
+    fun technical(error: String?, lines: List<EngineMessage>): List<String> =
+        (listOfNotNull(error) + lines.filter { it.level == EngineMessage.Level.Error }.map { it.text })
+            .map { it.trim().removeSuffix(".").replaceFirstChar(Char::uppercase) + "." }
+            .distinct()
+            .take(6)
 }
