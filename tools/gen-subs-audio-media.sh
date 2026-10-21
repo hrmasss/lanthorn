@@ -88,3 +88,36 @@ ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=25:duration=10 
   -f lavfi -i sine=frequency=440:duration=10:sample_rate=48000 -f lavfi -i sine=frequency=880:duration=10:sample_rate=48000 \
   -map 0:v -map 1:a -map 2:a -c:v libx264 -preset veryfast -crf 35 -pix_fmt yuv420p -c:a aac -b:a 48k \
   -metadata:s:a:0 language=eng -metadata:s:a:1 language=ita -disposition:a:0 0 -disposition:a:1 default "$AUD/default-second.mkv"
+
+# One subtitle file per format for the auto-load test (US-39.1), next to a clip with no subtitles.
+# PGS and VobSub are bitmaps: tools/pgs.py draws a PGS file, FFmpeg turns that into DVD subpictures
+# in an MPEG stream (the VobSub .sub), and the .idx is written with FFmpeg's palette.
+F=feature/subtitles/src/androidTest/assets/formats
+mkdir -p "$F"
+ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=10 -c:v libx264 -preset veryfast -crf 35 -pix_fmt yuv420p "$F/nosubs.mkv"
+cat > "$F/fmt.ass" <<'ASS'
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 640
+PlayResY: 360
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,sans-serif,30,&H0000FFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,1,2,20,20,30,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,ASS format line
+ASS
+printf 'WEBVTT\n\n00:00:00.000 --> 00:00:10.000\nVTT format line\n' > "$F/fmt.vtt"
+printf '{0}{250}MicroDVD format line\n{260}{300}Second line\n{310}{350}Third line\n' > "$F/fmt-microdvd.sub"  # FFmpeg's probe wants three lines
+python3 -I tools/pgs.py "$F/fmt-pgs.sup" "PGS format line" 1280 720
+python3 -I tools/pgs.py "$T/vob.sup" "VobSub format line" 720 480
+ffmpeg -loglevel error -y -i "$T/vob.sup" -map 0:s -c:s dvdsub -f mpeg "$F/fmt-vobsub.sub"
+cat > "$F/fmt-vobsub.idx" <<'IDX'
+# VobSub index file, v7 (do not modify this line!)
+size: 720x480
+palette: 000000, 0000ff, 00ff00, ff0000, ffff00, ff00ff, 00ffff, ffffff, 808000, 8080ff, 800080, 80ff80, 008080, ff8080, 555555, aaaaaa
+id: en, index: 0
+timestamp: 00:00:00:000, filepos: 000000000
+IDX

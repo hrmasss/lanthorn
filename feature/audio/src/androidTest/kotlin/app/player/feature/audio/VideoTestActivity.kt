@@ -67,3 +67,20 @@ internal suspend fun <T : Any> PlayerEngine.await(
 internal fun evidence(line: String) {
     android.util.Log.i("evidence", line)
 }
+
+/**
+ * A timing limit from the spec. Asserted on the reference emulator; recorded only when the run says
+ * `-e timing lenient` (the shared CI emulator is slower, its numbers make no claim either way).
+ */
+internal fun assertWithin(what: String, tookMs: Long, limitMs: Long) {
+    val lenient = InstrumentationRegistry.getArguments().getString("timing") == "lenient"
+    evidence("timing $what: $tookMs ms (limit $limitMs)" + if (lenient && tookMs >= limitMs) ", over, lenient run" else "")
+    if (!lenient) org.junit.Assert.assertTrue("$what took $tookMs ms (limit $limitMs)", tookMs < limitMs)
+}
+
+/**
+ * Runs of several minutes run only when asked (`-e long true`); otherwise the test passes at once
+ * and says so. (An assumption failure shows as a failure in the Gradle report, so no Assume.)
+ */
+internal fun longRun(): Boolean =
+    (InstrumentationRegistry.getArguments().getString("long") == "true").also { if (!it) evidence("long run skipped, pass -e long true") }

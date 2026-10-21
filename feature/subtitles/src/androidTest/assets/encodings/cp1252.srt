@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:10,000
+Où est passé le garçon qui jouait près de la fenêtre ?
+
+2
+00:00:10,000 --> 00:00:13,000
+Ça fait déjà trois jours qu'il pleut à Montréal.
+
+3
+00:00:13,000 --> 00:00:16,000
+Elle a mangé une crêpe brûlée au café.
+
+4
+00:00:16,000 --> 00:00:19,000
+Nous irons à la pêche dès l'aube.
+
+5
+00:00:19,000 --> 00:00:22,000
+Le château était entouré d'une forêt épaisse.
+
+6
+00:00:22,000 --> 00:00:25,000
+Je n'ai jamais vu un été aussi chaud.
+
+7
+00:00:25,000 --> 00:00:28,000
+Votre colis arrivera après-demain.
+
+8
+00:00:28,000 --> 00:00:31,000
+Merci beaucoup, à bientôt !

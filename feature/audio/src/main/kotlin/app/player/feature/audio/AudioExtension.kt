@@ -117,8 +117,12 @@ object AudioExtension : PlayerExtension {
             // US-47.4: the track the viewer picked for this file, once it has loaded.
             scope.launch {
                 val store = choices ?: PerFileChoices(context).also { choices = it }
-                engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
-                    store.get(uri, TRACK_KEY)?.toLongOrNull()?.let { engine.set("aid", it.toString()) }
+                // Every finished load, also of the same file again: mpv picks tracks afresh each time.
+                engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.collect { (_, uri) ->
+                    // mpv's aid is global: without a remembered pick, give the choice back to its own rule
+                    // (preferred language, else the default-flagged track), not the last file's pick.
+                    val remembered = uri?.let { store.get(it, TRACK_KEY) }?.toLongOrNull()
+                    engine.set("aid", remembered?.toString() ?: "auto")
                 }
             },
             // US-48.3: every new file starts at the default delay.

@@ -6,9 +6,9 @@ import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 
 /**
- * Turns subtitle file bytes into text. Our libmpv is built without iconv, so mpv's
- * `sub-codepage` does nothing: every external text subtitle is decoded here and handed to mpv
- * as UTF-8 (US-44).
+ * Turns subtitle file bytes into text (US-44). A byte-order mark, valid UTF-8 or the viewer's own
+ * encoding pick is decoded here and handed to mpv as UTF-8. Anything else is left to mpv, whose
+ * `sub-codepage=auto` detects it with uchardet and converts with iconv (libmpv P1.33).
  */
 internal object SubtitleText {
     /** Formats that are text and may need a charset. VobSub `.sub` is binary; see [isBinary]. */
@@ -26,18 +26,16 @@ internal object SubtitleText {
     }
 
     /**
-     * Decodes [bytes]. A byte-order mark wins, then [forced] (the viewer's pick), then strict
-     * UTF-8, then [guess], then Windows-1252, which decodes any byte.
+     * Decodes [bytes]: a byte-order mark wins, then [forced] (the viewer's pick), then strict
+     * UTF-8. Null when none applies: the file goes to mpv as it is, for detection.
      */
-    fun decode(bytes: ByteArray, forced: Charset? = null, guess: (ByteArray) -> String? = { null }): Decoded {
+    fun decode(bytes: ByteArray, forced: Charset? = null): Decoded? {
         bom(bytes)?.let { (charset, skip) ->
             return Decoded(String(bytes, skip, bytes.size - skip, charset), charset)
         }
         if (forced != null) return Decoded(String(bytes, forced), forced)
         strictUtf8(bytes)?.let { return Decoded(it, Charsets.UTF_8) }
-        val guessed = guess(bytes)?.let { name -> runCatching { Charset.forName(name) }.getOrNull() }
-        val charset = guessed ?: Charset.forName("windows-1252")
-        return Decoded(String(bytes, charset), charset)
+        return null
     }
 
     data class Decoded(val text: String, val charset: Charset)

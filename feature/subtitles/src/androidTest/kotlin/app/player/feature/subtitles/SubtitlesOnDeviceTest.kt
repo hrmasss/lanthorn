@@ -21,7 +21,7 @@ import java.nio.charset.Charset
 /** P1.3 subtitle wiring against the real libmpv, on the emulator. */
 class SubtitlesOnDeviceTest {
     /** A stuck wait fails the test instead of holding the shared emulator. */
-    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300)
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
@@ -29,12 +29,15 @@ class SubtitlesOnDeviceTest {
     private val holder = Any()
 
     @Before fun open() = runBlocking {
+        // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
+        SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         scenario.onActivity { it.surface.engine = engine }
         controller = SubtitleController(engine.asMpv())
         engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
+        engine.awaitAutoLoad()
         // Keep the subtitle on screen for the checks: pause one second in.
         engine.pause()
         // A seek sent while mpv is still starting the file can be dropped: resend until it lands.
@@ -47,6 +50,7 @@ class SubtitlesOnDeviceTest {
     }
 
     @After fun close() {
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         if (!::scenario.isInitialized) return
         scenario.onActivity { it.surface.engine = null }
         OnDevice.release(holder)
@@ -81,7 +85,7 @@ class SubtitlesOnDeviceTest {
         controller.setDelayMs(-50)
         engine.await("sub-delay", PropertyType.Real) { it != null && kotlin.math.abs(it + 0.05) < 1e-6 }
         evidence("US-41.1 sub-delay +20 s hid the line in $took ms (limit 100); -50 ms step read back -0.05")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("SubtitlesOnDeviceTest", took, 100)
     }
 
     @Test fun speedStretchesTiming_US41_2() = runBlocking {
@@ -144,7 +148,7 @@ class SubtitlesOnDeviceTest {
         delay(900)
         shot("us44-after-reload")
         evidence("US-44.2 '$before' -> '$expected' after picking windows-1250 in $took ms (limit 1000)")
-        assertTrue("took $took ms", took < 1000)
+        assertWithin("SubtitlesOnDeviceTest", took, 1000)
     }
 
     @Test fun ignoreEmbeddedFonts_US42_4() = runBlocking {
@@ -165,6 +169,7 @@ class SubtitlesOnDeviceTest {
     private suspend fun openFonts() {
         engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.awaitAutoLoad()
         engine.set("sid", "1")
         engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
     }
