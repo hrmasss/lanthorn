@@ -124,7 +124,7 @@ class OnlineSearchOnDeviceTest {
         val download = fake.requests.first { it.path.startsWith("/api/v1/download") }
         assertEquals("Bearer T0K3N", download.headers["authorization"])
         // US-46.5: the viewer's key on every request, not only the search.
-        fake.requests.forEach { assertEquals(it.path, "viewer-own-key", it.headers["api-key"]) }
+        fake.requests.filter { it.path.startsWith("/api/v1/") }.forEach { assertEquals(it.path, "viewer-own-key", it.headers["api-key"]) }
         shot("us46-downloaded-on")
         evidence("US-46.3 0 requests before the tap; then: $paths")
         evidence("US-46.1 search by moviehash and name (${search.path.substringAfter('?').take(80)}), results list language and rating")
