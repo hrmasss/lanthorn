@@ -146,8 +146,8 @@ class PlayerWindowUiTest {
         assertNotNull(device.wait(Until.findObject(By.text("Unlock")), 1_500))
         assertFalse("controls showed while locked", device.hasObject(By.desc("More options")))
         shot("11-touch-while-locked")
-        // Where play/pause sits when unlocked: nothing happens.
-        device.click(device.displayWidth / 2, device.displayHeight * 93 / 100)
+        // Near where play/pause sits when unlocked (above the system gesture bar): nothing happens.
+        device.click(device.displayWidth / 2, device.displayHeight * 80 / 100)
         SystemClock.sleep(800)
         assertEquals("a touch on the play button area changed playback", wasPaused, state()!!.paused)
         // US-28.3: rotation held while locked, whatever the device does.
@@ -209,9 +209,11 @@ class PlayerWindowUiTest {
         SystemClock.sleep(2_000)
         device.pressHome()
         assertTrue("no picture-in-picture after home", waitFor(5_000) { player()?.isInPictureInPictureMode == true })
-        val win = device.wait(Until.findObject(By.pkg("app.player")), 3_000)
-        assertNotNull(win)
-        val b = win!!.visibleBounds
+        // The window settles into its corner after entering, so read its bounds once it has.
+        SystemClock.sleep(1_000)
+        val b = retrying { device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds }
+        assertNotNull("no PiP window", b)
+        b!!
         val ratio = b.width().toFloat() / b.height()
         log("pip window $b, ratio $ratio")
         shot("20-pip")
@@ -253,7 +255,8 @@ class PlayerWindowUiTest {
         SystemClock.sleep(4_000)
         device.pressHome()
         assertTrue(waitFor(5_000) { player()?.isInPictureInPictureMode == true })
-        val b = device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds
+        SystemClock.sleep(1_000)
+        val b = retrying { device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds }!!
         device.click(b.centerX(), b.centerY())
         SystemClock.sleep(1_500)
         val close = device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)
@@ -263,10 +266,16 @@ class PlayerWindowUiTest {
         val at = state()!!.positionMs
         close!!.click()
         assertTrue("player still there after closing PiP", waitFor(5_000) { player() == null })
-        val row = runBlocking { ResumePoints(context).get(uri.toString()) }
+        // The save on leaving is written off the main thread; give it a moment after the close.
+        var row = runBlocking { ResumePoints(context).get(uri.toString()) }
+        waitFor(3_000) {
+            row = runBlocking { ResumePoints(context).get(uri.toString()) }
+            row?.let { it.positionMs >= at - 1_000 } == true
+        }
         log("after closing PiP at $at ms: row $row")
-        assertNotNull("no resume point after closing PiP", row)
-        assertTrue("resume point ${row!!.positionMs} not near $at", row.positionMs in at - 1_000..at + 3_000)
+        val saved = row
+        assertNotNull("no resume point after closing PiP", saved)
+        assertTrue("resume point ${saved!!.positionMs} not near $at", saved.positionMs in at - 1_000..at + 3_000)
         shot("24-pip-closed")
     }
 

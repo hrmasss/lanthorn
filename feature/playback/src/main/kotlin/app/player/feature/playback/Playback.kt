@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
@@ -301,14 +303,18 @@ object Playback : PlaybackControls {
                 }
             }
             var last: PlaybackState? = null
+            var lastSaved: PlaybackState? = null
             var savedAt = 0L
             fun save(s: PlaybackState, why: String) {
                 savedAt = SystemClock.elapsedRealtime()
+                lastSaved = s
                 scope.launch(NonCancellable) { write(s, why) }
             }
             launch {
                 PlayerSessions.current.first { it !== engine }
-                last?.let { withContext(NonCancellable) { write(it, "engine released") } }
+                // Leaving pauses first, and that save is the newest; `last` can be one update behind it.
+                val pausedSaved = lastSaved?.let { it.paused && it.uri == last?.uri } == true
+                if (!pausedSaved) last?.let { withContext(NonCancellable) { write(it, "engine released") } }
                 if (this@Playback.engine === engine) this@Playback.engine = null
                 watcher?.cancel()
             }
@@ -405,13 +411,18 @@ object Playback : PlaybackControls {
 
     private fun <T> PlayQueue<T>.currentOrNull(): T? = if (size == 0) null else current
 
+    /** Writes in the order they were asked for, so an older position never lands last. */
+    private val writes = Mutex()
+
     private suspend fun write(s: PlaybackState, why: String) {
-        val row = Resume.toSave(s, System.currentTimeMillis()) ?: run {
-            Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, uri ${s.uri}")
-            return
+        writes.withLock {
+            val row = Resume.toSave(s, System.currentTimeMillis()) ?: run {
+                Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, uri ${s.uri}")
+                return
+            }
+            if (history.isPaused()) return
+            resumePoints.put(row)
+            Log.i(TAG, "saved ${row.uri} at ${row.positionMs} of ${row.durationMs} ($why)")
         }
-        if (history.isPaused()) return
-        resumePoints.put(row)
-        Log.i(TAG, "saved ${row.uri} at ${row.positionMs} of ${row.durationMs} ($why)")
     }
 }
