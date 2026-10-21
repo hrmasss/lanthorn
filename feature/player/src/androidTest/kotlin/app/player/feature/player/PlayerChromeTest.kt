@@ -154,13 +154,14 @@ class PlayerChromeTest {
     }
 
     @Test fun remainingTimeSurvivesReopen_US16_4() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("end-time") }
+        repeat(3) { if (!shown("end-time")) { compose.onNodeWithTag("video").performClick(); runCatching { compose.waitUntil(3_000) { shown("end-time") } } } }
         compose.onNodeWithTag("end-time").performClick()
         waitUntil(2_000) { PlayerSettings.get(context).prefs.value.showRemaining }
         scenario.close()
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip()))
-        waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
+        // Through the compose rule, so the new window is laid out before the first tap.
+        compose.waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
+        compose.waitForIdle()
         // Show the controls and read at once; tap again if auto-hide got there first.
         fun endTime() = runCatching {
             if (!shown("end-time")) compose.onNodeWithTag("video").performClick()
@@ -238,13 +239,22 @@ class PlayerChromeTest {
         // mpv's own flag: PlaybackState.paused can read true while playing (engine bug, reported).
         val pausedNow = kotlinx.coroutines.runBlocking { PlayerSessions.current.value?.get("pause", app.player.core.engine.PropertyType.Flag) }
         assertTrue("still playing", pausedNow == false)
+        // The checks and the shot above can outlast the 2 s window on the hosted emulator, so the
+        // leaving pair is pressed fresh: one press arms again, the next within the window leaves.
+        SystemClock.sleep(BackTwice.WINDOW_MS + 200)
         back()
-        SystemClock.sleep(500)
-        assertTrue(scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED || run {
-            var f = false
-            scenario.onActivity { f = it.isFinishing }
-            f
-        })
+        back()
+        val t0 = SystemClock.elapsedRealtime()
+        var left = false
+        while (!left && SystemClock.elapsedRealtime() - t0 < 3_000) {
+            left = scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED || run {
+                var f = false
+                scenario.onActivity { f = it.isFinishing }
+                f
+            }
+            if (!left) SystemClock.sleep(100)
+        }
+        assertTrue("second back within the window left the player", left)
     }
 
     @Test fun backOnceLeavesByDefault_US78() {
