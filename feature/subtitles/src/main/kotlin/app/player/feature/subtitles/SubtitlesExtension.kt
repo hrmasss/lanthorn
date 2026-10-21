@@ -94,8 +94,9 @@ object SubtitlesExtension : PlayerExtension {
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
         val styles = styles(context)
         SubtitleFonts.install(context, listOf(styles.userFontDir.path))
-        // We find and decode subtitle files ourselves (UTF-8 for mpv, which has no iconv here).
+        // We find subtitle files ourselves (scoped storage). Legacy encodings: mpv detects them (US-44.1).
         engine.set("sub-auto", "no")
+        engine.set("sub-codepage", "auto")
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
@@ -158,15 +159,23 @@ private object TracksPanel : PlayerPanel {
         val ignoreFonts by controller.ignoreEmbeddedFonts.collectAsState(false)
         val failed = stringResource(R.string.subs_open_failed)
 
+        val loader = remember { SubtitlesExtension.autoLoad(context) }
+
         fun add(uri: Uri, charset: Charset? = null) = scope.launch {
             runCatching { files.prepare(uri, charset) }
-                .onSuccess { controller.addFile(it.path, it.title) }
+                .onSuccess { prepared ->
+                    controller.addFile(prepared.path, prepared.title)
+                    // US-40.2: keep read access and remember it for this video.
+                    runCatching { context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+                    host.engine.state.value.uri?.let { video -> loader.rememberExternal(video, uri, prepared.title) }
+                }
                 .onFailure { Toast.makeText(context, failed, Toast.LENGTH_SHORT).show() }
         }
 
-        val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(::add) }
+        // US-40.1: the picker opens in the video's folder.
+        val openSubtitle = remember { OpenSubtitle() }
+        val picker = rememberLauncherForActivityResult(openSubtitle) { uri -> uri?.let(::add) }
 
-        val loader = remember { SubtitlesExtension.autoLoad(context) }
         fun rememberPick(id: Long?) {
             val uri = host.engine.state.value.uri ?: return
             val track = tracks.firstOrNull { it.id == id }
@@ -228,7 +237,10 @@ private object TracksPanel : PlayerPanel {
                 ) { Text(stringResource(R.string.subs_allow_folder)) }
             }
             OutlinedButton(
-                onClick = { picker.launch(arrayOf("*/*")) },
+                onClick = {
+                    openSubtitle.start = loader.lastResult?.place?.let(loader::folderUri)
+                    picker.launch(arrayOf("*/*"))
+                },
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag("sub-open-file"),
             ) { Text(stringResource(R.string.subs_open_file)) }
             SwitchRow(stringResource(R.string.subs_override_styles), override, "sub-override", onChange = controller::setOverrideStyles)
@@ -321,3 +333,11 @@ private fun Track.details(secondary: Boolean): String = listOfNotNull(
     stringResource(R.string.subs_external).takeIf { external },
     stringResource(R.string.subs_second).takeIf { secondary },
 ).joinToString(" · ")
+
+/** The system file picker, opened at [start] (the video's folder) when the system knows it (US-40.1). */
+internal class OpenSubtitle : ActivityResultContracts.OpenDocument() {
+    var start: Uri? = null
+
+    override fun createIntent(context: Context, input: Array<String>): android.content.Intent =
+        super.createIntent(context, input).apply { start?.let { putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, it) } }
+}

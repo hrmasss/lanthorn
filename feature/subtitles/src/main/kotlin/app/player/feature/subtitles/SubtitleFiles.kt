@@ -54,7 +54,12 @@ internal class SubtitleFiles(context: Context) {
             out.writeBytes(bytes)
             return null
         }
-        val decoded = SubtitleText.decode(bytes, forced, ::detect)
+        val decoded = SubtitleText.decode(bytes, forced)
+        if (decoded == null) {
+            // Legacy encoding, not picked by hand: mpv detects it (sub-codepage=auto, uchardet).
+            out.writeBytes(bytes)
+            return null
+        }
         out.writeText(decoded.text, Charsets.UTF_8)
         return decoded.charset
     }
@@ -80,8 +85,6 @@ internal class SubtitleFiles(context: Context) {
         return uri.lastPathSegment?.substringAfterLast('/') ?: "subtitle"
     }
 
-    /** Legacy-encoding detection lands with P1.26 (US-44.1). Until then: UTF-8 or Windows-1252, or the viewer's pick. */
-    private fun detect(bytes: ByteArray): String? = null
 
     private fun digest(s: String): String =
         MessageDigest.getInstance("SHA-1").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }.take(16)
