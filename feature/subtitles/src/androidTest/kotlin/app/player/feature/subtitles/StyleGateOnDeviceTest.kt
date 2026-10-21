@@ -117,7 +117,7 @@ class StyleGateOnDeviceTest {
         delay(800)
         shot("us42-panel-box")
         evidence("US-42.3 from the player's style panel: tap on yellow to mpv sub-color in $took ms (limit 100); screenshots with the panel open over the line")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("StyleGateOnDeviceTest", took, 100)
     }
 
     @Test fun assStylingKeptUnderEdits_US42_4_NF7() = runBlocking {

@@ -68,7 +68,7 @@ class AudioOnDeviceTest {
         val outChannels = engine.get("audio-out-params/channel-count", PropertyType.Int64)
         evidence("US-47.1 tracks eng/aac/1ch, ita/ac3/6ch; switch to ita in $took ms (limit 500), position $pos0 -> $pos1 s, no seek")
         evidence("US-51.2 5.1 ac3 track plays out as $outChannels channels (downmixed, settled in $out ms)")
-        assertTrue("took $took ms", took < 500)
+        assertWithin("AudioOnDeviceTest", took, 500)
     }
 
     @Test fun delayAppliesWithin200ms_US48_1() = runBlocking {
@@ -80,7 +80,7 @@ class AudioOnDeviceTest {
         controller.setDelayMs(-20_000)
         engine.await("audio-delay", PropertyType.Real) { it != null && abs(it + 10.0) < 1e-6 }
         evidence("US-48.1 audio-delay 1234 ms snapped to 1.23 s, applied in $took ms (limit 200); -20 s clamped to -10 s")
-        assertTrue("took $took ms", took < 200)
+        assertWithin("AudioOnDeviceTest", took, 200)
     }
 
     @Test fun effectsOnOurSession_US49_2_US49_3_US50_2() = runBlocking {
@@ -119,7 +119,7 @@ class AudioOnDeviceTest {
         engine = OnDevice.acquire(holder) { AudioExtension.onEngineCreated(OnDevice.context, it) }
         assertEquals(1f, boost)
         evidence("US-49.3 boost 200% before close, ${(boost * 100).toInt()}% on the next player")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("AudioOnDeviceTest", took, 100)
     }
 
     /**
@@ -190,10 +190,11 @@ class AudioOnDeviceTest {
         OnDevice.main { effects.setStereo(StereoMode.Stereo) }
         engine.await("af", PropertyType.Text) { it?.contains("subsaudio-stereo") != true }
         evidence("US-51.1 mono: filter in the chain ($chainText) after $filterMs ms, audio out after $tookMs ms (limit 200)")
-        assertTrue("took $tookMs ms", tookMs < 200)
+        assertWithin("AudioOnDeviceTest", tookMs, 200)
     }
 
     @Test fun externalAudioStaysInSync_US47_3() = runBlocking {
+        assumeLongRun()
         engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))
         engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
         controller.addFile(OnDevice.asset("dub.m4a").path, "dub.m4a")
@@ -205,6 +206,7 @@ class AudioOnDeviceTest {
 
     /** Baseline for US-47.3: the file's own audio track, same file, same seeks, same device. */
     @Test fun embeddedAudioSyncBaseline() = runBlocking {
+        assumeLongRun()
         engine.open(Uri.fromFile(OnDevice.asset("long.mp4")))
         engine.await("duration", PropertyType.Real, 10_000) { it != null && it > 290 }
         engine.await("audio-out-params/channel-count", PropertyType.Int64, 10_000) { it != null }

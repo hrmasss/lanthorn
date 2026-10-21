@@ -87,7 +87,7 @@ class StyleOnDeviceTest {
         shot("us42-box-monospace")
         evidence("US-42.2 defaults: white #FFFFFFFF, size 46, bold, border 0, shadow 3 at #E0000000")
         evidence("US-42.3 colour, outline, font, size change applied to mpv in $took ms (limit 100); screenshots before/after")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("StyleOnDeviceTest", took, 100)
     }
 
     @Test fun alignmentMarginAndFit_US43_1_US43_2() = runBlocking {

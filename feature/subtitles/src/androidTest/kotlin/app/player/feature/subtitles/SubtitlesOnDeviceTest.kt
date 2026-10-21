@@ -85,7 +85,7 @@ class SubtitlesOnDeviceTest {
         controller.setDelayMs(-50)
         engine.await("sub-delay", PropertyType.Real) { it != null && kotlin.math.abs(it + 0.05) < 1e-6 }
         evidence("US-41.1 sub-delay +20 s hid the line in $took ms (limit 100); -50 ms step read back -0.05")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("SubtitlesOnDeviceTest", took, 100)
     }
 
     @Test fun speedStretchesTiming_US41_2() = runBlocking {
@@ -148,7 +148,7 @@ class SubtitlesOnDeviceTest {
         delay(900)
         shot("us44-after-reload")
         evidence("US-44.2 '$before' -> '$expected' after picking windows-1250 in $took ms (limit 1000)")
-        assertTrue("took $took ms", took < 1000)
+        assertWithin("SubtitlesOnDeviceTest", took, 1000)
     }
 
     @Test fun ignoreEmbeddedFonts_US42_4() = runBlocking {
