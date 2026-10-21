@@ -95,6 +95,9 @@ jobs:
             adb root || true
             adb wait-for-device
             adb shell pm disable com.google.android.gms/.setupservices.CoverSheetWelcomeActivity || true
+            # It may already be open by now: stopping Play services closes it, and it cannot reopen.
+            adb shell am force-stop com.google.android.gms || true
+            echo "First-boot welcome screen in the activity stack before the tests: $(adb shell dumpsys activity activities | grep -c CoverSheetWelcomeActivity)" | tee -a "$GITHUB_STEP_SUMMARY"
             adb shell settings put secure user_setup_complete 1 || true
             adb shell settings put global device_provisioned 1 || true
             adb shell input keyevent KEYCODE_HOME || true
