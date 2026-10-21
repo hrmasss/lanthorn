@@ -312,7 +312,8 @@ class BackgroundMediaUiTest {
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(PlayerIntents.withQueue(intent, uris, index))
-        assertTrue("${names[index]} never played", waitFor(15_000) { state()?.let { it.video != null && !it.paused && it.uri?.endsWith(names[index]) == true } == true })
+        // Until the first frame the engine thread is busy opening, and a pause or key waits behind it.
+        assertTrue("${names[index]} never played", waitFor(15_000) { state()?.let { it.video != null && !it.paused && it.firstFrameMs != null && it.uri?.endsWith(names[index]) == true } == true })
         return uris[index]
     }
 
