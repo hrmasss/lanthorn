@@ -1,5 +1,6 @@
 package app.player.feature.audio
 
+import app.player.core.testing.Ears
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -104,6 +105,7 @@ class AudioTest {
         )
     }
 
+    @Ears("US-51.1")
     @Test fun `reverse swaps the channels through pan, stereo removes it (US-51_1)`() {
         effects.setStereo(StereoMode.Reverse)
         effects.setStereo(StereoMode.Stereo)
@@ -117,6 +119,7 @@ class AudioTest {
         )
     }
 
+    @Ears("US-50.1")
     @Test fun `nine named presets and a custom one, ten bands each (US-50_1)`() {
         val named = EqPreset.entries.filter { it != EqPreset.Custom }
         assertEquals(9, named.size)
@@ -125,6 +128,7 @@ class AudioTest {
         assertFalse(EffectsState().eqOn)
     }
 
+    @Ears("US-50.1")
     @Test fun `a preset sets every band, a moved band makes the curve custom (US-50_1)`() {
         effects.setEq(true)
         effects.setPreset(EqPreset.Rock)
@@ -139,6 +143,7 @@ class AudioTest {
         assertEquals(s.customDb, effects.state.value.bandsDb)
     }
 
+    @Ears("US-50.3")
     @Test fun `saved equalizer comes back as it was (US-50_3)`() {
         val custom = List(Eq.BANDS) { i -> i - 4f }
         effects.restore(EqSaved(on = true, preampDb = -3f, preset = EqPreset.Custom, customDb = custom))

@@ -1,6 +1,5 @@
 package app.player.feature.audio
 
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import androidx.test.core.app.ActivityScenario
@@ -8,6 +7,8 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.PlayerEngine
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import app.player.core.engine.PropertyType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -19,7 +20,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.Timeout
-import java.io.File
 
 /** P1.32: presets, the equalizer kept across players, reverse stereo, the volume-boost hook. */
 class EffectsOnDeviceTest {
@@ -58,6 +58,7 @@ class EffectsOnDeviceTest {
     }
 
     /** US-50.1 from the real effects panel; US-50.3 the next player starts with the same equalizer. */
+    @Ears("US-50.1", "US-50.3")
     @Test fun presetsFromThePanelKeptForTheNextPlayer_US50_1_US50_3() = runBlocking {
         val effects = effects()
         PanelTestActivity.withVideo = false
@@ -99,6 +100,7 @@ class EffectsOnDeviceTest {
         evidence("US-50.3 band 31 Hz moved to -6 dB (Custom), saved; the next player started with equalizer on, Custom, ${restored.bandsDb}")
     }
 
+    @Ears("US-51.1")
     @Test fun reverseWithin200ms_US51_1() = runBlocking {
         val effects = effects()
         val chain = engine.observe("af", PropertyType.Text)
@@ -118,6 +120,7 @@ class EffectsOnDeviceTest {
     }
 
     /** US-49.1, this module's half: the hook player-ui's volume gesture calls. The gesture is P1.10's. */
+    @Ears("US-49.1")
     @Test fun boostHookRaisesGainAndFollowsTheSetting_US49_1() = runBlocking {
         val effects = effects()
         val boost = AudioExtension.volumeBoost
@@ -141,8 +144,6 @@ class EffectsOnDeviceTest {
     }
 
     private fun shot(name: String) {
-        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
-        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 }
