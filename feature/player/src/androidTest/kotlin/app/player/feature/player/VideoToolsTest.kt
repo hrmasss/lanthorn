@@ -152,6 +152,13 @@ class VideoToolsTest {
         assertEquals("zeros give back the frame", 0, back)
     }
 
+    @Test fun deinterlaceDefaultsToAuto_US38_1() = runBlocking<Unit> {
+        open("clip.mp4")
+        val mode = engine.get("deinterlace", PropertyType.Text)
+        log("US-38.1 fresh player: deinterlace=$mode")
+        assertEquals("auto", mode)
+    }
+
     @Test fun deinterlaceModes_US38() = runBlocking<Unit> {
         open("interlaced.mp4")
         // Deinterlacing needs frames in memory: zero-copy HW cannot run it (US-35.4).
