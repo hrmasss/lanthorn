@@ -67,6 +67,8 @@ class PlayerWindowUiTest {
         device.wakeUp()
         device.unfreezeRotation()
         // Each test starts its files from 0: a row left by an earlier test resumes near the end.
+        // The last test's engine writes its row as it goes, so wait for it to be gone first.
+        waitFor(5_000) { PlayerSessions.current.value == null }
         runBlocking { ResumePoints(context).clear() }
     }
 
