@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -100,6 +101,9 @@ class LibraryItemsTest {
         rule.onNodeWithTag("library-list").assertExists()
         rule.mainClock.autoAdvance = false
         layout = Layout.Grid
+        // A write from the test thread reaches the recomposer only once it is applied; apply it now,
+        // so the one frame below is the first frame that can show the grid.
+        Snapshot.sendApplyNotifications()
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("library-grid").assertExists()
         rule.onNodeWithTag("library-list").assertDoesNotExist()
