@@ -66,6 +66,8 @@ class PlayerWindowUiTest {
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         device.wakeUp()
         device.unfreezeRotation()
+        // Each test starts its files from 0: a row left by an earlier test resumes near the end.
+        runBlocking { ResumePoints(context).clear() }
     }
 
     @After fun tearDown() {
