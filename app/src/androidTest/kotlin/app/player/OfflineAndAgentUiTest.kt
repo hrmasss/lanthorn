@@ -93,13 +93,13 @@ class OfflineAndAgentUiTest {
     @Test fun us_72_1_in_airplane_mode_the_library_lists_and_plays_local_videos() {
         instr.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.READ_MEDIA_VIDEO)
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "ears-offline.mp4")
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "ears-local.mp4")
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/EarsOffline/")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/EarsLocal/")
         }
         val resolver = context.contentResolver
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        resolver.delete(collection, "${MediaStore.MediaColumns.DISPLAY_NAME}=?", arrayOf("ears-offline.mp4"))
+        resolver.delete(collection, "${MediaStore.MediaColumns.DISPLAY_NAME}=?", arrayOf("ears-local.mp4"))
         val uri = resolver.insert(collection, values)!!
         try {
             resolver.openOutputStream(uri)!!.use { out -> instr.context.assets.open("withsubs.mp4").use { it.copyTo(out) } }
@@ -116,7 +116,7 @@ class OfflineAndAgentUiTest {
             val start = SystemClock.uptimeMillis()
             context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-            val folder = device.wait(Until.findObject(By.text("EarsOffline")), 20_000)
+            val folder = device.wait(Until.findObject(By.text("EarsLocal")), 20_000)
             val listed = SystemClock.uptimeMillis() - start
             assertTrue("folder never listed offline", folder != null)
             // The scan indicator (text "Looking for videos", or the progress bar's own description) must not linger.
@@ -132,7 +132,7 @@ class OfflineAndAgentUiTest {
             assertFalse("network message in the library", device.hasObject(By.text(networkError)))
 
             folder.click()
-            val row = device.wait(Until.findObject(By.text("ears-offline")), 10_000)
+            val row = device.wait(Until.findObject(By.text("ears-local")), 10_000)
             assertTrue("video not listed in its folder", row != null)
             row.click()
             assertTrue("never played offline", waitFor(20_000) { state()?.let { it.video != null && it.positionMs > 1_000 } == true })
