@@ -19,8 +19,8 @@ internal class SubtitleDiscovery(context: Context) {
     private val appContext = context.applicationContext
     private val resolver: ContentResolver get() = appContext.contentResolver
 
-    /** One subtitle file beside the video: where to read it, and its name. */
-    data class Found(val uri: Uri, val name: String)
+    /** One subtitle file beside the video: where to read it, its name, and for VobSub the `.sub` its `.idx` needs. */
+    data class Found(val uri: Uri, val name: String, val companion: Uri? = null)
 
     /** Where a video sits: its file name, and its folder as a storage document id ("primary:Movies"). */
     data class Place(val videoName: String, val folderDocId: String?, val folderFile: File?)
@@ -44,7 +44,12 @@ internal class SubtitleDiscovery(context: Context) {
                 .forEach { (name, uri) -> names.putIfAbsent(name, uri) }
         }
         val picked = SubtitleMatch.pick(place.videoName, names.keys.toList())
-        Result(picked.map { Found(names.getValue(it), it) }, place, granted)
+        val byLower = names.entries.associate { it.key.lowercase() to it.value }
+        val found = picked.map { name ->
+            val vobsub = name.endsWith(".idx", ignoreCase = true)
+            Found(names.getValue(name), name, if (vobsub) byLower[name.dropLast(4).lowercase() + ".sub"] else null)
+        }
+        Result(found, place, granted)
     }
 
     /** The storage document uri of the video's folder, to start the folder picker there. */

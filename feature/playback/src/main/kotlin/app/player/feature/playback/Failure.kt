@@ -14,6 +14,14 @@ object Failures {
         "no decoder found", "Requested decoder", "No video or audio streams",
     )
 
+    /**
+     * A file that "ends" well before its duration right after mpv logged an error did not play: mpv
+     * hit a fatal read error and stopped (US-75.1). A normal end, or a short file, is not this.
+     */
+    fun endedEarly(positionMs: Long, durationMs: Long, lines: List<EngineMessage>): Boolean =
+        durationMs > 0 && positionMs < durationMs * 0.95 && durationMs - positionMs > 1_000 &&
+            lines.any { it.level == EngineMessage.Level.Error }
+
     /** True for a log line that says a decoder could not start. */
     fun isDecoderFailure(m: EngineMessage) = codec.any { m.text.contains(it, ignoreCase = true) }
 
@@ -27,4 +35,22 @@ object Failures {
             else -> FailureReason.Damaged
         }
     }
+
+    /** "Long.mp4" from "primary:Movies/PB/Single/Long.mp4" or "/sdcard/x/Long.mp4"; null for a bare number. */
+    fun nameFromPath(segment: String): String? {
+        val name = segment.substringAfterLast('/').substringAfterLast(':').trim()
+        return name.takeIf { it.isNotEmpty() && !it.all(Char::isDigit) }
+    }
+
+    /** The codec mpv could not decode, from its log, for the codec reason's text. */
+    fun codecOf(lines: List<EngineMessage>): String? = lines.firstNotNullOfOrNull { m ->
+        Regex("""codec '([\w-]+)'|for: ([\w-]+)""").find(m.text)?.groupValues?.drop(1)?.firstOrNull { it.isNotEmpty() }
+    }
+
+    /** Technical lines for "Info": the engine's error and mpv's errors, each a capitalised sentence, no repeats. */
+    fun technical(error: String?, lines: List<EngineMessage>): List<String> =
+        (listOfNotNull(error) + lines.filter { it.level == EngineMessage.Level.Error }.map { it.text })
+            .map { it.trim().removeSuffix(".").replaceFirstChar(Char::uppercase) + "." }
+            .distinct()
+            .take(6)
 }

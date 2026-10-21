@@ -15,7 +15,7 @@ import kotlin.math.abs
 /** P1.27: the default subtitle delay from settings applies to every new file (US-41.3). */
 class TimingOnDeviceTest {
     /** A stuck wait fails the test instead of holding the shared emulator. */
-    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300)
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine

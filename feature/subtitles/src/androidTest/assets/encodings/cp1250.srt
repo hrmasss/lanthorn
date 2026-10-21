@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:10,000
+Pøíliš žluouèký kùò úpìl ïábelské ódy.
+
+2
+00:00:10,000 --> 00:00:13,000
+Dobrý den, jak se dnes máte?
+
+3
+00:00:13,000 --> 00:00:16,000
+Veèer pùjdeme do kina na nový film.
+
+4
+00:00:16,000 --> 00:00:19,000
+Tìším se na víkend u babièky.
+
+5
+00:00:19,000 --> 00:00:22,000
+Prší už tøetí den, vezmi si deštník.
+
+6
+00:00:22,000 --> 00:00:25,000
+Kde je nejbližší nádraží?
+
+7
+00:00:25,000 --> 00:00:28,000
+Dìkuji za pomoc, byl jste velmi laskav.
+
+8
+00:00:28,000 --> 00:00:31,000
+Zítra ráno vyrážíme na hory.

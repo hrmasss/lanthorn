@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import app.player.core.testing.Ears
 
 class DecoderPolicyTest {
     private val uri = "content://media/external/video/media/42/movie.MKV"
@@ -13,12 +14,16 @@ class DecoderPolicyTest {
         assertEquals(DecoderMode.AUTO, DecoderPolicy.pick(uri, DecoderPrefs()))
     }
 
+    @Ears("US-36.1")
+
     @Test fun orderIsFileThenExtensionThenPreferSoftware() { // US-36.1
         val all = DecoderPrefs(preferSoftware = true, byExtension = mapOf("mkv" to DecoderMode.HW_PLUS))
         assertEquals(DecoderMode.HW, DecoderPolicy.pick(uri, all, remembered = DecoderMode.HW))
         assertEquals(DecoderMode.HW_PLUS, DecoderPolicy.pick(uri, all))
         assertEquals(DecoderMode.SW, DecoderPolicy.pick(uri, all.copy(byExtension = emptyMap())))
     }
+
+    @Ears("US-36.4")
 
     @Test fun extensionAppliesToEveryFileWithIt() { // US-36.4
         val prefs = DecoderPrefs(byExtension = mapOf("avi" to DecoderMode.SW))
@@ -35,11 +40,15 @@ class DecoderPolicyTest {
         assertNull(DecoderPolicy.extensionOf("file:///sdcard/trailingdot."))
     }
 
+    @Ears("US-36.2")
+
     @Test fun hardwareModesFallThroughInOrder() { // US-36.2: HW, then HW+, then SW
         assertEquals("mediacodec,mediacodec-copy", DecoderMode.HW.hwdec)
         assertEquals("mediacodec-copy", DecoderMode.HW_PLUS.hwdec)
         assertEquals("no", DecoderMode.SW.hwdec)
     }
+
+    @Ears("US-35.4")
 
     @Test fun featuresNeedingCpuFramesAreOffOnHw() { // US-35.4
         assertFalse(DecoderFeature.VideoFilters.runsOn(ActiveDecoder.HW))
@@ -47,6 +56,8 @@ class DecoderPolicyTest {
         assertTrue(DecoderFeature.Deinterlace.runsOn(ActiveDecoder.SW))
         assertEquals(DecoderMode.HW_PLUS, DecoderFeature.Deinterlace.enabledBy)
     }
+
+    @Ears("US-35.3")
 
     @Test fun fallbackNoticeOnlyWhenTheChosenDecoderIsNotRunning() { // US-35.3
         assertNull(fallbackNotice(DecoderMode.AUTO, ActiveDecoder.SW))

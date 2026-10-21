@@ -305,4 +305,27 @@ class GestureTest {
         rule.waitForIdle()
         assertTrue("zoom ${fx.zoomed}", fx.zoomed > 4.0 - 1e-9 || fx.zoomed > 2.5)
     }
+
+    @Test fun `US-55_1 pinch shows the zoom percentage while it runs`() {
+        c.twoFingerStart(TwoFingerKind.Pinch)
+        c.twoFinger(TwoFingerKind.Pinch, 2f, 0f, 0f, 800f, 400f)
+        assertEquals(Readout.Zoom(200), c.readout)
+        c.twoFinger(TwoFingerKind.Pinch, 10f, 0f, 0f, 800f, 400f)
+        assertEquals(Readout.Zoom(400), c.readout)
+        c.twoFinger(TwoFingerKind.Pinch, 0.1f, 0f, 0f, 800f, 400f)
+        assertEquals(Readout.Zoom(25), c.readout)
+    }
+
+    @Test fun `US-55_4 double tap with double-tap zoom on toggles fit and crop`() {
+        show(GesturePrefs(doubleTapZoom = true))
+        rule.onNodeWithTag("v").performTouchInput { doubleClick(Offset(700f, 200f)) }
+        rule.mainClock.advanceTimeBy(500)
+        rule.waitForIdle()
+        assertEquals(1, fx.fitCrop)
+        assertEquals("no skip while double-tap zoom is on", 60_000L, fx.positionMs)
+        rule.onNodeWithTag("v").performTouchInput { doubleClick(Offset(400f, 200f)) }
+        rule.mainClock.advanceTimeBy(500)
+        rule.waitForIdle()
+        assertEquals(2, fx.fitCrop)
+    }
 }

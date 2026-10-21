@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:10,000
+¿Dónde está el niño que jugaba junto a la ventana?
+
+2
+00:00:10,000 --> 00:00:13,000
+Mañana iremos a la montaña con mis padres.
+
+3
+00:00:13,000 --> 00:00:16,000
+El señor pidió una paella y un café.
+
+4
+00:00:16,000 --> 00:00:19,000
+Nunca había visto un otoño tan bonito.
+
+5
+00:00:19,000 --> 00:00:22,000
+La estación está a dos calles de aquí.
+
+6
+00:00:22,000 --> 00:00:25,000
+¡Qué alegría verte después de tanto tiempo!
+
+7
+00:00:25,000 --> 00:00:28,000
+Por favor, cierra la puerta al salir.
+
+8
+00:00:28,000 --> 00:00:31,000
+Gracias, nos vemos el próximo sábado.

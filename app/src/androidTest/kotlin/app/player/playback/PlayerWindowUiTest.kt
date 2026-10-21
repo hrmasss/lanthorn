@@ -23,6 +23,8 @@ import app.player.core.data.history.ResumePoints
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import app.player.feature.playback.Playback
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -39,14 +41,6 @@ import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
-
-/**
- * Stand-in for engine's `@Ears` (P1.35) until it lands on main: the criteria each test proves.
- * Swap the import then; same shape.
- */
-@Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
-annotation class Ears(vararg val ids: String)
 
 /**
  * P1.14 through the real app (UiAutomator, in-process): orientation (US-56), lock and kids lock
@@ -374,7 +368,7 @@ class PlayerWindowUiTest {
     }
 
     private fun shot(name: String) {
-        device.takeScreenshot(File(shots, "$name.png"))
+        evidenceShot(name)
         log("shot $name")
     }
 

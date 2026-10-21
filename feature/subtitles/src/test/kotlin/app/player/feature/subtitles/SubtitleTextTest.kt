@@ -11,13 +11,13 @@ class SubtitleTextTest {
 
     @Test fun `utf-8 is kept`() {
         val text = line + "Žluťoučký kůň — 你好"
-        assertEquals(text, SubtitleText.decode(text.toByteArray(Charsets.UTF_8)).text)
+        assertEquals(text, SubtitleText.decode(text.toByteArray(Charsets.UTF_8))!!.text)
     }
 
     @Test fun `bom wins, also over a forced charset`() {
         val text = line + "مرحبا"
         val bytes = byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + text.toByteArray(Charsets.UTF_16LE)
-        val d = SubtitleText.decode(bytes, forced = Charset.forName("windows-1252"))
+        val d = SubtitleText.decode(bytes, forced = Charset.forName("windows-1252"))!!
         assertEquals(text, d.text)
         assertEquals(Charsets.UTF_16LE, d.charset)
     }
@@ -25,14 +25,12 @@ class SubtitleTextTest {
     @Test fun `forced charset decodes a legacy file (US-44_2)`() {
         val text = line + "Příliš žluťoučký kůň"
         val cp1250 = Charset.forName("windows-1250")
-        assertEquals(text, SubtitleText.decode(text.toByteArray(cp1250), forced = cp1250).text)
+        assertEquals(text, SubtitleText.decode(text.toByteArray(cp1250), forced = cp1250)!!.text)
     }
 
-    @Test fun `non-utf-8 bytes go to the guess, then to windows-1252`() {
+    @Test fun `legacy bytes without a pick are left to mpv's detection (US-44_1)`() {
         val text = line + "Привет"
-        val cp1251 = Charset.forName("windows-1251")
-        assertEquals(text, SubtitleText.decode(text.toByteArray(cp1251)) { "windows-1251" }.text)
-        assertEquals(Charset.forName("windows-1252"), SubtitleText.decode(text.toByteArray(cp1251)).charset)
+        assertEquals(null, SubtitleText.decode(text.toByteArray(Charset.forName("windows-1251"))))
     }
 
     @Test fun `binary subtitles are not decoded`() {

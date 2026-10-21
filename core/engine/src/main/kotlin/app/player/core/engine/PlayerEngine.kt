@@ -68,6 +68,16 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private var scrubNext: Long? = null
     private var scrubSentAt = 0L
     private var scrubTarget: Long? = null
+    private var scrubExact = false
+    // Preview only: this file's keyframes sit too far apart for a keyframe seek to land near the
+    // finger, so preview seeks go exact. Learnt from the first keyframe seek of each file.
+    private var longGop = false
+    // Preview on a view that reports shown frames: a landed seek waits until its frame is on screen
+    // before the next one goes out, or the next seek cancels the frame before it is drawn.
+    @Volatile var reportsShownFrames = false
+    private var awaitingShow = false
+    private var nudged = false
+    private var landedAt = 0L
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -112,11 +122,14 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             lib.setOptionString("pause", "yes")
             lib.setOptionString("vd-lavc-skiploopfilter", "all")
             lib.setOptionString("vd-lavc-fast", "yes")
-            // Copy-back decoding: the preview surface comes and goes with the finger, and the
-            // zero-copy path would lose HW whenever the file loads before the surface exists.
-            lib.setOptionString("hwdec", DecoderMode.HW_PLUS.hwdec)
+            // Software decoding: an exact seek decodes every frame from the keyframe before the
+            // target, and copying each one back from a hardware decoder made that the slow part.
+            lib.setOptionString("hwdec", DecoderMode.SW.hwdec)
             lib.setOptionString("demuxer-max-bytes", "${8 * 1024 * 1024}")
             lib.setOptionString("demuxer-max-back-bytes", "0")
+            // Paused, mpv draws each seek's frame once. With a deeper swapchain the TextureView
+            // showed the frame of the seek before (gate shots: 7.8 s shown after 19.8 s landed).
+            lib.setOptionString("swapchain-depth", "1")
         }
         lib.init()
         lib.addObserver(observer)
@@ -187,7 +200,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
      * updates as fast as the decoder can deliver keyframes.
      */
     fun scrub(positionMs: Long) = post {
-        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < SCRUB_STALL_MS) {
+        val wait = if (awaitingShow) SHOW_WAIT_MS else SCRUB_STALL_MS
+        if (scrubInFlight && SystemClock.elapsedRealtime() - scrubSentAt < wait) {
             scrubNext = positionMs
         } else {
             sendScrub(positionMs)
@@ -199,29 +213,75 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         scrubNext = null
         scrubTarget = null
         scrubInFlight = false
+        awaitingShow = false
         mpvCommand("seek", "${positionMs / 1000.0}", "absolute+exact")
     }
 
     private fun sendScrub(positionMs: Long) {
+        awaitingShow = false
         scrubInFlight = true
         scrubTarget = positionMs
         scrubSentAt = SystemClock.elapsedRealtime()
-        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
-        if (preview) Log.i(TAG, "preview seek to $positionMs ms")
+        scrubExact = preview && longGop
+        mpvCommand("seek", "${positionMs / 1000.0}", if (scrubExact) "absolute+exact" else "absolute+keyframes")
+        if (preview) Log.i(TAG, "preview seek to $positionMs ms${if (scrubExact) " exact" else ""}")
     }
 
     private fun scrubLanded() = post {
         scrubInFlight = false
+        val shown = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() }
+        val sent = scrubTarget
+        if (preview) Log.i(TAG, "preview frame at $shown ms, target $sent ms")
+        if (preview && reportsShownFrames) {
+            // Keep the slot taken until the view has the frame; scrub() queues meanwhile, and the
+            // stall window, restarted here, sends anyway if the view never reports.
+            scrubInFlight = true
+            scrubSentAt = SystemClock.elapsedRealtime()
+            awaitingShow = true
+            nudged = false
+            landedAt = scrubSentAt
+            landedPos = shown
+            return@post
+        }
+        continueScrub(shown)
+    }
+
+    /** The preview view put a new frame on screen. Called from its thread. */
+    fun frameShown() = post {
+        if (preview) Log.i(TAG, "preview view update, ${if (!awaitingShow) "extra" else if (nudged) "after nudge" else "first"}")
+        if (!awaitingShow) return@post
+        if (!nudged) {
+            // Paused, mpv presents the old picture again when the seek ends and draws the new frame
+            // only when something next wakes its video output (gate runs: the view always showed
+            // the frame before the last landed one). An OSD change wakes it; its update is the frame.
+            nudged = true
+            mpvCommand("show-text", " ", "1")
+            return@post
+        }
+        awaitingShow = false
+        scrubInFlight = false
+        Log.i(TAG, "preview frame shown at $landedPos ms, ${SystemClock.elapsedRealtime() - landedAt} ms after it landed")
+        continueScrub(landedPos)
+    }
+
+    private var landedPos: Long? = null
+
+    private fun continueScrub(shown: Long?) {
+        val sent = scrubTarget
+        if (preview && !scrubExact && sent != null && shown != null && kotlin.math.abs(shown - sent) > SCRUB_REFINE_MS) {
+            if (!longGop) Log.i(TAG, "preview: keyframe landed ${shown - sent} ms from the target, seeking exact from now on")
+            longGop = true
+        }
         val next = scrubNext
         if (next != null) {
             scrubNext = null
             sendScrub(next)
-            return@post
+            return
         }
         // Nothing newer waiting: if the keyframe is far from the target (long GOPs), refine with
         // an exact seek, so a slowing finger sees the frame it points at (US-30.1: within 2 s).
-        val target = scrubTarget ?: return@post
-        val landed = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() } ?: return@post
+        val target = scrubTarget ?: return
+        val landed = shown ?: return
         if (kotlin.math.abs(landed - target) > SCRUB_REFINE_MS) {
             scrubTarget = null
             scrubInFlight = true
@@ -415,13 +475,18 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private fun mpvCommand(vararg args: String) = mpv?.command(arrayOf(*args))
     private fun setProperty(name: String, value: String) = mpv?.setPropertyString(name, value)
 
-    private fun refreshVideo() {
+    private fun refreshVideo(triesLeft: Int = DECODER_SETTLE_TRIES) {
         val lib = mpv ?: return
-        if (reattachedAt > 0) {
+        if (reattachedAt > 0 && triesLeft == DECODER_SETTLE_TRIES) {
             Log.i(TAG, "video shown again ${SystemClock.elapsedRealtime() - reattachedAt} ms after the surface came back, at ${_state.value.positionMs} ms")
             reattachedAt = 0
         }
-        val codec = lib.getPropertyString("video-format") ?: return
+        // VIDEO_RECONFIG can come before mpv knows the format, and no second one may follow: read
+        // again until it does (or give up: no video track, or video turned off).
+        val codec = lib.getPropertyString("video-format") ?: run {
+            if (triesLeft > 0) thread.schedule({ if (!released) refreshVideo(triesLeft - 1) }, DECODER_SETTLE_STEP_MS, TimeUnit.MILLISECONDS)
+            return
+        }
         val info = VideoInfo(
             codec = codec,
             width = lib.getPropertyInt("video-params/w") ?: 0,
@@ -503,14 +568,16 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
         override fun event(eventId: Int) {
             when (eventId) {
-                MpvEvent.MPV_EVENT_START_FILE -> starting = true
+                MpvEvent.MPV_EVENT_START_FILE -> {
+                    starting = true
+                    post { longGop = false }
+                }
                 MpvEvent.MPV_EVENT_FILE_LOADED -> {
                     starting = false
                     _state.update { it.copy(loaded = true, error = null) }
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
-                    if (preview) Log.i(TAG, "preview frame at ${_state.value.positionMs} ms")
                     scrubLanded()
                     _state.update {
                         if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
@@ -543,7 +610,11 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val SURFACE_WAIT_MS = 1000L
         private const val DECODER_SETTLE_STEP_MS = 100L
         private const val DECODER_SETTLE_TRIES = 50
-        private const val SCRUB_STALL_MS = 250L
+        // A newer seek cancels the one in flight, so replacing slow seeks early means no frame ever
+        // lands on a slow decoder. Wait this long for a seek to finish before giving up on it.
+        private const val SCRUB_STALL_MS = 5000L
+        // Longest a landed preview frame holds the next seek back when the view never reports it.
+        private const val SHOW_WAIT_MS = 500L
         private const val SCRUB_REFINE_MS = 1500L
 
         /**
