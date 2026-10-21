@@ -4,6 +4,8 @@ name: Instrumented
 # (free and with KVM now that the repo is public). Builds stay on the self-hosted CI workflow.
 # Results per module: artifact `androidTest-<module>` (JUnit XML, HTML report, logcat, and the
 # files tests write under /sdcard/Android/data/app.player*/files, such as screenshots).
+# Main runs all modules on every push; branches and PRs run only the modules they touched, plus the
+# app, and everything when shared code or the build changed (.github/scripts/instrumented-matrix.sh).
 
 on:
   push:
@@ -12,26 +14,34 @@ on:
 
 concurrency:
   group: instrumented-${{ github.ref }}
-  cancel-in-progress: true
+  # Main runs always finish; branch runs cancel older ones.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: matrix
+        run: |
+          m=$(.github/scripts/instrumented-matrix.sh "${{ github.ref }}" "origin/${{ github.base_ref || 'main' }}")
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+          echo "Modules: $m" | tee -a "$GITHUB_STEP_SUMMARY"
+
   instrumented:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
     name: instrumented (${{ matrix.module }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { module: app, build: ':app:assembleDebug :app:assembleDebugAndroidTest', task: ':app:connectedDebugAndroidTest' }
-          - { module: core-engine, build: ':core:engine:assembleDebugAndroidTest', task: ':core:engine:connectedDebugAndroidTest' }
-          - { module: core-data, build: ':core:data:assembleDebugAndroidTest', task: ':core:data:connectedDebugAndroidTest' }
-          - { module: feature-info, build: ':feature:info:assembleDebugAndroidTest', task: ':feature:info:connectedDebugAndroidTest' }
-          - { module: feature-library, build: ':feature:library:assembleDebugAndroidTest', task: ':feature:library:connectedDebugAndroidTest' }
-          - { module: feature-player, build: ':feature:player:assembleDebugAndroidTest', task: ':feature:player:connectedDebugAndroidTest' }
-          - { module: feature-subtitles, build: ':feature:subtitles:assembleDebugAndroidTest', task: ':feature:subtitles:connectedDebugAndroidTest' }
-          # Audio tests need the emulator's audio device: no -noaudio here.
-          - { module: feature-audio, build: ':feature:audio:assembleDebugAndroidTest', task: ':feature:audio:connectedDebugAndroidTest', audio: true }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 
