@@ -180,7 +180,6 @@ fun PlayerScreen(
     val video = remember(engine) { VideoState(VideoTools(engine, context)) }
     val videoTools = remember(engine) { VideoTools(engine, context) }
     var rotationLocked by remember { mutableStateOf(false) }
-    val loopFile by remember(engine) { engine.observe("loop-file", PropertyType.Text) }.collectAsStateWithLifecycle()
     val muted by remember(engine) { engine.observe("mute", PropertyType.Flag) }.collectAsStateWithLifecycle()
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
@@ -268,6 +267,10 @@ fun PlayerScreen(
     // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
     val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
     val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    // Loop, shuffle and background play belong to playback; the shortcuts call its hooks.
+    val loopOn by (playback?.loop ?: off).collectAsStateWithLifecycle()
+    val shuffleOn by (playback?.shuffle ?: off).collectAsStateWithLifecycle()
+    val backgroundOn by (playback?.backgroundPlay ?: off).collectAsStateWithLifecycle()
     val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
     val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
     val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
@@ -400,10 +403,10 @@ fun PlayerScreen(
                 if (rotationLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         Shortcut.Speed -> ShortcutState(speedLabel(speed) != null) { openPanel = OwnPanel.SPEED }
-        Shortcut.Background -> ShortcutState(false, null)
-        Shortcut.Loop -> ShortcutState(loopFile != null && loopFile != "no") { tools.setLoopFile(loopFile == null || loopFile == "no") }
+        Shortcut.Background -> ShortcutState(backgroundOn, playback?.let { p -> { p.toggleBackgroundPlay() } })
+        Shortcut.Loop -> ShortcutState(loopOn, playback?.let { p -> { p.toggleLoop() } })
         Shortcut.Mute -> ShortcutState(muted == true) { engine.set("mute", muted != true) }
-        Shortcut.Shuffle -> ShortcutState(false, null)
+        Shortcut.Shuffle -> ShortcutState(shuffleOn, playback?.let { p -> { p.toggleShuffle() } })
         Shortcut.Equalizer -> ShortcutState(false, null)
         Shortcut.SleepTimer -> ShortcutState(sleep != null) { openPanel = OwnPanel.SLEEP }
         Shortcut.AbRepeat -> ShortcutState(abMs(abA) != null) { openPanel = OwnPanel.AB }
