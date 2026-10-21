@@ -4,15 +4,19 @@ import android.net.Uri
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * P1.1 against the real libmpv: the one-line notice when the chosen decoder cannot play the file
@@ -48,5 +52,29 @@ class DecoderFallbackTest {
         withTimeout(10_000) { engine.state.first { it.video != null } }
         delay(500)
         assertEquals(null, engine.state.value.decoderNotice)
+    }
+
+    /** A live switch to HW+: if it comes up, no notice at any point while mpv tries it; if not, notice and badge agree (P1.9 finding). */
+    @Test fun switchToHwPlusNoticeMatchesBadge_US35_3(): Unit = runBlocking {
+        engine.open(asset("clip.mp4"), decoder = DecoderMode.SW)
+        withTimeout(10_000) { engine.state.first { it.video != null } }
+        // Every state the switch passes through, so a failure says what mpv did.
+        val seen = CopyOnWriteArrayList<String>()
+        val watch = launch(Dispatchers.Default) {
+            engine.state.collect { s -> "${s.activeDecoder.label}/${s.decoderNotice}".let { if (seen.lastOrNull() != it) seen += it } }
+        }
+        engine.setDecoder(DecoderMode.HW_PLUS)
+        val cameUp = withTimeoutOrNull(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.HW_PLUS } } != null
+        delay(2000)
+        watch.cancel()
+        Log.i("P1.1", "switch SW to HW+: $seen")
+        val notice = engine.state.value.decoderNotice
+        if (cameUp) {
+            assertEquals("a notice showed though HW+ came up: $seen", emptyList<String>(), seen.filterNot { it.endsWith("/null") })
+        } else {
+            // HW+ cannot play this file here: then the notice must say so and the badge must agree.
+            assertEquals("states $seen", "HW+ cannot play this video. Playing with SW.", notice)
+            assertEquals("states $seen", ActiveDecoder.SW, engine.state.value.activeDecoder)
+        }
     }
 }
