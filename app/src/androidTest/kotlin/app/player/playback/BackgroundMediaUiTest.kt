@@ -169,6 +169,9 @@ class BackgroundMediaUiTest {
         assertTrue("one press did not play", waitFor(3_000) { state()?.paused == false })
         headset(2)
         assertTrue("two presses did not open the next video", waitFor(8_000) { state()?.uri?.endsWith("longgop.mp4") == true })
+        // Presses while the next file opens arrive late and split the count: wait for it to show.
+        assertTrue("next video never showed", waitFor(8_000) { state()?.firstFrameMs != null })
+        SystemClock.sleep(1_000)
         headset(3)
         assertTrue("three presses did not open the previous video", waitFor(8_000) { state()?.uri?.endsWith("withsubs.mp4") == true })
         shot("03-headset-previous")
@@ -250,12 +253,13 @@ class BackgroundMediaUiTest {
         runBlocking { prefs.setVolumeKeys(VolumeKeys.Brightness) }
         play(listOf("clip420.mp4"))
         // The player screen's own chrome moves the window brightness 5% a key (the level bar: GestureTest, shot here).
+        val activity = player()!!
         fun brightness(): Int {
             var b = -1f
-            instr.runOnMainSync { b = player()!!.window.attributes.screenBrightness }
+            instr.runOnMainSync { b = activity.window.attributes.screenBrightness }
             return (b * 100).roundToInt()
         }
-        instr.runOnMainSync { player()!!.window.attributes = player()!!.window.attributes.apply { screenBrightness = 0.5f } }
+        instr.runOnMainSync { activity.window.attributes = activity.window.attributes.apply { screenBrightness = 0.5f } }
         val volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
         key(KeyEvent.KEYCODE_VOLUME_UP)
         assertTrue("volume up did not step brightness to 55%, at ${brightness()}", waitFor(2_000) { brightness() == 55 })
