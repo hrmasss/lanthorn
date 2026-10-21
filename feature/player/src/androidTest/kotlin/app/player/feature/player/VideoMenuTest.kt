@@ -72,13 +72,14 @@ class VideoMenuTest {
         shot("p116-menu-shortcuts")
         compose.onNodeWithTag("sc-Mute").performClick()
         compose.waitUntil(3_000) { prop("mute", PropertyType.Flag) == true }
-        compose.onNodeWithTag("sc-Loop").performClick()
-        compose.waitUntil(3_000) { prop("loop-file", PropertyType.Text) == "inf" }
+        // Loop, shuffle and background play are playback's hooks, not present in this test.
+        compose.onNodeWithTag("sc-Mirror").performClick()
+        compose.waitUntil(3_000) { prop("glsl-shaders", PropertyType.Text)?.contains("lanthorn-mirror") == true }
         compose.waitForIdle()
         shot("p116-shortcuts-on")
     }
 
-    @Ears("US-57")
+    @Ears("US-57.1", "US-57.2")
     @Test fun pictureMenu_US57() {
         open()
         menu()

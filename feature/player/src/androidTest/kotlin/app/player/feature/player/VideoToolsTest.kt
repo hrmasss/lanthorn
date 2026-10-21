@@ -119,7 +119,7 @@ class VideoToolsTest {
         assertTrue("portrait after rotation: ${shownW}x$shownH", shownH > shownW)
     }
 
-    @Ears("US-57")
+    @Ears("US-57.1", "US-57.2")
     @Test fun mirrorFlipNight_US57() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
@@ -247,7 +247,7 @@ class VideoToolsTest {
     }
 
     /** US-57.1, US-57.2 on the whole screen: a subtitle and the controls stay as they are. */
-    @Ears("US-57")
+    @Ears("US-57.1", "US-57.2")
     @Test fun mirrorAndNightFullScreen_US57() = runBlocking<Unit> {
         open("clip.mp4")
         engine.command("sub-add", copyFile("sub.srt").path, "select")
