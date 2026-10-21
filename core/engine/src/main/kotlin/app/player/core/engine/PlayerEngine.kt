@@ -526,6 +526,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         val ms = SystemClock.elapsedRealtime() - since
         if (ms < STALL_MS) return
         val s = _state.value
+        // Before any decoder runs, mpv is still opening the file (scripts, fonts, demuxer) and holds
+        // its lock for seconds on a slow device. A decoder hanging at open is caught at the longer bound.
+        if (s.activeDecoder == ActiveDecoder.NONE && ms < OPEN_STALL_MS) return
         val stack = engineThread?.stackTrace?.take(12)?.joinToString("\n") { "  at $it" }
         // Hardware runs, or was just asked for (a live switch can stall while MediaCodec opens).
         val onHardware = s.activeDecoder == ActiveDecoder.HW || s.activeDecoder == ActiveDecoder.HW_PLUS
@@ -745,6 +748,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val GET_TIMEOUT_MS = 5000L
         // An mpv call that has not returned in this long on a hardware decoder is a stall.
         const val STALL_MS = 3000L
+        const val OPEN_STALL_MS = 10_000L
         private const val STALL_CHECK_MS = 250L
         private val WATCHDOG: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine-watchdog").apply { isDaemon = true } }
         private const val SCRUB_STALL_MS = 5000L
