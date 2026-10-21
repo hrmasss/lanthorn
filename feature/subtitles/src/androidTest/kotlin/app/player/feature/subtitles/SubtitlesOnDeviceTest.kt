@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
@@ -57,6 +58,7 @@ class SubtitlesOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-39.3")
     @Test fun twoTracksAtOnceAndNone_US39_3() = runBlocking {
         val tracks = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" }
         assertEquals(listOf("Karaoke", "English"), tracks.map { it.title })
@@ -74,6 +76,7 @@ class SubtitlesOnDeviceTest {
         evidence("US-39.3 two tracks on (sid ${both.primary}, secondary ${both.secondary}), then none: ok")
     }
 
+    @Ears("US-41.1")
     @Test fun delayAppliesWithin100ms_US41_1() = runBlocking {
         selectEnglish()
         engine.await("sub-text", PropertyType.Text) { it == "Embedded English line" }
@@ -88,6 +91,7 @@ class SubtitlesOnDeviceTest {
         assertWithin("SubtitlesOnDeviceTest", took, 100)
     }
 
+    @Ears("US-41.2")
     @Test fun speedStretchesTiming_US41_2() = runBlocking {
         selectEnglish()
         controller.setSpeed(0.5) // the 0 to 10 s line becomes 0 to 5 s
@@ -99,6 +103,7 @@ class SubtitlesOnDeviceTest {
         evidence("US-41.2 sub-speed 0.5 ended the 10 s line by 7 s; 1.0 brought it back")
     }
 
+    @Ears("US-42.4", "NF-7")
     @Test fun assKeepsStylingUnlessOverride_US42_4_NF7() = runBlocking {
         val karaoke = parseTracks(engine.get("track-list", PropertyType.Text)).first { it.title == "Karaoke" }
         controller.select(SubSelection(karaoke.id))
@@ -124,6 +129,7 @@ class SubtitlesOnDeviceTest {
         evidence("NF-7 emulator: karaoke ASS rendered 8 s, frame-drop-count +$dropped (swiftshader, no claim)")
     }
 
+    @Ears("US-44.2")
     @Test fun externalFileAndEncodingReload_US44_2() = runBlocking {
         val files = SubtitleFiles(OnDevice.context)
         val ext = files.prepare(Uri.fromFile(OnDevice.asset("external.srt")))
@@ -151,6 +157,7 @@ class SubtitlesOnDeviceTest {
         assertWithin("SubtitlesOnDeviceTest", took, 1000)
     }
 
+    @Ears("US-42.4")
     @Test fun ignoreEmbeddedFonts_US42_4() = runBlocking {
         openFonts()
         delay(1500)

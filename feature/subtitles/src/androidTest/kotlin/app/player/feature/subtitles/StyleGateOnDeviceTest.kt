@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
@@ -76,6 +77,7 @@ class StyleGateOnDeviceTest {
         throw AssertionError("seek to 1 s never landed")
     }
 
+    @Ears("US-42.1")
     @Test fun fontFolderImport_US42_1() = runBlocking {
         val picked = File(OnDevice.context.cacheDir, "picked-fonts").apply { deleteRecursively(); mkdirs() }
         OnDevice.asset("LiberationMono-Regular.ttf").copyTo(File(picked, "LiberationMono-Regular.ttf"), overwrite = true)
@@ -94,6 +96,7 @@ class StyleGateOnDeviceTest {
         evidence("US-42.1 font folder: $copied font imported through the documents provider path, 'Liberation Mono' in the list (${families.size} text families, AndroidClock filtered out), drawn in a subtitle; screenshot")
     }
 
+    @Ears("US-42.3")
     @Test fun editFromThePanel_US42_3() = runBlocking {
         // The panel's surface first, then the file, so the paused frame is drawn on it.
         scenario = ActivityScenario.launch(PanelTestActivity::class.java)
@@ -120,6 +123,7 @@ class StyleGateOnDeviceTest {
         assertWithin("StyleGateOnDeviceTest", took, 100)
     }
 
+    @Ears("US-42.4", "NF-7")
     @Test fun assStylingKeptUnderEdits_US42_4_NF7() = runBlocking {
         videoScreen()
         open("tracks.mkv", "Karaoke")

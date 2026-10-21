@@ -1,5 +1,6 @@
 package app.player.feature.audio
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
@@ -49,6 +50,7 @@ class AudioSettingsOnDeviceTest {
         engine.await("current-tracks/audio/id", PropertyType.Int64, 10_000) { it != null }
     }
 
+    @Ears("US-47.2")
     @Test fun preferredLanguagePicksTrack_US47_2() = runBlocking {
         open("tracks.mkv")
         val first = engine.get("current-tracks/audio/lang", PropertyType.Text)
@@ -62,6 +64,7 @@ class AudioSettingsOnDeviceTest {
         evidence("US-47.2 no preference: '$first' (the default track); preferred Italian: '$picked' picked at open (alang it,ita)")
     }
 
+    @Ears("US-48.3")
     @Test fun defaultDelayOnEveryNewFile_US48_3() = runBlocking {
         store.setDefaultDelay(250)
         delay(300)
@@ -74,6 +77,7 @@ class AudioSettingsOnDeviceTest {
         evidence("US-48.3 default 250 ms applied on open; changed to -500 ms; the next file started at 250 ms again")
     }
 
+    @Ears("US-47.4")
     @Test fun remembersTrackPerFile_US47_4() = runBlocking {
         open("tracks.mkv")
         val ita = parseTracks(engine.get("track-list", PropertyType.Text)).first { it.type == "audio" && it.lang == "ita" }.id
@@ -98,6 +102,7 @@ class AudioSettingsOnDeviceTest {
         evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored; with remember choices off it opened on 'eng'")
     }
 
+    @Ears("US-47.2")
     @Test fun defaultFlaggedTrackWithoutPreference_US47_2() = runBlocking {
         engine.open(Uri.fromFile(OnDevice.asset("default-second.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 3 }

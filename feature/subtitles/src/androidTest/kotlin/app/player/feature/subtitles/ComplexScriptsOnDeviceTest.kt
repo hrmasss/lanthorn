@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
@@ -40,6 +41,7 @@ class ComplexScriptsOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-44.3")
     @Test fun complexScriptsDrawnForComparison_US44_3() = runBlocking {
         engine.open(Uri.fromFile(OnDevice.asset("complex.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }

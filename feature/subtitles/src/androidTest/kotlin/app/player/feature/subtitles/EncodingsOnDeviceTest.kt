@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
 import app.player.core.engine.PlayerEngine
@@ -38,6 +39,7 @@ class EncodingsOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-44.1")
     @Test fun everyNamedEncodingShowsOnAuto_US44_1() = runBlocking {
         val assets = OnDevice.instrumentation.context.assets
         val expected = assets.open("encodings/expected.tsv").bufferedReader().readLines()

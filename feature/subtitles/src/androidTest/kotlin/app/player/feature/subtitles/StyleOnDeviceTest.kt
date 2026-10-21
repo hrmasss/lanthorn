@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
@@ -61,6 +62,7 @@ class StyleOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-42.1", "US-42.2", "US-42.3")
     @Test fun defaultsAndLiveEdit_US42_1_US42_2_US42_3() = runBlocking {
         assertEquals("#FFFFFFFF", engine.get("sub-color", PropertyType.Text))
         assertEquals(true, engine.get("sub-bold", PropertyType.Flag))
@@ -90,6 +92,7 @@ class StyleOnDeviceTest {
         assertWithin("StyleOnDeviceTest", took, 100)
     }
 
+    @Ears("US-43.1", "US-43.2")
     @Test fun alignmentMarginAndFit_US43_1_US43_2() = runBlocking {
         OnDevice.main { styles.update { it.copy(align = SubAlign.Left, bottomMarginPercent = 25f) } }
         engine.await("sub-margin-y", PropertyType.Int64) { it == 180L }
@@ -130,6 +133,7 @@ class StyleOnDeviceTest {
         evidence("Subtitle settings page shows a live preview that follows edits; screenshots")
     }
 
+    @Ears("US-42.1")
     @Test fun fontNamesAndFamilies_US42_1() = runBlocking {
         assertEquals("Roboto", FontNames.family(File("/system/fonts/Roboto-Regular.ttf")))
         val families = styles.families()

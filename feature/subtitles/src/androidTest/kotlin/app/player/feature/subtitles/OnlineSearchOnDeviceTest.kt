@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
@@ -68,6 +69,7 @@ class OnlineSearchOnDeviceTest {
         return ActivityScenario.launch(PanelTestActivity::class.java)
     }
 
+    @Ears("US-46.4", "US-46.5")
     @Test fun offByDefaultAndHidden_US46_4_US46_5() = runBlocking {
         val defaults = OnlineAccount()
         assertEquals(false, defaults.enabled)
@@ -89,6 +91,7 @@ class OnlineSearchOnDeviceTest {
         evidence("US-46.4 off by default, no search action; on with a key, the action shows. US-46.5 defaults: no API key shipped (empty), off")
     }
 
+    @Ears("US-46.1", "US-46.2", "US-46.3")
     @Test fun searchOnlyOnTapThenDownloadAndTurnOn_US46_1_US46_2_US46_3() = runBlocking {
         accounts.setEnabled(true)
         accounts.setApiKey("viewer-own-key")

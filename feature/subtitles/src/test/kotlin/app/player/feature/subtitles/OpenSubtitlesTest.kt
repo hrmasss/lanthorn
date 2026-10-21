@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -7,6 +8,7 @@ import java.io.File
 import java.io.RandomAccessFile
 
 class OpenSubtitlesTest {
+    @Ears("US-46.1")
     @Test fun `hash is size plus the little-endian sums of the first and last 64 KiB`() {
         val f = File.createTempFile("hash", ".bin")
         // 131072 bytes: first chunk all 0x01, last chunk all 0x02.
@@ -18,12 +20,15 @@ class OpenSubtitlesTest {
         f.delete()
     }
 
+    @Ears("US-46.1")
+
     @Test fun `files under 64 KiB have no hash`() {
         val f = File.createTempFile("small", ".bin").apply { writeBytes(ByteArray(100)) }
         assertNull(RandomAccessFile(f, "r").use { OpenSubtitles.hash(it) })
         f.delete()
     }
 
+    @Ears("US-46.1")
     @Test fun `results list language, rating and release, hash matches first (US-46_1)`() {
         val json = """{"data":[
           {"attributes":{"language":"en","release":"Clip.WEB","ratings":6.0,"download_count":10,"moviehash_match":false,"files":[{"file_id":1,"file_name":"a.srt"}]}},
