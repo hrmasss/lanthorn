@@ -130,8 +130,14 @@ class DecoderUiTest {
     }
 
     private fun badge(): String? {
-        showControls()
-        return retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
+        // The controls can hide between the tap and the read: tap again until the badge shows.
+        var desc: String? = null
+        waitFor(8000) {
+            showControls()
+            desc = retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
+            desc != null
+        }
+        return desc
     }
 
     private fun shot(name: String) {
