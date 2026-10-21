@@ -111,7 +111,8 @@ class DecoderUiTest {
                 SystemClock.sleep(1200)
                 return
             }
-            device.pressBack()
+            // Back with nothing open leaves the player, so close only a menu that did open.
+            if (device.hasObject(By.scrollable(true))) device.pressBack()
         }
         fail("menu entry '$label' not reachable")
     }
@@ -123,7 +124,7 @@ class DecoderUiTest {
             if (device.wait(Until.hasObject(By.text(summary)), 2000) && retrying { device.findObject(By.text(summary)).click() } != null) {
                 return
             }
-            device.pressBack()
+            if (device.hasObject(By.textStartsWith("Software")) || device.hasObject(By.textStartsWith("Hardware"))) device.pressBack()
         }
         fail("decoder option '$summary' not reachable")
     }
