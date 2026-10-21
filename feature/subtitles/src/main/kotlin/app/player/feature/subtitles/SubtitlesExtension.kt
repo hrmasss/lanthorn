@@ -115,8 +115,9 @@ object SubtitlesExtension : PlayerExtension {
             engine.state.map { it.loaded }.distinctUntilChanged().filter { !it }.collect { loader.clear() }
         }
         val loadJob = scope.launch {
-            engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
-                runCatching { loader.onFileLoaded(engine, uri) }
+            // Every finished load, also of the same file again: its external tracks went with the old one.
+            engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.collect { (_, uri) ->
+                if (uri != null) runCatching { loader.onFileLoaded(engine, uri) }
             }
         }
         scope.launch {
