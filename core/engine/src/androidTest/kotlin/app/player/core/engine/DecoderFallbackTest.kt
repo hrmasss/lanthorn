@@ -40,7 +40,6 @@ class DecoderFallbackTest {
     }
 
     @Ears("US-35.3")
-
     @Test fun chosenHwThatCannotPlaySaysSoInOneLine_US35_3(): Unit = runBlocking {
         engine.open(asset("h444.mp4"), decoder = DecoderMode.HW)
         val s = withTimeout(10_000) { engine.state.first { it.decoderNotice != null } }
@@ -50,8 +49,21 @@ class DecoderFallbackTest {
         assertEquals(null, s.error)
     }
 
-    @Ears("US-35.3")
+    /** NF-5: a file HW refuses plays on SW within 1 s of opening, in the same player. */
+    @Ears("NF-5")
+    @Test fun autoFallsBackToSwWithinOneSecond_NF5(): Unit = runBlocking {
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        engine.open(asset("h444.mp4"))
+        val s = withTimeout(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.SW && it.firstFrameMs != null } }
+        val ms = android.os.SystemClock.elapsedRealtime() - t0
+        Log.i("P1.1", "auto on 4:4:4: SW running with a frame after $ms ms, first frame ${s.firstFrameMs} ms, error ${s.error}")
+        assertEquals(null, s.error)
+        // The hosted emulator makes no timing claim (timing=lenient): there the number is only logged.
+        val lenient = InstrumentationRegistry.getArguments().getString("timing") == "lenient"
+        if (!lenient) org.junit.Assert.assertTrue("SW took $ms ms", ms <= 1000)
+    }
 
+    @Ears("US-35.3")
     @Test fun autoNeedsNoNotice_US35_3(): Unit = runBlocking {
         engine.open(asset("h444.mp4"), decoder = DecoderMode.AUTO)
         withTimeout(10_000) { engine.state.first { it.video != null } }
