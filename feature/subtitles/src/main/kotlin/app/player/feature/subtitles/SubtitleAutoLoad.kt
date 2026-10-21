@@ -41,7 +41,7 @@ internal class SubtitleAutoLoad(context: Context, private val files: SubtitleFil
         val controller = SubtitleController(engine.asMpv())
         val before = engine.get("track-list/count", PropertyType.Int64) ?: 0
         for (found in result.found) {
-            val prepared = runCatching { files.prepare(found.uri) }.getOrNull() ?: continue
+            val prepared = runCatching { files.prepare(found.uri, companion = found.companion) }.getOrNull() ?: continue
             val lang = result.place?.let { SubtitleMatch.languageOf(it.videoName, found.name) }
             controller.addFile(prepared.path, found.name, lang, select = false)
         }

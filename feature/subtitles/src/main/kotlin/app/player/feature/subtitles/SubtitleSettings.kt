@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -164,7 +165,7 @@ object SubtitleSettings : SettingsGroup {
                 }
             }
             item(ALLOWED) {
-                SettingsNote(stringResource(R.string.subs_setting_allowed) + ": " + stringResource(R.string.subs_setting_allowed_summary, allowed))
+                SettingsNote(stringResource(R.string.subs_setting_allowed) + ": " + pluralStringResource(R.plurals.subs_setting_allowed_summary, allowed, allowed))
             }
             item("timing") { SettingsHeader(stringResource(R.string.subs_setting_timing)) }
             item(DEFAULT_DELAY) {

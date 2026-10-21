@@ -1,0 +1,5 @@
+# VobSub index file, v7 (do not modify this line!)
+size: 720x480
+palette: 000000, 0000ff, 00ff00, ff0000, ffff00, ff00ff, 00ffff, ffffff, 808000, 8080ff, 800080, 80ff80, 008080, ff8080, 555555, aaaaaa
+id: en, index: 0
+timestamp: 00:00:00:000, filepos: 000000000

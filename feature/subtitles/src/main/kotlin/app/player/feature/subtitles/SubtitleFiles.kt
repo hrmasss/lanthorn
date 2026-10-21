@@ -27,13 +27,15 @@ internal class SubtitleFiles(context: Context) {
     class Prepared(val path: String, val title: String, val charset: Charset?)
 
     /** Reads [uri], decodes it with [forced] or by detection, and returns a path mpv can load. */
-    suspend fun prepare(uri: Uri, forced: Charset? = null): Prepared = withContext(Dispatchers.IO) {
+    suspend fun prepare(uri: Uri, forced: Charset? = null, companion: Uri? = null): Prepared = withContext(Dispatchers.IO) {
         val name = displayName(uri)
         val extension = name.substringAfterLast('.', "").lowercase()
         val bytes = read(uri)
         dir.mkdirs()
         val out = File(dir, "${digest(uri.toString())}.${extension.ifEmpty { "srt" }}")
         val charset = write(bytes, extension, forced, out)
+        // VobSub: mpv opens the .idx and reads the .sub with the same name beside it.
+        companion?.let { File(dir, out.nameWithoutExtension + ".sub").writeBytes(read(it)) }
         sources[out.path] = Source(uri, extension)
         Prepared(out.path, name, charset)
     }

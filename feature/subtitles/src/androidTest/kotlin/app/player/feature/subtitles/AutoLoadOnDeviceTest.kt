@@ -90,6 +90,38 @@ class AutoLoadOnDeviceTest {
         evidence("US-39.1 the same file opened twice: its two subtitle files load again (${external}), ${again.size} sub tracks")
     }
 
+    /** US-39.1: one clip per format, each with one subtitle file beside it; each loads and turns on. */
+    @Test fun eachFormatLoadsOnDevice_US39_1() = runBlocking {
+        data class Case(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
+        val cases = listOf(
+            Case("ass", mapOf("fmt.ass" to "Clip.ass"), "ASS format line", "ass"),
+            Case("vtt", mapOf("fmt.vtt" to "Clip.vtt"), "VTT format line", "webvtt"),
+            Case("microdvd", mapOf("fmt-microdvd.sub" to "Clip.sub"), "MicroDVD format line", "microdvd"),
+            Case("vobsub", mapOf("fmt-vobsub.idx" to "Clip.idx", "fmt-vobsub.sub" to "Clip.sub"), null, "dvd_subtitle"),
+            Case("pgs", mapOf("fmt-pgs.sup" to "Clip.sup"), null, "hdmv_pgs_subtitle"),
+        )
+        val assets = OnDevice.instrumentation.context.assets
+        for (c in cases) {
+            val dir = File(OnDevice.context.cacheDir, "formats-${c.label}").apply { deleteRecursively(); mkdirs() }
+            assets.open("formats/nosubs.mkv").use { input -> File(dir, "Clip.mkv").outputStream().use { input.copyTo(it) } }
+            c.files.forEach { (from, to) -> assets.open("formats/$from").use { input -> File(dir, to).outputStream().use { input.copyTo(it) } } }
+            engine.open(Uri.fromFile(File(dir, "Clip.mkv")))
+            engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+            engine.awaitAutoLoad()
+            val external = parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" && it.external }
+            assertEquals("${c.label}: external tracks ${external.map { it.title to it.codec }}", 1, external.size)
+            assertEquals(c.label, c.codec, external[0].codec)
+            assertEquals(c.label, external[0].id, selected()?.id)
+            engine.pause()
+            engine.seekTo(1000)
+            delay(1500)
+            if (c.text != null) engine.await("sub-text", PropertyType.Text, 5_000) { it == c.text }
+            shotTo("us39-format-${c.label}")
+            evidence("US-39.1 ${c.label}: ${external[0].title} loaded as ${external[0].codec} and on${c.text?.let { ", shows '$it'" } ?: " (bitmap, screenshot)"}")
+            engine.play()
+        }
+    }
+
     @Test fun preferredLanguageWins_US39_2() = runBlocking {
         prefs.setLanguage("it")
         openClip()
@@ -154,6 +186,14 @@ class AutoLoadOnDeviceTest {
             step("scan: granted=${before.folderGranted} found=${before.found.size} place=${before.place}")
             assertFalse(before.folderGranted)
             assertTrue(before.found.isEmpty())
+            // The track panel offers to look in this folder.
+            PanelTestActivity.panelId = SubtitlesExtension.TRACKS_PANEL
+            val panel = ActivityScenario.launch(PanelTestActivity::class.java)
+            val offer = UiDevice.getInstance(OnDevice.instrumentation).wait(Until.findObject(By.text("Find subtitles in this folder")), 5_000)
+            shotTo("us39-panel-offers-folder")
+            panel.close()
+            PanelTestActivity.panelId = SubtitlesExtension.STYLE_PANEL
+            assertTrue("no offer in the track panel", offer != null)
             // The panel's offer: the system picker, opened at the video's folder.
             GrantTestActivity.start = loader.folderUri(before.place!!)
             GrantTestActivity.result = java.util.concurrent.CompletableFuture()
@@ -176,6 +216,9 @@ class AutoLoadOnDeviceTest {
             assertTrue(after.folderGranted)
             assertEquals(listOf("Grant.srt"), after.found.map { it.name })
             engine.await("sub-text", PropertyType.Text, 5_000) { it == "Found through the folder grant" }
+            engine.pause()
+            delay(1500)
+            shotTo("us39-grant-srt-drawn")
             evidence("US-39.1 shared storage: Movies/LanthornGrant not listable before the grant; after one grant in the system picker, Grant.srt loaded and on")
         } finally {
             resolver.delete(video, null, null)
