@@ -44,6 +44,7 @@
     <string name="action_delete">Delete</string>
     <string name="action_rename">Rename</string>
     <string name="action_properties">Properties</string>
+    <string name="write_access_reason">Android asks before Lanthorn changes a video another app added.</string>
     <string name="play_with_hw">Play with HW</string>
     <string name="play_with_hw_plus">Play with HW+</string>
     <string name="play_with_sw">Play with SW</string>
