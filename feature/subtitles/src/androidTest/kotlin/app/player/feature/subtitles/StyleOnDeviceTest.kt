@@ -44,6 +44,8 @@ class StyleOnDeviceTest {
             delay(500)
             if ((engine.get("time-pos", PropertyType.Real) ?: 0.0) >= 0.9) {
                 engine.set("sid", "1")
+                // Paused, mpv may have read past the track's packets: seek again so it reads them.
+                engine.seekTo(1000)
                 engine.await("sub-text", PropertyType.Text) { it == "Inside or outside the picture" }
                 delay(1500) // font cache on first load
                 return@runBlocking
