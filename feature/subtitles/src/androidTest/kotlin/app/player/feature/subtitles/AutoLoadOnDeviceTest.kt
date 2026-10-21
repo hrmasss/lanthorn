@@ -66,6 +66,19 @@ class AutoLoadOnDeviceTest {
         return parseTracks(engine.get("track-list", PropertyType.Text)).filter { it.type == "sub" }
     }
 
+    /**
+     * Another activity on top (panel, system picker) can destroy the video activity on the
+     * emulator; mpv then has no surface and keeps video off. In the app the player is only
+     * stopped and gets its surface back. Bring the video activity back and wait for video.
+     */
+    private suspend fun showVideoAgain() {
+        if (engine.get("vid", PropertyType.Text) != "no") return
+        runCatching { scenario.close() }
+        scenario = ActivityScenario.launch(VideoTestActivity::class.java)
+        scenario.onActivity { it.surface.engine = engine }
+        engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
+    }
+
     /** What mpv has, for a test that waits on subtitle text after another screen was on top. */
     private suspend fun dumpState(tag: String) {
         for (name in listOf("vid", "sid", "current-tracks/sub/id", "current-tracks/sub/title", "time-pos", "pause", "video-params/w", "track-list/count")) {
@@ -199,6 +212,7 @@ class AutoLoadOnDeviceTest {
             panel.close()
             PanelTestActivity.panelId = SubtitlesExtension.STYLE_PANEL
             PanelTestActivity.withVideo = true
+            showVideoAgain()
             engine.pause()
             engine.seekTo(1000)
             delay(1000)
@@ -281,6 +295,7 @@ class AutoLoadOnDeviceTest {
             step("tree: $tree")
             picker.close()
             assertTrue("no grant", tree != null)
+            showVideoAgain()
             loader.onFileLoaded(engine, video.toString())
             step("rescanned")
             val after = loader.lastResult!!
