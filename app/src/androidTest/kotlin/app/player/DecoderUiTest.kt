@@ -29,6 +29,8 @@ import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 
 /**
  * P1.1 through the real player UI (UiAutomator, in-process, so the 3 s auto-hide of the controls
@@ -144,13 +146,14 @@ class DecoderUiTest {
     }
 
     private fun shot(name: String) {
-        device.takeScreenshot(File(shots, "$name.png"))
+        evidenceShot(name)
         log("shot $name")
     }
 
     private fun log(s: String) = Log.i("P1.1", s)
 
     /** US-37.2 after the 4:4:4 fallback, then US-35.3 by hand: pick HW on a file only SW plays. */
+    @Ears("US-37.2", "US-35.3")
     @Test fun a_fallbackThenHandPickHw() {
         play("clip444.mp4")
         assertTrue("decoder never settled on SW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
@@ -170,6 +173,7 @@ class DecoderUiTest {
     }
 
     /** US-36.3 (badge pick remembered on reopen) and US-37.2 (info names the new decoder within 1 s). */
+    @Ears("US-36.3", "US-37.2")
     @Test fun b_badgePickRememberedAndShownInInfo() {
         play("clip420.mp4")
         log("badge before: ${badge()}")
@@ -192,6 +196,7 @@ class DecoderUiTest {
     }
 
     /** US-37.3: two captures a second apart while playing, with the engine's counters logged. */
+    @Ears("US-37.3")
     @Test fun c_liveValues() {
         play("clip420.mp4")
         openFromMenu("Info")
@@ -206,6 +211,7 @@ class DecoderUiTest {
     }
 
     /** US-37.1: the embedded subtitle section. */
+    @Ears("US-37.1")
     @Test fun d_embeddedAndExternalSubtitlesInInfo() {
         play("withsubs.mp4")
         // subs-audio loads sidecar files itself; here the external file is added directly.
@@ -222,6 +228,7 @@ class DecoderUiTest {
     }
 
     /** US-09.3 (library's "play with"): a one-time decoder for that launch, not remembered. */
+    @Ears("US-09.3")
     @Test fun e_oneTimeDecoderNotRemembered() {
         play("withsubs.mp4", oneTime = DecoderMode.SW)
         assertTrue("one-time SW never ran, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
@@ -234,6 +241,7 @@ class DecoderUiTest {
     }
 
     /** US-10.4: file properties from anywhere, by action, with nothing playing. */
+    @Ears("US-10.4")
     @Test fun f_infoScreenForAFile() {
         context.startActivity(PlayerIntents.showInfo(context, Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         assertTrue("info screen never showed the codec", device.wait(Until.hasObject(By.text("H.264")), 20_000))
