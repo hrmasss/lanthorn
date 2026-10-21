@@ -63,9 +63,10 @@ class BackgroundPlayUiTest {
 
     private fun log(s: String) = Log.i("P1.7", s)
 
+    // A file with audio: with the video track off in the background, audio is what moves the clock.
     @Ears("US-59.1", "US-59.3")
     @Test fun leavingKeepsPlayingAndReturningShowsTheVideo() {
-        context.startActivity(playerIntent("longgop.mp4", Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        context.startActivity(playerIntent("clip420.mp4", Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         assertTrue("never played", waitFor { state()?.let { it.video != null && it.positionMs > 1000 && !it.paused } == true })
         val engine = PlayerSessions.current.value
 
@@ -81,7 +82,7 @@ class BackgroundPlayUiTest {
         assertTrue("position did not move while away: $leftAt -> ${away?.positionMs}", away!!.positionMs - leftAt >= 3000)
 
         // Same file again: the player keeps going, no reload (US-59.3).
-        context.startActivity(playerIntent("longgop.mp4", Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(playerIntent("clip420.mp4", Intent.FLAG_ACTIVITY_NEW_TASK))
         assertTrue("video never came back", waitFor(10_000) { state()?.videoBackMs != null })
         val back = state()!!
         log("video back after ${back.videoBackMs} ms at ${back.positionMs} ms")
