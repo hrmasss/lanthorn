@@ -27,6 +27,14 @@ import app.player.core.playerapi.PanelHost
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class PanelTestActivity : ComponentActivity() {
+    companion object {
+        /** Which of the subtitle panels to show; the style panel unless a test says otherwise. */
+        var panelId: String = SubtitlesExtension.STYLE_PANEL
+
+        /** False when another screen already shows the video: one engine, one surface. */
+        var withVideo: Boolean = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val engine = PlayerSessions.current.value!!
@@ -39,8 +47,10 @@ class PanelTestActivity : ComponentActivity() {
             MaterialTheme {
                 // Test tags as resource ids, so UiAutomator taps the real panel.
                 Row(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
-                    AndroidView({ VideoSurfaceView(it).apply { this.engine = engine } }, Modifier.weight(1f).fillMaxHeight())
-                    Surface(Modifier.width(380.dp).fillMaxHeight()) { Box { StylePanel.Content(host) } }
+                    if (withVideo) AndroidView({ VideoSurfaceView(it).apply { this.engine = engine } }, Modifier.weight(1f).fillMaxHeight())
+                    else Box(Modifier.weight(1f).fillMaxHeight())
+                    val panel = SubtitlesExtension.panels.first { it.id == panelId }
+                    Surface(Modifier.width(380.dp).fillMaxHeight()) { Box { panel.Content(host) } }
                 }
             }
         }

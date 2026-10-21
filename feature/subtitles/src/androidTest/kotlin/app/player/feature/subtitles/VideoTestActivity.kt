@@ -50,7 +50,7 @@ internal object OnDevice {
 internal suspend fun <T : Any> PlayerEngine.await(
     name: String,
     type: PropertyType<T>,
-    timeoutMs: Long = 5000,
+    timeoutMs: Long = 15_000, // a bound, not a claim: the hosted CI emulator is slow
     ok: (T?) -> Boolean,
 ): Long {
     val t0 = SystemClock.elapsedRealtime()
@@ -67,3 +67,31 @@ internal suspend fun <T : Any> PlayerEngine.await(
 internal fun evidence(line: String) {
     android.util.Log.i("evidence", line)
 }
+
+/** Waits until P1.25's auto-load has finished for the open file, so a test's own track pick sticks. */
+internal suspend fun PlayerEngine.awaitAutoLoad(timeoutMs: Long = 10_000) {
+    val loader = SubtitlesExtension.autoLoad(OnDevice.context)
+    val t0 = SystemClock.elapsedRealtime()
+    while (SystemClock.elapsedRealtime() - t0 < timeoutMs) {
+        val uri = state.value.uri
+        if (uri != null && state.value.loaded && loader.doneFor.value == uri) return
+        kotlinx.coroutines.delay(20)
+    }
+}
+
+/**
+ * A timing limit from the spec. Asserted on the reference emulator; recorded only when the run says
+ * `-e timing lenient` (the shared CI emulator is slower, its numbers make no claim either way).
+ */
+internal fun assertWithin(what: String, tookMs: Long, limitMs: Long) {
+    val lenient = InstrumentationRegistry.getArguments().getString("timing") == "lenient"
+    evidence("timing $what: $tookMs ms (limit $limitMs)" + if (lenient && tookMs >= limitMs) ", over, lenient run" else "")
+    if (!lenient) org.junit.Assert.assertTrue("$what took $tookMs ms (limit $limitMs)", tookMs < limitMs)
+}
+
+/**
+ * Runs of several minutes run only when asked (`-e long true`); otherwise the test passes at once
+ * and says so. (An assumption failure shows as a failure in the Gradle report, so no Assume.)
+ */
+internal fun longRun(): Boolean =
+    (InstrumentationRegistry.getArguments().getString("long") == "true").also { if (!it) evidence("long run skipped, pass -e long true") }

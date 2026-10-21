@@ -56,5 +56,8 @@
     <string name="subs_setting_folder_none">Not set. Subtitles are looked for beside each video.</string>
     <string name="subs_setting_folder_clear">Stop using the subtitle folder</string>
     <string name="subs_setting_allowed">Folders allowed for subtitles</string>
-    <string name="subs_setting_allowed_summary">%1$d folders. Videos in them and below find their subtitles by themselves.</string>
+    <plurals name="subs_setting_allowed_summary">
+        <item quantity="one">%1$d folder. Videos in it and below find their subtitles by themselves.</item>
+        <item quantity="other">%1$d folders. Videos in them and below find their subtitles by themselves.</item>
+    </plurals>
 </resources>

@@ -27,13 +27,15 @@ internal class SubtitleFiles(context: Context) {
     class Prepared(val path: String, val title: String, val charset: Charset?)
 
     /** Reads [uri], decodes it with [forced] or by detection, and returns a path mpv can load. */
-    suspend fun prepare(uri: Uri, forced: Charset? = null): Prepared = withContext(Dispatchers.IO) {
+    suspend fun prepare(uri: Uri, forced: Charset? = null, companion: Uri? = null): Prepared = withContext(Dispatchers.IO) {
         val name = displayName(uri)
         val extension = name.substringAfterLast('.', "").lowercase()
         val bytes = read(uri)
         dir.mkdirs()
         val out = File(dir, "${digest(uri.toString())}.${extension.ifEmpty { "srt" }}")
         val charset = write(bytes, extension, forced, out)
+        // VobSub: mpv opens the .idx and reads the .sub with the same name beside it.
+        companion?.let { File(dir, out.nameWithoutExtension + ".sub").writeBytes(read(it)) }
         sources[out.path] = Source(uri, extension)
         Prepared(out.path, name, charset)
     }
@@ -52,7 +54,12 @@ internal class SubtitleFiles(context: Context) {
             out.writeBytes(bytes)
             return null
         }
-        val decoded = SubtitleText.decode(bytes, forced, ::detect)
+        val decoded = SubtitleText.decode(bytes, forced)
+        if (decoded == null) {
+            // Legacy encoding, not picked by hand: mpv detects it (sub-codepage=auto, uchardet).
+            out.writeBytes(bytes)
+            return null
+        }
         out.writeText(decoded.text, Charsets.UTF_8)
         return decoded.charset
     }
@@ -78,8 +85,6 @@ internal class SubtitleFiles(context: Context) {
         return uri.lastPathSegment?.substringAfterLast('/') ?: "subtitle"
     }
 
-    /** Legacy-encoding detection lands with P1.26 (US-44.1). Until then: UTF-8 or Windows-1252, or the viewer's pick. */
-    private fun detect(bytes: ByteArray): String? = null
 
     private fun digest(s: String): String =
         MessageDigest.getInstance("SHA-1").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }.take(16)

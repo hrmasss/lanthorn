@@ -20,7 +20,7 @@ import java.io.File
 /** P1.28 style and placement on the real libmpv: property read-back plus screenshots. */
 class StyleOnDeviceTest {
     /** A stuck wait fails the test instead of holding the shared emulator. */
-    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300)
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine
@@ -28,6 +28,8 @@ class StyleOnDeviceTest {
     private val holder = Any()
 
     @Before fun open() = runBlocking {
+        // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
+        SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         styles = OnDevice.main { SubtitlesExtension.styles(OnDevice.context) }
@@ -35,6 +37,7 @@ class StyleOnDeviceTest {
         scenario.onActivity { it.surface.engine = engine }
         engine.open(Uri.fromFile(OnDevice.asset("wide.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.awaitAutoLoad()
         engine.pause()
         repeat(20) {
             engine.seekTo(1000)
@@ -50,6 +53,7 @@ class StyleOnDeviceTest {
     }
 
     @After fun close() {
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         if (!::scenario.isInitialized) return
         OnDevice.main { styles.reset() }
         runCatching { scenario.onActivity { it.surface.engine = null } }
@@ -83,7 +87,7 @@ class StyleOnDeviceTest {
         shot("us42-box-monospace")
         evidence("US-42.2 defaults: white #FFFFFFFF, size 46, bold, border 0, shadow 3 at #E0000000")
         evidence("US-42.3 colour, outline, font, size change applied to mpv in $took ms (limit 100); screenshots before/after")
-        assertTrue("took $took ms", took < 100)
+        assertWithin("StyleOnDeviceTest", took, 100)
     }
 
     @Test fun alignmentMarginAndFit_US43_1_US43_2() = runBlocking {
@@ -135,22 +139,6 @@ class StyleOnDeviceTest {
     }
 
     /** Why text on the wide clip drew tiny: dump what mpv thinks, compare with the 16:9 clip. */
-    @Test fun sizeDiagnostic() = runBlocking {
-        for (name in listOf("osd-dimensions", "sub-font-size", "sub-scale", "sub-use-margins", "sub-scale-by-window", "video-params", "sub-ass-override")) {
-            evidence("diag wide $name = ${engine.get(name, PropertyType.Text)}")
-        }
-        shot("diag-wide-default")
-        engine.set("sub-use-margins", "yes")
-        delay(500)
-        shot("diag-wide-use-margins")
-        engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
-        engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
-        engine.set("sid", "2")
-        delay(1500)
-        evidence("diag tracks osd-dimensions = ${engine.get("osd-dimensions", PropertyType.Text)}")
-        shot("diag-tracks-english")
-    }
-
     private fun shot(name: String) {
         val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
         val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }

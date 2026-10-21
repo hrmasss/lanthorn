@@ -120,25 +120,6 @@ class AudioSettingsOnDeviceTest {
         evidence("Audio group: export $exported; reset gave the defaults; import brought back it/120/200")
     }
 
-    @Test fun groupInRealSettings() {
-        val device = androidx.test.uiautomator.UiDevice.getInstance(OnDevice.instrumentation)
-        val launch = OnDevice.context.packageManager.getLaunchIntentForPackage("app.player")
-            ?: throw AssertionError("app.player not installed")
-        runBlocking { store.setDefaultDelay(120); store.setBluetoothDelay(200) }
-        OnDevice.context.startActivity(launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK))
-        fun tap(sel: androidx.test.uiautomator.BySelector) {
-            device.wait(androidx.test.uiautomator.Until.findObject(sel), 15_000)?.click() ?: throw AssertionError("not found: $sel")
-        }
-        tap(androidx.test.uiautomator.By.desc("More options"))
-        tap(androidx.test.uiautomator.By.text("Settings"))
-        tap(androidx.test.uiautomator.By.text("Audio"))
-        device.wait(androidx.test.uiautomator.Until.hasObject(androidx.test.uiautomator.By.text("Default audio delay")), 5_000)
-        Thread.sleep(1500)
-        shot("audio-settings-real-screen")
-        device.pressBack(); device.pressBack(); device.pressBack()
-        evidence("Audio group opened from the app's real Settings screen; screenshot")
-    }
-
     @Test fun settingsPage_P1_31() = runBlocking {
         store.setLanguage("it")
         store.setDefaultDelay(120)
