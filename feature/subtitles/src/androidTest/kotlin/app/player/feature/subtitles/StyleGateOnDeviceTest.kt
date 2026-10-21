@@ -59,6 +59,7 @@ class StyleGateOnDeviceTest {
     private suspend fun open(name: String, title: String? = null) {
         e.open(Uri.fromFile(OnDevice.asset(name)))
         e.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        e.awaitAutoLoad()
         val track = parseTracks(e.get("track-list", PropertyType.Text)).filter { it.type == "sub" }
             .let { subs -> subs.firstOrNull { it.title == title } ?: subs.first() }
         e.set("sid", track.id.toString())

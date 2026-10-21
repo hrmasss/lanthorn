@@ -111,6 +111,9 @@ object SubtitlesExtension : PlayerExtension {
         }
         // US-39: subtitle files beside the video, and which track turns on, once the file has loaded.
         val loader = autoLoad(context)
+        val clearJob = scope.launch {
+            engine.state.map { it.loaded }.distinctUntilChanged().filter { !it }.collect { loader.clear() }
+        }
         val loadJob = scope.launch {
             engine.state.filter { it.loaded }.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
                 runCatching { loader.onFileLoaded(engine, uri) }
@@ -120,6 +123,7 @@ object SubtitlesExtension : PlayerExtension {
             PlayerSessions.current.first { it !== engine }
             job.cancel()
             loadJob.cancel()
+            clearJob.cancel()
         }
     }
 

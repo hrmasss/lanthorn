@@ -22,6 +22,16 @@ internal class SubtitleAutoLoad(context: Context, private val files: SubtitleFil
     @Volatile var lastResult: SubtitleDiscovery.Result? = null
         private set
 
+    private val _doneFor = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** The uri the last auto-load finished for: anything that picks tracks itself waits for it. */
+    val doneFor: kotlinx.coroutines.flow.StateFlow<String?> = _doneFor
+
+    /** A new file started loading: the last result no longer applies. */
+    fun clear() {
+        _doneFor.value = null
+    }
+
     fun folderUri(place: SubtitleDiscovery.Place): Uri? = discovery.folderUri(place)
 
     suspend fun onFileLoaded(engine: PlayerEngine, uri: String) {
@@ -51,6 +61,7 @@ internal class SubtitleAutoLoad(context: Context, private val files: SubtitleFil
             else -> null
         }
         controller.select(SubSelection(pick?.id))
+        _doneFor.value = uri
     }
 
     /** US-39.4: the viewer turned [track] on (or none) for [uri]. No-op while "remember choices" is off. */

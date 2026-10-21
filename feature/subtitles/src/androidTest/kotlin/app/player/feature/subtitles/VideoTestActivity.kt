@@ -67,3 +67,14 @@ internal suspend fun <T : Any> PlayerEngine.await(
 internal fun evidence(line: String) {
     android.util.Log.i("evidence", line)
 }
+
+/** Waits until P1.25's auto-load has finished for the open file, so a test's own track pick sticks. */
+internal suspend fun PlayerEngine.awaitAutoLoad(timeoutMs: Long = 10_000) {
+    val loader = SubtitlesExtension.autoLoad(OnDevice.context)
+    val t0 = SystemClock.elapsedRealtime()
+    while (SystemClock.elapsedRealtime() - t0 < timeoutMs) {
+        val uri = state.value.uri
+        if (uri != null && state.value.loaded && loader.doneFor.value == uri) return
+        kotlinx.coroutines.delay(20)
+    }
+}

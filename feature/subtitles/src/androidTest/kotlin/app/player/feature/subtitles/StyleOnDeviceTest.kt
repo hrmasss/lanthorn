@@ -37,6 +37,7 @@ class StyleOnDeviceTest {
         scenario.onActivity { it.surface.engine = engine }
         engine.open(Uri.fromFile(OnDevice.asset("wide.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.awaitAutoLoad()
         engine.pause()
         repeat(20) {
             engine.seekTo(1000)
@@ -148,6 +149,7 @@ class StyleOnDeviceTest {
         shot("diag-wide-use-margins")
         engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
+        engine.awaitAutoLoad()
         engine.set("sid", "2")
         delay(1500)
         evidence("diag tracks osd-dimensions = ${engine.get("osd-dimensions", PropertyType.Text)}")

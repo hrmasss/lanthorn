@@ -37,6 +37,7 @@ class SubtitlesOnDeviceTest {
         controller = SubtitleController(engine.asMpv())
         engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 5 }
+        engine.awaitAutoLoad()
         // Keep the subtitle on screen for the checks: pause one second in.
         engine.pause()
         // A seek sent while mpv is still starting the file can be dropped: resend until it lands.
@@ -168,6 +169,7 @@ class SubtitlesOnDeviceTest {
     private suspend fun openFonts() {
         engine.open(Uri.fromFile(OnDevice.asset("fonts.mkv")))
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
+        engine.awaitAutoLoad()
         engine.set("sid", "1")
         engine.await("sub-text", PropertyType.Text, 10_000) { it == "iiii WWWW embedded font" }
     }
