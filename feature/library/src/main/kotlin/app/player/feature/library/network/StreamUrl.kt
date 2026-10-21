@@ -21,9 +21,10 @@ fun parseStreamUrl(text: String): String? {
     return withScheme.replaceFirst(uri.scheme, scheme)
 }
 
-/** True for a stream URL, false for local content and files. */
+/** True for a stream URL or a file on an SMB share (served by SmbProvider), false for local files. */
 fun isNetworkUrl(uri: String): Boolean =
-    uri.substringBefore("://", "").lowercase(Locale.ROOT) in StreamSchemes
+    uri.substringBefore("://", "").lowercase(Locale.ROOT) in StreamSchemes ||
+        (uri.startsWith("content://") && uri.substringAfter("content://").substringBefore('/').endsWith(".smb"))
 
 /** Why a stream failed, in the viewer's terms (US-61.4). */
 enum class StreamFailure { NotFound, Timeout, Unsupported, Other }

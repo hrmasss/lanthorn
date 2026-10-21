@@ -49,7 +49,9 @@ class PlayerChromeTest {
         compose.onNodeWithTag("video").performClick()
         compose.waitUntil(2_000) { shown("back") }
         val shownAt = SystemClock.elapsedRealtime()
-        shot("01-controls")
+        // No screenshot while the overlay is about to animate out: taking one during a layout
+        // pass made Espresso's idle check fail on the hosted emulator. 01-controls comes from
+        // controlsStayWhilePaused instead.
         compose.waitUntil(9_000) { !shown("back") }
         val hiddenAfter = SystemClock.elapsedRealtime() - shownAt
         // The Compose test clock skews wall time on the emulator; the exact 3 s is proven by the
@@ -65,6 +67,7 @@ class PlayerChromeTest {
         compose.onNodeWithTag("play-pause").performClick()
         SystemClock.sleep(5_000)
         assertTrue(shown("back"))
+        shot("01-controls")
         shot("03-paused")
     }
 

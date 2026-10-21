@@ -9,7 +9,10 @@ enum class FailureReason { MissingFile, UnsupportedCodec, Damaged, NoPermission 
 object Failures {
     private val missing = listOf("ENOENT", "No such file", "FileNotFoundException", "not found")
     private val permission = listOf("Permission Denial", "EACCES", "Permission denied", "SecurityException")
-    private val codec = listOf("Failed to initialize a decoder", "Could not open codec", "No decoder", "codec not found")
+    private val codec = listOf(
+        "Failed to initialize a decoder", "Could not open codec", "No decoder", "codec not found", "Could not find decoder", "Decoder not found",
+        "no decoder found", "Requested decoder", "No video or audio streams",
+    )
 
     /** True for a log line that says a decoder could not start. */
     fun isDecoderFailure(m: EngineMessage) = codec.any { m.text.contains(it, ignoreCase = true) }
