@@ -147,11 +147,13 @@ class BackgroundMediaUiTest {
         SystemClock.sleep(3_000)
         device.pressHome()
         assertTrue("not paused after leaving", waitFor(5_000) { state()?.paused == true })
-        // The last position update can land just after the pause flag.
-        SystemClock.sleep(500)
-        val at = state()!!.positionMs
+        // Frames decoded before the pause can still show just after it: where it stopped is where
+        // the position stands still.
+        var at = state()!!.positionMs
+        waitFor(3_000) { SystemClock.sleep(300); val now = state()!!.positionMs; (now == at).also { at = now } }
+        // A row from the regular saves while playing is already there: wait for the one from leaving.
         var row = runBlocking { ResumePoints(context).get(uri.toString()) }
-        waitFor(3_000) { row = runBlocking { ResumePoints(context).get(uri.toString()) }; row != null }
+        waitFor(3_000) { row = runBlocking { ResumePoints(context).get(uri.toString()) }; row?.positionMs == at / 1000 * 1000 }
         log("stop on leaving: paused at $at, row $row")
         assertNotNull("no resume point after leaving", row)
         // Rows are whole seconds: the pause's own second.
