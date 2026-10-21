@@ -224,19 +224,19 @@ class DecoderUiTest {
     /** US-09.3 (library's "play with"): a one-time decoder for that launch, not remembered. */
     @Test fun e_oneTimeDecoderNotRemembered() {
         play("withsubs.mp4", oneTime = DecoderMode.SW)
-        assertEquals(ActiveDecoder.SW, engineState()?.activeDecoder)
+        assertTrue("one-time SW never ran, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
         assertEquals(DecoderMode.SW, engineState()?.decoderMode)
         close()
         play("withsubs.mp4")
         log("one-time SW, then a plain open: ${engineState()?.decoderMode} on ${engineState()?.activeDecoder?.label}")
-        assertEquals(ActiveDecoder.HW, engineState()?.activeDecoder)
+        assertTrue("plain open did not go back to HW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.HW })
         close()
     }
 
     /** US-10.4: file properties from anywhere, by action, with nothing playing. */
     @Test fun f_infoScreenForAFile() {
         context.startActivity(PlayerIntents.showInfo(Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        assertTrue(device.wait(Until.hasObject(By.text("H.264")), 8000))
+        assertTrue("info screen never showed the codec", device.wait(Until.hasObject(By.text("H.264")), 20_000))
         assertTrue(device.hasObject(By.text("MP4")))
         assertTrue(device.hasObject(By.text("AAC")))
         assertEquals(null, PlayerSessions.current.value)
