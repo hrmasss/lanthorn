@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.player.core.designsystem.component.SettingsChoice
 import app.player.core.designsystem.component.SettingsHeader
 import app.player.core.designsystem.component.SettingsNote
+import app.player.core.designsystem.component.SettingsSwitch
 import app.player.core.settingsapi.PreferencesJson
 import app.player.core.settingsapi.SettingsEntry
 import app.player.core.settingsapi.SettingsGroup
@@ -40,7 +41,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.Locale
 
-/** The Audio settings group (order 40): preferred language, default delay, Bluetooth delay. */
+/** The Audio settings group (order 40): preferred language, default delay, Bluetooth delay, volume boost. */
 object AudioSettings : SettingsGroup {
     override val id = "audio"
     override val order = 40
@@ -49,12 +50,14 @@ object AudioSettings : SettingsGroup {
     private const val LANGUAGE = "preferred_language"
     private const val DEFAULT_DELAY = "default_delay"
     private const val BLUETOOTH_DELAY = "bluetooth_delay"
-    private val KEYS = listOf("header", LANGUAGE, DEFAULT_DELAY, BLUETOOTH_DELAY)
+    private const val VOLUME_BOOST = "volume_boost"
+    private val KEYS = listOf("header", LANGUAGE, DEFAULT_DELAY, BLUETOOTH_DELAY, "note", VOLUME_BOOST)
 
     override val entries = listOf(
         SettingsEntry(LANGUAGE, R.string.audio_setting_language),
         SettingsEntry(DEFAULT_DELAY, R.string.audio_setting_default_delay, R.string.audio_setting_default_delay_summary),
         SettingsEntry(BLUETOOTH_DELAY, R.string.audio_setting_bluetooth_delay, R.string.audio_setting_bluetooth_delay_summary),
+        SettingsEntry(VOLUME_BOOST, R.string.audio_setting_volume_boost, R.string.audio_setting_volume_boost_summary),
     )
 
     @Composable
@@ -103,6 +106,16 @@ object AudioSettings : SettingsGroup {
                 ) { scope.launch { store.setBluetoothDelay(it) } }
             }
             item("note") { SettingsNote(stringResource(R.string.audio_setting_delay_note)) }
+            item(VOLUME_BOOST) {
+                SettingsSwitch(
+                    title = stringResource(R.string.audio_setting_volume_boost),
+                    summary = stringResource(R.string.audio_setting_volume_boost_summary),
+                    checked = prefs.volumeBoost,
+                    onCheckedChange = { scope.launch { store.setVolumeBoost(it) } },
+                    modifier = Modifier.testTag("audio-setting-volume-boost"),
+                    highlighted = highlight == VOLUME_BOOST,
+                )
+            }
         }
     }
 

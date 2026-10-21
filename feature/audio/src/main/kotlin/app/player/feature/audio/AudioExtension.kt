@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
@@ -40,8 +42,15 @@ import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
+import app.player.core.playerapi.VolumeBoost
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
@@ -70,6 +79,18 @@ object AudioExtension : PlayerExtension {
     private val scope = MainScope()
     private var bound: AudioSession? = null
 
+    private val boostEnabled = MutableStateFlow(true)
+    private val boostGain = MutableStateFlow(1f)
+
+    /** US-49.1: player-ui's volume gesture raises the gain past the system maximum through this. */
+    override val volumeBoost: VolumeBoost = object : VolumeBoost {
+        override val enabled: StateFlow<Boolean> = boostEnabled.asStateFlow()
+        override val gain: StateFlow<Float> = boostGain.asStateFlow()
+        override fun setGain(gain: Float) {
+            if (boostEnabled.value) bound?.effects?.setBoost(gain)
+        }
+    }
+
     /** What this feature holds for the live engine. */
     internal class AudioSession(val engine: PlayerEngine, val effects: AudioEffects, val delay: AudioDelay)
 
@@ -88,7 +109,9 @@ object AudioExtension : PlayerExtension {
     }
 
     private const val TRACK_KEY = "audio.track"
+    private const val SAVE_DEBOUNCE_MS = 300L
 
+    @OptIn(FlowPreview::class)
     override fun onEngineCreated(context: Context, engine: PlayerEngine) {
         bound?.effects?.release()
         val audio = context.getSystemService(AudioManager::class.java)
@@ -109,6 +132,8 @@ object AudioExtension : PlayerExtension {
             scope.launch {
                 store.prefs.collect {
                     prefs = it
+                    boostEnabled.value = it.volumeBoost
+                    if (!it.volumeBoost) effects.resetBoost()
                     // US-47.2: mpv picks the matching track at open, else the default-flagged one.
                     engine.set("alang", alangFor(it.preferredLanguage))
                     delay.setBluetooth(it.bluetoothDelayMs, bluetooth.active())
@@ -125,6 +150,12 @@ object AudioExtension : PlayerExtension {
                     engine.set("aid", remembered?.toString() ?: "auto")
                 }
             },
+            // US-50.3: the equalizer as the viewer left it, saved again as it changes.
+            scope.launch {
+                effects.restore(store.prefs.first().eq)
+                effects.state.map { it.saved }.distinctUntilChanged().drop(1).debounce(SAVE_DEBOUNCE_MS).collect { store.setEq(it) }
+            },
+            scope.launch { effects.state.map { it.boost }.distinctUntilChanged().collect { boostGain.value = it } },
             // US-48.3: every new file starts at the default delay.
             scope.launch {
                 engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { delay.setBase(prefs.defaultDelayMs) }
@@ -134,7 +165,10 @@ object AudioExtension : PlayerExtension {
         // A new engine starts at 100% boost (US-49.3); the old effect goes with the old engine.
         scope.launch {
             PlayerSessions.current.first { it !== engine }
-            if (bound?.engine === engine) bound = null
+            if (bound?.engine === engine) {
+                bound = null
+                boostGain.value = 1f
+            }
             jobs.forEach { it.cancel() }
             effects.release()
             channels.stop()
@@ -235,7 +269,6 @@ private object EffectsPanel : PlayerPanel {
                     FilterChip(
                         selected = state.stereo == mode,
                         onClick = { effects.setStereo(mode) },
-                        enabled = mode.available,
                         label = { Text(stringResource(mode.label)) },
                         modifier = Modifier.testTag("audio-stereo-${mode.name}"),
                     )
@@ -255,6 +288,19 @@ private object EffectsPanel : PlayerPanel {
             )
             if (state.eqOn) {
                 LazyColumn {
+                    item {
+                        Text(stringResource(R.string.audio_eq_presets), style = MaterialTheme.typography.labelLarge)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(end = 24.dp)) {
+                            items(EqPreset.entries) { preset ->
+                                FilterChip(
+                                    selected = state.preset == preset,
+                                    onClick = { effects.setPreset(preset) },
+                                    label = { Text(stringResource(preset.label)) },
+                                    modifier = Modifier.testTag("audio-preset-${preset.name}"),
+                                )
+                            }
+                        }
+                    }
                     item {
                         Text(stringResource(R.string.audio_preamp, state.preampDb))
                         Slider(state.preampDb, effects::setPreamp, valueRange = Eq.MIN_DB..Eq.MAX_DB)
@@ -278,6 +324,19 @@ private val StereoMode.label: Int get() = when (this) {
     StereoMode.Stereo -> R.string.audio_stereo
     StereoMode.Mono -> R.string.audio_mono
     StereoMode.Reverse -> R.string.audio_reverse
+}
+
+private val EqPreset.label: Int get() = when (this) {
+    EqPreset.Flat -> R.string.audio_eq_flat
+    EqPreset.Classical -> R.string.audio_eq_classical
+    EqPreset.Dance -> R.string.audio_eq_dance
+    EqPreset.Folk -> R.string.audio_eq_folk
+    EqPreset.HeavyMetal -> R.string.audio_eq_heavy_metal
+    EqPreset.HipHop -> R.string.audio_eq_hip_hop
+    EqPreset.Jazz -> R.string.audio_eq_jazz
+    EqPreset.Pop -> R.string.audio_eq_pop
+    EqPreset.Rock -> R.string.audio_eq_rock
+    EqPreset.Custom -> R.string.audio_eq_custom
 }
 
 private fun hz(f: Float): String = if (f >= 1000) "${(f / 1000).let { if (it % 1f == 0f) it.toInt().toString() else it.toString() }} kHz" else "${f.toInt()} Hz"

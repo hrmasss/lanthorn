@@ -12,12 +12,31 @@ enum class StereoMode {
     Stereo,
     Mono,
 
-    /** Needs FFmpeg's `pan`, which our libmpv build lacks (questions.md). Shown, not selectable. */
+    /** Left and right swapped, through FFmpeg's `pan` (in libmpv since P1.33). */
     Reverse,
-    ;
-
-    val available: Boolean get() = this != Reverse
 }
+
+/** EQ presets (US-50.1): gains in dB for the ten bands, 31 Hz to 16 kHz. Custom holds the viewer's own. */
+enum class EqPreset(internal val bandsDb: List<Float>?) {
+    Flat(listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f)),
+    Classical(listOf(0f, 0f, 0f, 0f, 0f, 0f, -3f, -4f, -4f, -6f)),
+    Dance(listOf(6f, 5f, 2f, 0f, 0f, -2f, -2f, -2f, 0f, 1f)),
+    Folk(listOf(-1f, 0f, 1f, 2f, 3f, 2f, 1f, 0f, 0f, -1f)),
+    HeavyMetal(listOf(4f, 3f, 0f, -2f, 0f, 2f, 4f, 5f, 4f, 2f)),
+    HipHop(listOf(5f, 4f, 2f, 3f, -1f, -1f, 1f, -1f, 2f, 3f)),
+    Jazz(listOf(3f, 2f, 1f, 2f, -2f, -2f, 0f, 1f, 3f, 4f)),
+    Pop(listOf(-1f, 1f, 3f, 4f, 3f, 0f, -1f, -1f, -1f, -1f)),
+    Rock(listOf(5f, 3f, -2f, -4f, -1f, 2f, 4f, 5f, 5f, 5f)),
+    Custom(null),
+}
+
+/** What the equalizer keeps across files and restarts (US-50.3). */
+internal data class EqSaved(
+    val on: Boolean = false,
+    val preampDb: Float = 0f,
+    val preset: EqPreset = EqPreset.Flat,
+    val customDb: List<Float> = List(Eq.BANDS) { 0f },
+)
 
 /** Everything the viewer can change about the sound past track and delay (P1.4). */
 internal data class EffectsState(
@@ -27,7 +46,12 @@ internal data class EffectsState(
     /** Player gain, 1.0 to 2.0 (US-49). Never saved: it resets with the player (US-49.3). */
     val boost: Float = 1f,
     val stereo: StereoMode = StereoMode.Stereo,
+    val preset: EqPreset = EqPreset.Flat,
+    /** The Custom preset's bands: the last hand-moved curve. */
+    val customDb: List<Float> = List(Eq.BANDS) { 0f },
 ) {
+    val saved: EqSaved get() = EqSaved(eqOn, preampDb, preset, customDb)
+
     /** Whether the platform effect needs to run at all. Off costs nothing. */
     val processing: Boolean get() = eqOn || boost > 1f
 
@@ -72,14 +96,16 @@ internal class StereoFilter(private val mpv: Mpv) {
     fun apply(mode: StereoMode) {
         mpv.command("af", "remove", "@$LABEL")
         when (mode) {
-            StereoMode.Stereo, StereoMode.Reverse -> Unit
+            StereoMode.Stereo -> Unit
             // mpv's own format filter downmixes with the FFmpeg resampler: centre and surround kept.
             StereoMode.Mono -> mpv.command("af", "add", "@$LABEL:format=channels=mono")
+            StereoMode.Reverse -> mpv.command("af", "add", "@$LABEL:$REVERSE")
         }
     }
 
     companion object {
         const val LABEL = "subsaudio-stereo"
+        const val REVERSE = "lavfi=[pan=stereo|c0=c1|c1=c0]"
     }
 }
 
@@ -97,15 +123,32 @@ internal class AudioEffects(internal val sink: EffectsSink, private val stereo: 
         change { it.copy(bandsDb = bandsDb.map { db -> db.coerceIn(Eq.MIN_DB, Eq.MAX_DB) }) }
     }
 
-    /** US-50.2: one band moves alone, without rebuilding the effect. */
+    /** US-50.1: a preset sets all ten bands; Custom brings back the viewer's own curve. */
+    fun setPreset(preset: EqPreset) = change { it.copy(preset = preset, bandsDb = preset.bandsDb ?: it.customDb) }
+
+    /** US-50.2: one band moves alone, without rebuilding the effect. The curve becomes Custom. */
     fun setBand(index: Int, db: Float) {
         val clamped = db.coerceIn(Eq.MIN_DB, Eq.MAX_DB)
-        val next = _state.updateAndGet { it.copy(bandsDb = it.bandsDb.toMutableList().also { b -> b[index] = clamped }) }
+        val next = _state.updateAndGet {
+            val bands = it.bandsDb.toMutableList().also { b -> b[index] = clamped }
+            it.copy(bandsDb = bands, preset = EqPreset.Custom, customDb = bands)
+        }
         if (next.eqOn) sink.setBand(index, clamped)
     }
 
+    /** US-50.3: the equalizer as it was saved. */
+    fun restore(saved: EqSaved) = change {
+        val custom = saved.customDb.takeIf { c -> c.size == Eq.BANDS } ?: List(Eq.BANDS) { 0f }
+        it.copy(
+            eqOn = saved.on,
+            preampDb = saved.preampDb.coerceIn(Eq.MIN_DB, Eq.MAX_DB),
+            preset = saved.preset,
+            customDb = custom,
+            bandsDb = (saved.preset.bandsDb ?: custom).map { db -> db.coerceIn(Eq.MIN_DB, Eq.MAX_DB) },
+        )
+    }
+
     fun setStereo(mode: StereoMode) {
-        if (!mode.available) return
         _state.update { it.copy(stereo = mode) }
         stereo.apply(mode)
     }
