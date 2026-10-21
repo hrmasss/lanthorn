@@ -4,6 +4,8 @@ name: Instrumented
 # (free and with KVM now that the repo is public). Builds stay on the self-hosted CI workflow.
 # Results per module: artifact `androidTest-<module>` (JUnit XML, HTML report, logcat, and the
 # files tests write under /sdcard/Android/data/app.player*/files, such as screenshots).
+# Main runs all modules on every push; branches and PRs run only the modules they touched, plus the
+# app, and everything when shared code or the build changed (.github/scripts/instrumented-matrix.sh).
 
 on:
   push:
@@ -11,27 +13,35 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: instrumented-${{ github.ref }}
-  cancel-in-progress: true
+  # Same rule as CI: every main commit runs to completion, branch pushes cancel older runs.
+  group: instrumented-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'branch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: matrix
+        run: |
+          m=$(.github/scripts/instrumented-matrix.sh "${{ github.ref }}" "origin/${{ github.base_ref || 'main' }}")
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+          echo "Modules: $m" | tee -a "$GITHUB_STEP_SUMMARY"
+
   instrumented:
+    needs: plan
+    if: needs.plan.outputs.matrix != '[]'
     name: instrumented (${{ matrix.module }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { module: app, build: ':app:assembleDebug :app:assembleDebugAndroidTest', task: ':app:connectedDebugAndroidTest' }
-          - { module: core-engine, build: ':core:engine:assembleDebugAndroidTest', task: ':core:engine:connectedDebugAndroidTest' }
-          - { module: core-data, build: ':core:data:assembleDebugAndroidTest', task: ':core:data:connectedDebugAndroidTest' }
-          - { module: feature-info, build: ':feature:info:assembleDebugAndroidTest', task: ':feature:info:connectedDebugAndroidTest' }
-          - { module: feature-library, build: ':feature:library:assembleDebugAndroidTest', task: ':feature:library:connectedDebugAndroidTest' }
-          - { module: feature-player, build: ':feature:player:assembleDebugAndroidTest', task: ':feature:player:connectedDebugAndroidTest' }
-          - { module: feature-subtitles, build: ':feature:subtitles:assembleDebugAndroidTest', task: ':feature:subtitles:connectedDebugAndroidTest' }
-          # Audio tests need the emulator's audio device: no -noaudio here.
-          - { module: feature-audio, build: ':feature:audio:assembleDebugAndroidTest', task: ':feature:audio:connectedDebugAndroidTest', audio: true }
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -86,18 +96,25 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect ${{ matrix.audio && ' ' || '-noaudio' }} -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            adb logcat -G 16M || true
             adb logcat -c || true
             # A fresh AVD shows a one-time "Viewing full screen" prompt over the player that takes the taps.
             adb shell settings put secure immersive_mode_confirmations confirmed || true
-            # First boot also opens Google's welcome and Tips screens over whatever runs, about 30 s in.
-            adb shell pm disable-user --user 0 com.google.android.apps.tips || true
+            # First boot also has Google Play services open its welcome screen over whatever runs,
+            # about 30 s in. Disable that one activity (needs root, which google_apis images allow).
+            adb root || true
+            adb wait-for-device
+            adb shell pm disable com.google.android.gms/.setupservices.CoverSheetWelcomeActivity || true
+            # It may already be open by now: stopping Play services closes it, and it cannot reopen.
             adb shell am force-stop com.google.android.gms || true
+            echo "First-boot welcome screen in the activity stack before the tests: $(adb shell dumpsys activity activities | grep -c CoverSheetWelcomeActivity)" | tee -a "$GITHUB_STEP_SUMMARY"
             adb shell settings put secure user_setup_complete 1 || true
             adb shell settings put global device_provisioned 1 || true
             adb shell input keyevent KEYCODE_HOME || true
             ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
+            echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"
             test ! -f failed.marker
 
       - name: Summary
