@@ -566,7 +566,13 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
                 done.countDown()
             }
         }
-        if (!done.await(SURFACE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) Log.w(TAG, "surface change timed out")
+        // The engine thread already stuck in an mpv call will not get to this soon: do not hold the
+        // caller (the main thread, for Back) for the full timeout. A stuck mpv draws nothing anyway.
+        val since = busySince
+        val stuck = since != 0L && SystemClock.elapsedRealtime() - since > STUCK_HINT_MS
+        if (!done.await(if (stuck) STUCK_WAIT_MS else SURFACE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            Log.w(TAG, "surface change timed out" + if (stuck) " (engine thread busy)" else "")
+        }
     }
 
     private fun mpvCommand(vararg args: String) = mpv?.command(arrayOf(*args))
@@ -706,6 +712,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     companion object {
         private const val TAG = "PlayerEngine"
         private const val SURFACE_TIMEOUT_MS = 2000L
+        private const val STUCK_HINT_MS = 500L
+        private const val STUCK_WAIT_MS = 300L
         private const val SURFACE_WAIT_MS = 1000L
         private const val DECODER_SETTLE_STEP_MS = 100L
         private const val DECODER_SETTLE_TRIES = 50
