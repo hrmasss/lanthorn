@@ -45,10 +45,10 @@ class LibraryHomeTest {
     private val dao = MemoryDao()
     private val store = LibraryPrefsStore(context)
 
-    @After fun tearDown() = runBlocking {
+    @After fun tearDown() { runBlocking {
         store.setViewMode(ViewMode.Folders)
         store.setSort(Sort())
-    }
+    } }
 
     private fun show(vm: LibraryViewModel, index: LibraryIndex) {
         val loaders = testLoaders(context, index)
@@ -59,7 +59,7 @@ class LibraryHomeTest {
     private fun Home(vm: LibraryViewModel, loaders: Pair<ThumbnailLoader, VideoProbe>) {
         val state by vm.state.collectAsState()
         LanthornTheme {
-            LibraryHome(state, vm, loaders, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, {}, {})
+            LibraryHome(state, vm, loaders, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, {}, {}, {})
         }
     }
 

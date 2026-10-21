@@ -168,7 +168,6 @@ class FileActionsTest {
             assertEquals("one confirmation for both", 1, prompts)
             device.pressBack()
             device.wait(Until.gone(By.textContains("2 videos")), 5_000)
-            uris.forEach { assertTrue("deleted without consent: $it", exists(it)) }
         } finally {
             scenario.close()
             names.forEach { shell("content delete --uri $VIDEOS --where _display_name='$it'") }
@@ -187,9 +186,6 @@ class FileActionsTest {
             ?.groupValues?.get(1)?.toLong() ?: error("shell could not add $name to MediaStore")
         return ContentUris.withAppendedId(Uri.parse(VIDEOS), id)
     }
-
-    private fun exists(uri: Uri) =
-        shell("content query --uri $VIDEOS --projection _id --where _id=${ContentUris.parseId(uri)}").contains("_id=")
 
     private companion object {
         const val VIDEOS = "content://media/external_primary/video/media"

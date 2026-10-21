@@ -30,10 +30,10 @@ class FolderSettingsTest {
     private val folder = "external_primary/Movies/Trips/"
     private val video = testVideo(1, "external_primary/Movies/", "Beach day.mp4")
 
-    @After fun tearDown() = runBlocking {
+    @After fun tearDown() { runBlocking {
         store.setHidden(folder, false)
         store.setHidden(video.uri, false)
-    }
+    } }
 
     @Ears("US-15.2")
     @Test fun us_15_2_hidden_items_are_listed_and_each_can_be_shown_again() {

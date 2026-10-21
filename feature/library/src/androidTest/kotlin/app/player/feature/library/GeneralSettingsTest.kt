@@ -60,12 +60,12 @@ class GeneralSettingsTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val started = mutableListOf<Intent>()
 
-    @Before fun setUp() = runBlocking { GeneralSettings.reset(context) }
+    @Before fun setUp() { runBlocking { GeneralSettings.reset(context) } }
 
-    @After fun tearDown() = runBlocking {
+    @After fun tearDown() { runBlocking {
         GeneralSettings.reset(context)
         clearAll()
-    }
+    } }
 
     private suspend fun clearAll() {
         ResumePoints(context).clear()

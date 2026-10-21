@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.datastore.preferences.core.edit
@@ -433,7 +434,10 @@ private fun ImportDialog(backup: JSONObject, onDone: (report: String?) -> Unit) 
     )
 }
 
-private fun Context.toast(text: Int) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+/** Toasts on the main thread, wherever the coroutine that finished the action runs. */
+private fun Context.toast(text: Int) = ContextCompat.getMainExecutor(this).execute {
+    Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+}
 
 /** US-68.1: the system's per-app language page (Android 13+). */
 private fun Context.openLanguageSettings() {

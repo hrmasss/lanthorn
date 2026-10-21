@@ -71,8 +71,15 @@ class FontScaleTest {
             node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(results)
             val r = results.firstOrNull() ?: return@mapNotNull null
             val text = node.config.getOrNull(SemanticsProperties.Text)?.joinToString() ?: r.layoutInput.text.text
-            text.takeIf { r.hasVisualOverflow && r.layoutInput.overflow != TextOverflow.Ellipsis }
+            if (r.layoutInput.overflow == TextOverflow.Ellipsis) return@mapNotNull null
+            // Cut off: wider or taller than the room it was given, by more than rounding.
+            val wide = r.multiParagraph.width - r.size.width
+            val tall = r.multiParagraph.height - r.size.height
+            val lines = r.multiParagraph.didExceedMaxLines
+            "$text (over by ${"%.1f".format(wide)} x ${"%.1f".format(tall)} px, lines cut $lines)"
+                .takeIf { tall > 2f || lines || (r.didOverflowWidth && wide > 2f) }
         }
+        android.util.Log.i("US-69.3", "$screen: ${nodes.size} texts checked")
         assertTrue("$screen at 200% font: clipped text $clipped", clipped.isEmpty())
     }
 
@@ -104,7 +111,7 @@ class FontScaleTest {
         val loaders = testLoaders(context, index)
         rule.setContent {
             val state by vm.state.collectAsState()
-            Large(tall = false) { LibraryHome(state, vm, loaders, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, {}, {}) }
+            Large(tall = false) { LibraryHome(state, vm, loaders, {}, { _, _ -> }, { _, _ -> }, {}, {}, {}, {}, {}, {}, {}) }
         }
         rule.waitUntil(5_000) { rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "folder-row")).fetchSemanticsNodes().isNotEmpty() }
         evidenceShot("library-200")

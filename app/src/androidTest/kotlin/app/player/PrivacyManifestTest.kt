@@ -82,7 +82,7 @@ class PrivacyManifestTest {
         SystemClock.sleep(3_000)
         evidenceShot("first-screen")
         assertFalse(device.hasObject(By.text(Pattern.compile("(?i).*(sign in|log in|login|sign up|create account).*"))))
-        instr.runOnMainSync { resumed()?.finish() }
+        resumed()?.let { a -> instr.runOnMainSync { a.finish() } }
     }
 
     @Ears("US-68.1")
