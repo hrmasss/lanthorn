@@ -111,14 +111,14 @@ class ToolsUiTest {
 
     @Test fun sleepTimerPausesWhenItRunsOut_US26_1() {
         open("clip.mp4")
-        // A 1-minute timer started 58 s ago runs out in 2 s.
-        SleepTimer.start(1, finishVideo = false, now = SystemClock.elapsedRealtime() - 58_000)
+        // A 1-minute timer started 52 s ago runs out in 8 s: enough to open the menu and see it.
+        SleepTimer.start(1, finishVideo = false, now = SystemClock.elapsedRealtime() - 52_000)
         menu("sleep-timer")
         compose.waitUntil(2_000) { shown("sleep-left") }
         shot("p113-sleep-running")
-        val t0 = SystemClock.elapsedRealtime()
-        waitUntil(5_000) { engine.state.value.paused }
-        log("sleep timer paused playback ${SystemClock.elapsedRealtime() - t0} ms after the check started (due at about 2 s)")
+        val due = SleepTimer.running.value?.endsAt ?: 0L
+        waitUntil(12_000) { engine.state.value.paused }
+        log("sleep timer paused playback ${SystemClock.elapsedRealtime() - due} ms after it was due")
         assertEquals(null, SleepTimer.running.value)
     }
 
