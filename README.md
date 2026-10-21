@@ -5,8 +5,7 @@ phone, your SD card and your home network, with hardware decoding, gestures and 
 subtitles. It has no ads, no tracking and no account. It runs on Android 10 and later, targets
 Android 16, and is free software under GPL-3.0-or-later.
 
-> **Work in progress.** Not released yet; expect breaking changes. The first release will be
-> published under GitHub Releases.
+Download the APK for your phone from [Releases](https://github.com/hrmasss/player-app/releases).
 
 ## Features
 
@@ -120,6 +119,10 @@ JDK 21 and the Android SDK (platform 37) are required.
 Release signing reads `keystore.properties` at the repo root (never committed) or the
 `PLAYER_KEYSTORE`, `PLAYER_KEYSTORE_PASSWORD`, `PLAYER_KEY_ALIAS`, `PLAYER_KEY_PASSWORD` env vars.
 Without them the release APK is unsigned.
+
+Releases come from a `v*` tag: [.github/workflows/release.yml](.github/workflows/release.yml) builds
+one signed APK per ABI plus a universal one, checks the signatures, and opens a draft release with
+`SHA256SUMS` and the notes in `docs/release-notes/`.
 
 libmpv comes as a prebuilt AAR from [hrmasss/libmpv-android](https://github.com/hrmasss/libmpv-android)
 releases, pinned by tag in `gradle/libs.versions.toml` and by checksum in

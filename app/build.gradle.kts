@@ -21,7 +21,8 @@ android {
         // Codename id. Changes when brand's name lands.
         applicationId = "app.player"
         versionCode = 1
-        versionName = "0.1.0"
+        // The release workflow refuses a tag that is not "v" + this name.
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -59,7 +60,9 @@ android {
             isEnable = true
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = false
+            // Only the release workflow asks for the universal APK (-Pplayer.universal=true);
+            // every other build skips it to keep CI quick.
+            isUniversalApk = providers.gradleProperty("player.universal").orNull == "true"
         }
     }
 
