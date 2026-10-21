@@ -31,6 +31,9 @@ interface PlayerExtension {
     /** Volume past the system maximum. Only subs-audio's extension sets it; the volume gesture uses the first one. */
     val volumeBoost: VolumeBoost? get() = null
 
+    /** Gestures on subtitle text (US-45); null when the extension has none. */
+    val subtitleGestures: SubtitleGestures? get() = null
+
     /**
      * Drawn over the video, under the controls and panels, full size, always present while the
      * player shows. For state the feature owns, such as network buffering and an error card.
