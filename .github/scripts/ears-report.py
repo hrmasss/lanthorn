@@ -38,7 +38,7 @@ def scan_sources(src):
     """{"pkg.Class#method": {"ids": [...], "module": m, "kind": k}} and class-level tags."""
     tests, class_tags = {}, {}
     for root, dirs, files in os.walk(src):
-        dirs[:] = [d for d in dirs if d not in ("build", ".git", ".gradle", ".claude")]
+        dirs[:] = [d for d in dirs if d not in ("build", ".git", ".gradle", ".claude", "results", "ears")]
         rel = os.path.relpath(root, src)
         if f"{os.sep}src{os.sep}test" not in os.sep + rel and f"{os.sep}src{os.sep}androidTest" not in os.sep + rel:
             continue

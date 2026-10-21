@@ -32,9 +32,12 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
     steps:
+      # The report script from main; the tags from the commit's own sources, which may predate it.
+      - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.SHA }}
+          path: src
 
       - name: Download both workflows' results for the commit
         run: |
@@ -58,7 +61,7 @@ jobs:
 
       - name: Report
         run: |
-          python3 .github/scripts/ears-report.py --src . --results results --out ears --commit "$SHA" $RUN_ARGS
+          python3 .github/scripts/ears-report.py --src src --results results --out ears --commit "$SHA" $RUN_ARGS
           cat ears/ears-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
