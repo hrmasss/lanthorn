@@ -49,6 +49,10 @@ internal fun NetworkOverlay(engine: PlayerEngine) {
     }
     val percent by remember(engine) { engine.observe("cache-buffering-state", PropertyType.Int64) }
         .collectAsStateWithLifecycle()
+    // Each stall's start and end once the stream plays, so a run can count rebuffers and their length (US-62.2).
+    LaunchedEffect(state.loaded, state.buffering) {
+        if (state.loaded) Log.i("LibraryNet", "stalled=${state.buffering} at ${state.positionMs} ms")
+    }
 
     Box(Modifier.fillMaxSize()) {
         val error = state.error

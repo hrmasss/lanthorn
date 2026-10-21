@@ -78,6 +78,17 @@ import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.settings.PlayerSettingsContent
 import app.player.feature.player.tools.Chapter
+import app.player.feature.player.gesture.GestureController
+import app.player.feature.player.gesture.GestureEffects
+import app.player.feature.player.gesture.GestureReadout
+import app.player.feature.player.gesture.Readout
+import app.player.feature.player.gesture.playerGestures
+import android.media.AudioManager
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import app.player.feature.player.tools.FitMode
 import app.player.feature.player.tools.PlaybackTools
 import app.player.feature.player.tools.SleepTimer
@@ -93,6 +104,8 @@ import app.player.feature.player.tools.VideoTools
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+
+private val Main = Dispatchers.Main.immediate
 
 /** The player's own panels. Feature panels use their own ids. */
 internal object OwnPanel {
@@ -134,11 +147,14 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
+    // Engine flows change on mpv's thread. Collecting on Main keeps the resumed collector, and any
+    // frame it triggers, off that thread (under the test clock a frame ran there and broke the
+    // slot table).
     // Engine's paused flag is right after open since 9004c23; read it as it is.
-    val state by engine.state.collectAsStateWithLifecycle()
-    val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle()
+    val state by engine.state.collectAsStateWithLifecycle(context = Main)
+    val speed by remember(engine) { engine.observe("speed", PropertyType.Real) }.collectAsStateWithLifecycle(context = Main)
     val prefs by (settings?.prefs ?: remember { kotlinx.coroutines.flow.MutableStateFlow(PlayerPrefs()) })
-        .collectAsStateWithLifecycle()
+        .collectAsStateWithLifecycle(context = Main)
     val talkBack = rememberTalkBackOn()
     var controls by controlsState
     var openPanel by remember { mutableStateOf<String?>(null) }
@@ -150,32 +166,119 @@ fun PlayerScreen(
     var screenshotRequests by remember { mutableIntStateOf(0) }
     var note by remember { mutableStateOf<Note?>(null) }
     val tools = remember(engine) { PlaybackTools(engine) }
-    val sleep by SleepTimer.running.collectAsStateWithLifecycle()
-    val abA by remember(engine) { tools.abA }.collectAsStateWithLifecycle()
-    val abB by remember(engine) { tools.abB }.collectAsStateWithLifecycle()
-    val chapterCount by remember(engine) { tools.chapterCount }.collectAsStateWithLifecycle()
+    val sleep by SleepTimer.running.collectAsStateWithLifecycle(context = Main)
+    val abA by remember(engine) { tools.abA }.collectAsStateWithLifecycle(context = Main)
+    val abB by remember(engine) { tools.abB }.collectAsStateWithLifecycle(context = Main)
+    val chapterCount by remember(engine) { tools.chapterCount }.collectAsStateWithLifecycle(context = Main)
     val chapters by produceState(emptyList<Chapter>(), state.uri, chapterCount, state.loaded) { value = tools.chapters() }
     val brightness = remember(activity) { activity?.let(::WindowBrightness) }
     val video = remember(engine) { VideoTools(engine, context) }
     var fitMode by remember { mutableStateOf(FitMode.Fit) }
+    var viewSize by remember { mutableStateOf(IntSize.Zero) }
+    val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
+    val currentControls by rememberUpdatedState(controls)
+    val windowBrightness = brightness
+    val currentPreview by rememberUpdatedState(preview)
+    val volumeBoost by rememberUpdatedState(extensions.firstNotNullOfOrNull { it.volumeBoost })
+    val gestures = remember(engine) {
+        GestureController(object : GestureEffects {
+            override val positionMs get() = engine.state.value.positionMs
+            override val durationMs get() = engine.state.value.durationMs
+            override val paused get() = engine.state.value.paused
+            override val speed get() = engine.observe("speed", PropertyType.Real).value ?: 1.0
+            override val controlsShown get() = currentControls
+            // A swipe uses the seek bar's path: scrub while the finger moves (the preview frame
+            // shows when it is on, US-17.3, US-30.1), one exact seek on release (US-17.2).
+            override fun seek(ms: Long, exact: Boolean) {
+                if (exact) {
+                    if (scrubbing) {
+                        scrubbing = false
+                        engine.endScrub(ms)
+                    } else {
+                        engine.seekTo(ms, exact = true)
+                    }
+                } else {
+                    scrubbing = true
+                    scrubTargetMs = ms
+                    if (currentPreview == null) engine.scrub(ms)
+                }
+            }
+            override fun togglePause() = engine.togglePause()
+            override fun pause() = engine.pause()
+            override fun setSpeed(speed: Double) = tools.setSpeed(speed)
+            override fun setControls(shown: Boolean) { controls = shown }
+            override var brightness: Float
+                get() = windowBrightness?.level ?: 0.5f
+                set(v) { windowBrightness?.set(v) }
+            override var volume: Float
+                get() = audio?.let { it.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / it.getStreamMaxVolume(AudioManager.STREAM_MUSIC) } ?: 0f
+                set(v) {
+                    audio?.let { it.setStreamVolume(AudioManager.STREAM_MUSIC, (v * it.getStreamMaxVolume(AudioManager.STREAM_MUSIC)).roundToInt(), 0) }
+                }
+            override val volumeSteps get() = audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+            override val boostOn get() = volumeBoost?.enabled?.value == true
+            override var boost: Float
+                get() = volumeBoost?.gain?.value ?: 1f
+                set(v) { volumeBoost?.setGain(v) }
+            override fun setZoom(scale: Double) = video.setZoom(scale)
+            override fun setPan(x: Double, y: Double) = video.setPan(x, y)
+            override fun toggleFitCrop() {
+                fitMode = if (fitMode == FitMode.Crop) FitMode.Fit else FitMode.Crop
+                video.setFit(fitMode)
+            }
+        })
+    }
+    gestures.prefs = prefs.gestures
+    // Picture geometry for pan limits and the 100% snap (US-55.2, US-55.3).
+    LaunchedEffect(state.video, viewSize) {
+        val v = state.video ?: return@LaunchedEffect
+        if (viewSize.width == 0 || v.width == 0 || v.height == 0) return@LaunchedEffect
+        val aspect = v.width.toDouble() / v.height
+        val fitW = minOf(1.0, viewSize.height * aspect / viewSize.width)
+        val fitH = minOf(1.0, viewSize.width / aspect / viewSize.height)
+        gestures.fitWidth = fitW
+        gestures.fitHeight = fitH
+        gestures.nativeScale = v.width / (fitW * viewSize.width)
+    }
+    // Readouts from taps go after the skip window (US-19.3).
+    LaunchedEffect(gestures.readout) {
+        val r = gestures.readout
+        if (r is Readout.Skip || r is Readout.PlayPause || (r is Readout.Speed && !r.top)) {
+            delay(GestureController.SKIP_RUN_MS + 300)
+            if (gestures.readout === r) gestures.clearReadout()
+        }
+    }
+    // US-18.3: the window starts at the system brightness unless the viewer asked to remember it;
+    // leaving the player drops the window override, so the system level is back.
+    LaunchedEffect(prefs.gestures.rememberBrightness) {
+        val last = prefs.gestures.lastBrightness
+        if (prefs.gestures.rememberBrightness && last >= 0f) brightness?.set(last)
+    }
+    DisposableEffect(brightness) {
+        onDispose {
+            val b = brightness ?: return@onDispose
+            val level = b.level
+            settings?.update { p -> if (p.gestures.rememberBrightness) p.copy(gestures = p.gestures.copy(lastBrightness = level)) else p }
+        }
+    }
     val fitNames = FitMode.entries.associateWith { stringResource(it.label) }
 
     // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
     val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
     val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
     val on = remember { kotlinx.coroutines.flow.MutableStateFlow(true) }
-    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle()
-    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle()
-    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle()
-    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle()
+    val hasPrevious by (playback?.hasPrevious ?: off).collectAsStateWithLifecycle(context = Main)
+    val hasNext by (playback?.hasNext ?: off).collectAsStateWithLifecycle(context = Main)
+    val showPreviousNext by (playback?.showPreviousNext ?: on).collectAsStateWithLifecycle(context = Main)
+    val stepButtons by (playback?.stepButtons ?: off).collectAsStateWithLifecycle(context = Main)
     // While locked, playback's Overlay owns every touch and the controls stay hidden (US-28).
-    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle()
+    val locked by (playback?.locked ?: off).collectAsStateWithLifecycle(context = Main)
     LaunchedEffect(locked) { if (locked) { controls = false; openPanel = null } }
     val panels = remember(extensions) { extensions.flatMap { it.panels }.associateBy { it.id } }
     val entries = remember(extensions) { extensions.flatMap { it.menuEntries } }
     val subtitleEntry = entries.firstOrNull { it.id == PlayerMenuEntry.SUBTITLE_TRACKS }
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
-    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle()
+    val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle(context = Main)
     val hasChapters = chapters.isNotEmpty()
     val items = remember(entries, hasChapters) {
         val own = listOfNotNull(
@@ -198,6 +301,9 @@ fun PlayerScreen(
     // changed delay applies from the next time the controls show (US-79.2).
     val hideAfter = autoHideDelay(prefs.autoHide, prefs.autoHideDelayMs, state.paused, talkBack, openPanel != null || scrubbing)
     AutoHideEffect(controls, touches, hideAfter) { controls = false }
+    LaunchedEffect(controls, hideAfter) {
+        android.util.Log.i("PlayerChrome", "auto-hide: controls $controls, after $hideAfter (paused ${state.paused}, panel ${openPanel != null}, scrubbing $scrubbing, talkback $talkBack)")
+    }
     SystemBarsEffect(activity, controls)
     KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
     LaunchedEffect(note) {
@@ -316,7 +422,9 @@ fun PlayerScreen(
             Modifier
                 .fillMaxSize()
                 .testTag("video")
-                .clickable(remember { MutableInteractionSource() }, indication = null, enabled = !locked) { controls = !controls }
+                .onSizeChanged { viewSize = it }
+                // While locked, playback's Overlay owns every touch (US-28): no gestures here.
+                .then(if (locked) Modifier else Modifier.playerGestures(gestures))
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions
@@ -325,6 +433,19 @@ fun PlayerScreen(
         )
         // Extension overlays (network state and the like): over the video, under the controls.
         extensions.forEach { it.Overlay(host) }
+        // Gesture readouts linger 300 ms after the finger lifts, then fade (docs/design.md).
+        // The last readout is kept for the fade-out; it is updated in an effect, never written
+        // during composition (that corrupted the slot table on the hosted emulator).
+        val readoutNow = gestures.readout
+        var lastReadout by remember { mutableStateOf<Readout?>(null) }
+        LaunchedEffect(readoutNow) { if (readoutNow != null) lastReadout = readoutNow }
+        AnimatedVisibility(
+            readoutNow != null,
+            enter = fadeIn(snap()),
+            exit = fadeOut(PlayerMotion.readoutOut()),
+        ) {
+            GestureReadout(readoutNow ?: lastReadout, gestures::resetSpeed)
+        }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
         // Playback draws the failure card with the reason and actions (US-75.1); the raw line is
         // only for a player without it.
@@ -351,7 +472,8 @@ fun PlayerScreen(
                 ControlsUi(
                     title = title,
                     playing = !state.paused && state.error == null,
-                    positionMs = state.positionMs,
+                    // While scrubbing (bar or swipe) the elapsed time and the bar follow the finger.
+                    positionMs = if (scrubbing) scrubTargetMs else state.positionMs,
                     durationMs = state.durationMs,
                     decoder = state.activeDecoder.label,
                     speed = speedLabel(speed),
@@ -488,7 +610,7 @@ private val FitMode.label get() = when (this) {
 /** "Sleep timer", or "Sleep timer · 12:30 left" while one runs (US-26.3). */
 @Composable
 private fun sleepLabel(): String {
-    val running by SleepTimer.running.collectAsStateWithLifecycle()
+    val running by SleepTimer.running.collectAsStateWithLifecycle(context = Main)
     return running?.let { stringResource(R.string.tool_sleep_left, SleepTimer.format(rememberLeft(it))) }
         ?: stringResource(R.string.tool_sleep)
 }
