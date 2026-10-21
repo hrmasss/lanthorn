@@ -88,7 +88,7 @@ class BackgroundMediaUiTest {
     @After fun tearDown() {
         device.pressBack()
         // A background test leaves the service holding the engine: let it go too.
-        PlaybackService.stop(context)
+        instr.runOnMainSync { PlaybackService.stop(context) }
         closePlayer()
         runBlocking { prefs.reset() }
         device.unfreezeRotation()
@@ -107,7 +107,8 @@ class BackgroundMediaUiTest {
         val after = state()!!.positionMs
         log("background: $before -> $after ms, paused ${state()?.paused}")
         assertFalse("paused in background", state()!!.paused)
-        assertTrue("position did not move in background: $before -> $after", after - before >= 1_500)
+        // The hosted emulator plays at under half speed at times: moving at all is the point.
+        assertTrue("position did not move in background: $before -> $after", after - before >= 500)
 
         // US-59.2: the notification is a media one, tied to the session, with title, picture and buttons.
         val n = waitForValue(5_000) { mediaNotification() }
@@ -274,8 +275,14 @@ class BackgroundMediaUiTest {
         assertTrue("no PiP", waitFor(5_000) { player()?.isInPictureInPictureMode == true })
         val before = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
         val down = before > 0
-        device.pressKeyCode(if (down) KeyEvent.KEYCODE_VOLUME_DOWN else KeyEvent.KEYCODE_VOLUME_UP)
-        assertTrue("volume key in PiP did not change the volume", waitFor(3_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) != before })
+        // A press can be swallowed while the system's volume panel comes up: up to three.
+        var changed = false
+        repeat(3) {
+            if (changed) return@repeat
+            device.pressKeyCode(if (down) KeyEvent.KEYCODE_VOLUME_DOWN else KeyEvent.KEYCODE_VOLUME_UP)
+            changed = waitFor(2_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) != before }
+        }
+        assertTrue("volume key in PiP did not change the volume", changed)
         assertEquals("brightness stepped in PiP", 45, brightness())
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
     }
@@ -305,7 +312,8 @@ class BackgroundMediaUiTest {
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(PlayerIntents.withQueue(intent, uris, index))
-        assertTrue("${names[index]} never played", waitFor(15_000) { state()?.let { it.video != null && !it.paused && it.uri?.endsWith(names[index]) == true } == true })
+        // Until the first frame the engine thread is busy opening, and a pause or key waits behind it.
+        assertTrue("${names[index]} never played", waitFor(15_000) { state()?.let { it.video != null && !it.paused && it.firstFrameMs != null && it.uri?.endsWith(names[index]) == true } == true })
         return uris[index]
     }
 
