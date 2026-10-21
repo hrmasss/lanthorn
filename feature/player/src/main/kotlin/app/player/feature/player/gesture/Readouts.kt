@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +34,9 @@ import app.player.feature.player.time
  */
 @Composable
 fun GestureReadout(readout: Readout?, onResetSpeed: () -> Unit, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    // A plain Box: a subcomposition (BoxWithConstraints) inside the exiting AnimatedVisibility
+    // corrupted the slot table on the hosted emulator.
+    Box(modifier.fillMaxSize()) {
         when (readout) {
             null -> Unit
             is Readout.Seek -> ReadoutPill(
@@ -71,7 +72,7 @@ fun GestureReadout(readout: Readout?, onResetSpeed: () -> Unit, modifier: Modifi
                 Modifier
                     .align(if (readout.forward) Alignment.CenterEnd else Alignment.CenterStart)
                     .fillMaxHeight()
-                    .width(maxWidth / 3)
+                    .fillMaxWidth(1f / 3)
                     .background(PlayerColors.Scrim.copy(alpha = 0.3f))
                     .testTag("readout-skip"),
                 contentAlignment = Alignment.Center,
