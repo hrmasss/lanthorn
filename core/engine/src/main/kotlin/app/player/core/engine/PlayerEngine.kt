@@ -468,12 +468,10 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             when (property) {
                 "hwdec-current" -> {
                     val before = _state.value.activeDecoder
-                    val s = _state.updateAndGet {
-                        val running = ActiveDecoder.fromHwdecCurrent(value)
-                        // An empty value is mpv between decoders; judge only settled values on loaded video.
-                        val notice = if (value.isNotEmpty() && it.video != null) fallbackNotice(it.decoderMode, running) else it.decoderNotice
-                        it.copy(activeDecoder = running, decoderNotice = notice)
-                    }
+                    // Only the badge follows this. While mpv tries a hardware decoder the value passes
+                    // through "no" before the decoder comes up, so the fallback is judged on
+                    // VIDEO_RECONFIG (refreshVideo), once the decoder has settled.
+                    val s = _state.updateAndGet { it.copy(activeDecoder = ActiveDecoder.fromHwdecCurrent(value)) }
                     if (s.activeDecoder != before) Log.i(TAG, "decoder ${before.label} -> ${s.activeDecoder.label} ($value) at ${s.positionMs} ms, notice ${s.decoderNotice}")
                 }
             }
