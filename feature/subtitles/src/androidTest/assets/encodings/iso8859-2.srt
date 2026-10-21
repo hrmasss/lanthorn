@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:10,000
+Árvíztûrõ tükörfúrógép.
+
+2
+00:00:10,000 --> 00:00:13,000
+Jó reggelt, hogy vagy ma?
+
+3
+00:00:13,000 --> 00:00:16,000
+Holnap elmegyünk a hegyekbe.
+
+4
+00:00:16,000 --> 00:00:19,000
+A vonat pontosan nyolckor indul.
+
+5
+00:00:19,000 --> 00:00:22,000
+Még soha nem láttam ilyen naplementét.
+
+6
+00:00:22,000 --> 00:00:25,000
+Köszönöm szépen a segítséget.
+
+7
+00:00:25,000 --> 00:00:28,000
+Az öreg híd mellett találkozunk.
+
+8
+00:00:28,000 --> 00:00:31,000
+Viszontlátásra a jövõ héten.
