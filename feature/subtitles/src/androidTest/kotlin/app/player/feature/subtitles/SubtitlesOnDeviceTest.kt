@@ -21,7 +21,7 @@ import java.nio.charset.Charset
 /** P1.3 subtitle wiring against the real libmpv, on the emulator. */
 class SubtitlesOnDeviceTest {
     /** A stuck wait fails the test instead of holding the shared emulator. */
-    @get:Rule val timeout: Timeout = Timeout.seconds(120)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300)
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine

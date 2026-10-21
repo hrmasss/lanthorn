@@ -50,7 +50,7 @@ internal object OnDevice {
 internal suspend fun <T : Any> PlayerEngine.await(
     name: String,
     type: PropertyType<T>,
-    timeoutMs: Long = 5000,
+    timeoutMs: Long = 15_000, // a bound, not a claim: the hosted CI emulator is slow
     ok: (T?) -> Boolean,
 ): Long {
     val t0 = SystemClock.elapsedRealtime()

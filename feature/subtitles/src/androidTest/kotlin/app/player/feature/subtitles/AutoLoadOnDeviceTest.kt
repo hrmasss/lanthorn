@@ -204,10 +204,12 @@ class AutoLoadOnDeviceTest {
             val device = UiDevice.getInstance(OnDevice.instrumentation)
             device.wait(Until.findObject(By.text("Open subtitle file")), 5_000)?.click() ?: throw AssertionError("no open button")
             val inFolder = device.wait(Until.findObject(By.textContains("LanthornOpen")), 10_000)
-            shotTo("us40-picker-in-video-folder")
             step("picker shows the folder: ${inFolder != null}")
             assertTrue("picker did not start in the video's folder", inFolder != null)
-            device.wait(Until.findObject(By.text("Picked by hand.srt")), 5_000)?.click() ?: throw AssertionError("file not listed")
+            val listed = device.wait(Until.findObject(By.text("Picked by hand.srt")), 10_000) ?: throw AssertionError("file not listed")
+            delay(500) // the list settles before the shot
+            shotTo("us40-picker-in-video-folder")
+            listed.click()
             delay(2000)
             panel.close()
             PanelTestActivity.panelId = SubtitlesExtension.STYLE_PANEL
@@ -227,6 +229,7 @@ class AutoLoadOnDeviceTest {
             engine.pause()
             engine.seekTo(1000)
             engine.await("sub-text", PropertyType.Text, 10_000) { it == "Opened by hand" }
+            delay(1500) // the paused frame redraws with the line
             shotTo("us40-picked-file-back")
             evidence("US-40.1 picker opened in Movies/LanthornOpen, 'Picked by hand.srt' chosen and on; US-40.2 after another file, reopening Holiday.mkv brought it back on")
         } finally {
