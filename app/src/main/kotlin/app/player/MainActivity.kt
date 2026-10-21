@@ -23,6 +23,10 @@ class MainActivity : ComponentActivity() {
                     onPlayQueue = { uris, index ->
                         startActivity(PlayerIntents.withQueue(PlayerActivity.intent(this, uris[index]), uris, index))
                     },
+                    onPlayWith = { uris, decoder ->
+                        val queue = PlayerIntents.withQueue(PlayerActivity.intent(this, uris[0]), uris, 0)
+                        startActivity(PlayerIntents.withDecoder(queue, decoder))
+                    },
                 )
             }
         }

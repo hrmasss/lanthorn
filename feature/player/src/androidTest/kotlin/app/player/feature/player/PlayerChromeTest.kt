@@ -66,8 +66,7 @@ class PlayerChromeTest {
     }
 
     @Test fun controlsStayWhilePaused_US16_3() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        showControls("back")
         compose.onNodeWithTag("play-pause").performClick()
         SystemClock.sleep(5_000)
         assertTrue(shown("back"))
@@ -76,8 +75,7 @@ class PlayerChromeTest {
     }
 
     @Test fun systemBarsFollowControls_US16_5() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        showControls("back")
         SystemClock.sleep(500)
         assertTrue("bars visible with controls", barsVisible())
         compose.onNodeWithTag("video").performClick()
@@ -101,8 +99,7 @@ class PlayerChromeTest {
         // Preconditions, logged so a failure says which side is wrong.
         waitUntil(3_000) { !PlayerSettings.get(context).prefs.value.keepScreenOnPaused }
         // Pause the way a viewer does: the play/pause button.
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("play-pause") }
+        showControls("play-pause")
         compose.onNodeWithTag("play-pause").performClick()
         waitUntil(3_000) { mpvPaused() == true }
         log("US-60.1 after the pause tap: mpv pause=${mpvPaused()}, setting keepScreenOnPaused=${PlayerSettings.get(context).prefs.value.keepScreenOnPaused}")
@@ -154,13 +151,14 @@ class PlayerChromeTest {
     }
 
     @Test fun remainingTimeSurvivesReopen_US16_4() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("end-time") }
+        repeat(3) { if (!shown("end-time")) { compose.onNodeWithTag("video").performClick(); runCatching { compose.waitUntil(3_000) { shown("end-time") } } } }
         compose.onNodeWithTag("end-time").performClick()
         waitUntil(2_000) { PlayerSettings.get(context).prefs.value.showRemaining }
         scenario.close()
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip()))
-        waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
+        // Through the compose rule, so the new window is laid out before the first tap.
+        compose.waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
+        compose.waitForIdle()
         // Show the controls and read at once; tap again if auto-hide got there first.
         fun endTime() = runCatching {
             if (!shown("end-time")) compose.onNodeWithTag("video").performClick()
@@ -200,8 +198,7 @@ class PlayerChromeTest {
             org.junit.Assume.assumeTrue("no hardware decoder on this emulator run", engine.state.value.activeDecoder == ActiveDecoder.HW)
             SystemClock.sleep(1_000)
         }
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("decoder-badge") }
+        showControls("decoder-badge")
         compose.onNodeWithTag("decoder-badge").performClick()
         compose.waitUntil(2_000) { shown("decoder-picker") }
         shot("04-decoder-picker")
@@ -238,13 +235,22 @@ class PlayerChromeTest {
         // mpv's own flag: PlaybackState.paused can read true while playing (engine bug, reported).
         val pausedNow = kotlinx.coroutines.runBlocking { PlayerSessions.current.value?.get("pause", app.player.core.engine.PropertyType.Flag) }
         assertTrue("still playing", pausedNow == false)
+        // The checks and the shot above can outlast the 2 s window on the hosted emulator, so the
+        // leaving pair is pressed fresh: one press arms again, the next within the window leaves.
+        SystemClock.sleep(BackTwice.WINDOW_MS + 200)
         back()
-        SystemClock.sleep(500)
-        assertTrue(scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED || run {
-            var f = false
-            scenario.onActivity { f = it.isFinishing }
-            f
-        })
+        back()
+        val t0 = SystemClock.elapsedRealtime()
+        var left = false
+        while (!left && SystemClock.elapsedRealtime() - t0 < 3_000) {
+            left = scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED || run {
+                var f = false
+                scenario.onActivity { f = it.isFinishing }
+                f
+            }
+            if (!left) SystemClock.sleep(100)
+        }
+        assertTrue("second back within the window left the player", left)
     }
 
     @Test fun backOnceLeavesByDefault_US78() {
@@ -262,8 +268,7 @@ class PlayerChromeTest {
     }
 
     @Test fun menuOpensSideSheetWithSettings_US65_3() {
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("more") }
+        showControls("more")
         compose.onNodeWithTag("more").performClick()
         compose.waitUntil(2_000) { shown("menu-player-settings") }
         shot("07-menu")
@@ -271,6 +276,16 @@ class PlayerChromeTest {
         compose.waitUntil(2_000) { shown("player-settings") }
         shot("08-player-settings")
         assertTrue("playback continued", PlayerSessions.current.value?.state?.value?.paused == false)
+    }
+
+    /** Taps the video until [tag] shows: the hosted emulator can drop a tap while the player starts. */
+    private fun showControls(tag: String) {
+        repeat(3) {
+            if (shown(tag)) return
+            compose.onNodeWithTag("video").performClick()
+            if (runCatching { compose.waitUntil(3_000) { shown(tag) } }.isSuccess) return
+        }
+        compose.waitUntil(3_000) { shown(tag) }
     }
 
     private fun back() = scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
