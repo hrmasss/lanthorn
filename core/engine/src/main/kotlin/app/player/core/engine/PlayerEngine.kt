@@ -84,8 +84,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private var pendingLoad: (() -> Unit)? = null
     private var videoBeforeDetach: String? = null
     private var reattachedAt = 0L
-    // Engine thread only. The video chain came back after the surface returned; the next
-    // PLAYBACK_RESTART is then its first frame on screen (US-59.3).
+    // Engine thread only. The video chain came back after the surface returned; mpv's next
+    // "first video frame" line is then its first frame on screen (US-59.3).
     private var reconfiguredSinceReattach = false
     @Volatile private var released = false
 
@@ -585,7 +585,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     /**
      * US-59.3: back from background, the time from the surface's return to the first frame drawn
      * on it. VIDEO_RECONFIG alone comes about 0.9 s before that frame on the emulator (player-ui,
-     * run 39637149909), so the stamp waits for the playback restart that follows it.
+     * run 39637149909), so the stamp waits for mpv's "first video frame after restart shown".
      */
     private fun videoShownAgain() {
         if (reattachedAt == 0L || !reconfiguredSinceReattach) return
@@ -696,8 +696,6 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
-                    // In order behind VIDEO_RECONFIG's post: stamps only once the new video chain exists.
-                    post { videoShownAgain() }
                     scrubLanded()
                     _state.update {
                         if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
@@ -719,6 +717,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
     private val logObserver = object : MPVLib.LogObserver {
         override fun logMessage(prefix: String, level: Int, text: String) {
+            // mpv's only signal that a new video chain drew its first frame: a track switched back on
+            // sends no PLAYBACK_RESTART (US-59.3). Posted, so it lands behind VIDEO_RECONFIG's post.
+            if (prefix == "cplayer" && text.startsWith("first video frame after restart shown")) post { videoShownAgain() }
             Log.println(if (level <= 20) Log.ERROR else Log.WARN, "mpv", "[$prefix] ${text.trimEnd()}")
             _messages.tryEmit(EngineMessage(prefix, if (level <= 20) EngineMessage.Level.Error else EngineMessage.Level.Warn, text.trimEnd()))
         }
