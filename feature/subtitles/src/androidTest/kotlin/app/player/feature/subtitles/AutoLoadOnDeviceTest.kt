@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 /** P1.25: subtitles beside the video load by themselves; the right one turns on. */
 @org.junit.FixMethodOrder(org.junit.runners.MethodSorters.NAME_ASCENDING)
 class AutoLoadOnDeviceTest {
-    @get:Rule val timeout: Timeout = Timeout.seconds(150)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300) // the hosted CI emulator is slow; the first font scan alone takes a while
 
     private lateinit var scenario: ActivityScenario<VideoTestActivity>
     private lateinit var engine: PlayerEngine

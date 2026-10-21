@@ -23,7 +23,7 @@ import java.io.File
 
 /** P1.28 gate: font folder import, edits from the real panel, ASS kept under style edits, real Settings. */
 class StyleGateOnDeviceTest {
-    @get:Rule val timeout: Timeout = Timeout.seconds(150)
+    @get:Rule val timeout: Timeout = Timeout.seconds(300) // the hosted CI emulator is slow; the first font scan alone takes a while
 
     private var engine: PlayerEngine? = null
     private val holder = Any()

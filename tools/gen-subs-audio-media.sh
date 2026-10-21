@@ -110,7 +110,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.00,0:00:10.00,Default,,0,0,0,,ASS format line
 ASS
 printf 'WEBVTT\n\n00:00:00.000 --> 00:00:10.000\nVTT format line\n' > "$F/fmt.vtt"
-printf '{0}{250}MicroDVD format line\n' > "$F/fmt-microdvd.sub"
+printf '{0}{250}MicroDVD format line\n{260}{300}Second line\n{310}{350}Third line\n' > "$F/fmt-microdvd.sub"  # FFmpeg's probe wants three lines
 python3 -I tools/pgs.py "$F/fmt-pgs.sup" "PGS format line" 1280 720
 python3 -I tools/pgs.py "$T/vob.sup" "VobSub format line" 720 480
 ffmpeg -loglevel error -y -i "$T/vob.sup" -map 0:s -c:s dvdsub -f mpeg "$F/fmt-vobsub.sub"
