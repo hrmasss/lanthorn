@@ -119,13 +119,12 @@ class AutoLoadOnDeviceTest {
     /** US-39.1: one clip per format, each with one subtitle file beside it; each loads and turns on. */
     @Ears("US-39.1")
     @Test fun eachFormatLoadsOnDevice_US39_1() = runBlocking {
-        data class Case(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
         val cases = listOf(
-            Case("ass", mapOf("fmt.ass" to "Clip.ass"), "ASS format line", "ass"),
-            Case("vtt", mapOf("fmt.vtt" to "Clip.vtt"), "VTT format line", "webvtt"),
-            Case("microdvd", mapOf("fmt-microdvd.sub" to "Clip.sub"), "MicroDVD format line", "microdvd"),
-            Case("vobsub", mapOf("fmt-vobsub.idx" to "Clip.idx", "fmt-vobsub.sub" to "Clip.sub"), null, "dvd_subtitle"),
-            Case("pgs", mapOf("fmt-pgs.sup" to "Clip.sup"), null, "hdmv_pgs_subtitle"),
+            FormatCase("ass", mapOf("fmt.ass" to "Clip.ass"), "ASS format line", "ass"),
+            FormatCase("vtt", mapOf("fmt.vtt" to "Clip.vtt"), "VTT format line", "webvtt"),
+            FormatCase("microdvd", mapOf("fmt-microdvd.sub" to "Clip.sub"), "MicroDVD format line", "microdvd"),
+            FormatCase("vobsub", mapOf("fmt-vobsub.idx" to "Clip.idx", "fmt-vobsub.sub" to "Clip.sub"), null, "dvd_subtitle"),
+            FormatCase("pgs", mapOf("fmt-pgs.sup" to "Clip.sup"), null, "hdmv_pgs_subtitle"),
         )
         val assets = OnDevice.instrumentation.context.assets
         for (c in cases) {
@@ -390,3 +389,6 @@ class AutoLoadOnDeviceTest {
         evidenceShot(name)
     }
 }
+
+/** One subtitle format for [AutoLoadOnDeviceTest.eachFormatLoadsOnDevice_US39_1]. Top level and last, so the EARS report's source scan keeps the tests above in their class. */
+private data class FormatCase(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
