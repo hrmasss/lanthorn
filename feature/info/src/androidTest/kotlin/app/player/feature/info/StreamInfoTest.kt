@@ -35,9 +35,9 @@ class StreamInfoTest {
         val srt = File(context.cacheDir, "clip.fr.srt").apply { writeText("1\n00:00:00,000 --> 00:00:04,000\nSous-titre externe\n\n") }
         engine.set("sub-auto", "no") // mpv would also load clip.fr.srt by itself and list it twice
         engine.open(Uri.fromFile(clip))
-        withTimeout(10_000) { engine.state.first { it.loaded } }
+        withTimeout(20_000) { engine.state.first { it.loaded } }
         engine.command("sub-add", srt.path, "select", "external", "fr")
-        withTimeout(5_000) { while ((engine.get("track-list/count", PropertyType.Int64) ?: 0) < 3) delay(100) }
+        withTimeout(20_000) { while ((engine.get("track-list/count", PropertyType.Int64) ?: 0) < 3) delay(100) }
 
         val info = StreamInfoReader.read(context, engine)
         Log.i("P1.1", "subtitles ${info.subtitles}")

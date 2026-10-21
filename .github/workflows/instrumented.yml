@@ -1,0 +1,133 @@
+name: Instrumented
+
+# Every module's androidTest on its own API 36 emulator, in parallel, on GitHub-hosted runners
+# (free and with KVM now that the repo is public). Builds stay on the self-hosted CI workflow.
+# Results per module: artifact `androidTest-<module>` (JUnit XML, HTML report, logcat, and the
+# files tests write under /sdcard/Android/data/app.player*/files, such as screenshots).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: instrumented-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  instrumented:
+    name: instrumented (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { module: app, build: ':app:assembleDebug :app:assembleDebugAndroidTest', task: ':app:connectedDebugAndroidTest' }
+          - { module: core-engine, build: ':core:engine:assembleDebugAndroidTest', task: ':core:engine:connectedDebugAndroidTest' }
+          - { module: core-data, build: ':core:data:assembleDebugAndroidTest', task: ':core:data:connectedDebugAndroidTest' }
+          - { module: feature-info, build: ':feature:info:assembleDebugAndroidTest', task: ':feature:info:connectedDebugAndroidTest' }
+          - { module: feature-library, build: ':feature:library:assembleDebugAndroidTest', task: ':feature:library:connectedDebugAndroidTest' }
+          - { module: feature-player, build: ':feature:player:assembleDebugAndroidTest', task: ':feature:player:connectedDebugAndroidTest' }
+          - { module: feature-subtitles, build: ':feature:subtitles:assembleDebugAndroidTest', task: ':feature:subtitles:connectedDebugAndroidTest' }
+          # Audio tests need the emulator's audio device: no -noaudio here.
+          - { module: feature-audio, build: ':feature:audio:assembleDebugAndroidTest', task: ':feature:audio:connectedDebugAndroidTest', audio: true }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD cache
+        uses: actions/cache@v6
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-36-google_apis-x86_64-pixel_7-v1
+
+      # Only warms the cache; when it fails the run step below creates the AVD itself.
+      - name: AVD snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "snapshot saved"
+
+      - name: Build the APKs first (keeps emulator time short)
+        run: ./gradlew ${{ matrix.build }} --console=plain
+
+      - name: Run ${{ matrix.module }} on an API 36 emulator
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect ${{ matrix.audio && ' ' || '-noaudio' }} -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb logcat -G 16M || true
+            adb logcat -c || true
+            # A fresh AVD shows a one-time "Viewing full screen" prompt over the player that takes the taps.
+            adb shell settings put secure immersive_mode_confirmations confirmed || true
+            # First boot also has Google Play services open its welcome screen over whatever runs,
+            # about 30 s in. Disable that one activity (needs root, which google_apis images allow).
+            adb root || true
+            adb wait-for-device
+            adb shell pm disable com.google.android.gms/.setupservices.CoverSheetWelcomeActivity || true
+            # It may already be open by now: stopping Play services closes it, and it cannot reopen.
+            adb shell am force-stop com.google.android.gms || true
+            echo "First-boot welcome screen in the activity stack before the tests: $(adb shell dumpsys activity activities | grep -c CoverSheetWelcomeActivity)" | tee -a "$GITHUB_STEP_SUMMARY"
+            adb shell settings put secure user_setup_complete 1 || true
+            adb shell settings put global device_provisioned 1 || true
+            adb shell input keyevent KEYCODE_HOME || true
+            ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
+            mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
+            adb logcat -d > logcat.txt || true
+            echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"
+            test ! -f failed.marker
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          for path in sorted(glob.glob("**/androidTest-results/connected/**/*.xml", recursive=True)):
+              r = ET.parse(path).getroot()
+              print(f"- {r.get('name')}: tests {r.get('tests')}, failures {r.get('failures')}, errors {r.get('errors')}, skipped {r.get('skipped')}")
+              for tc in r.iter("testcase"):
+                  f = tc.find("failure") if tc.find("failure") is not None else tc.find("error")
+                  if f is not None:
+                      print(f"  - FAIL {tc.get('classname')}.{tc.get('name')}: {(f.text or '').strip().splitlines()[0][:200]}")
+          PY
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: androidTest-${{ matrix.module }}
+          path: |
+            **/build/outputs/androidTest-results/connected/
+            **/build/reports/androidTests/connected/
+            device-files/
+            logcat.txt
+          retention-days: 7
