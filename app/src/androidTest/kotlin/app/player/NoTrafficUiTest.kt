@@ -45,13 +45,35 @@ class NoTrafficUiTest {
         return false
     }
 
+    private fun shell(command: String): String = runCatching {
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(instr.uiAutomation.executeShellCommand(command)).bufferedReader().readText()
+    }.getOrDefault("")
+
+    private fun settle(uid: Int) {
+        var last = TrafficStats.getUidRxBytes(uid) + TrafficStats.getUidTxBytes(uid)
+        var stillSince = SystemClock.elapsedRealtime()
+        val end = stillSince + 20_000
+        while (SystemClock.elapsedRealtime() < end && SystemClock.elapsedRealtime() - stillSince < 3_000) {
+            SystemClock.sleep(200)
+            val now = TrafficStats.getUidRxBytes(uid) + TrafficStats.getUidTxBytes(uid)
+            if (now != last) {
+                Log.i("P2.1", "counters moved by ${now - last} bytes before the baseline")
+                last = now
+                stillSince = SystemClock.elapsedRealtime()
+            }
+        }
+    }
+
     @Ears("NF-8", "US-72.3")
     @Test fun localUseSendsAndReceivesNothing() {
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         val uid = Process.myUid()
+        assertTrue("traffic counters unsupported here", TrafficStats.getUidTxBytes(uid) != TrafficStats.UNSUPPORTED.toLong())
+        // The baseline waits until the counters hold still for 3 s, so a late packet from an earlier
+        // test in this process is not counted as local use.
+        settle(uid)
         val tx0 = TrafficStats.getUidTxBytes(uid)
         val rx0 = TrafficStats.getUidRxBytes(uid)
-        assertTrue("traffic counters unsupported here", tx0 != TrafficStats.UNSUPPORTED.toLong())
 
         context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
@@ -69,6 +91,12 @@ class NoTrafficUiTest {
         val tx = TrafficStats.getUidTxBytes(uid) - tx0
         val rx = TrafficStats.getUidRxBytes(uid) - rx0
         Log.i("P2.1", "local use: sent $tx bytes, received $rx bytes")
+        // If anything moved, say where: the uid's sockets and its network stats by tag.
+        if (tx != 0L || rx != 0L) {
+            for (cmd in listOf("cat /proc/net/tcp /proc/net/tcp6 /proc/net/udp /proc/net/udp6", "dumpsys netstats detail")) {
+                shell(cmd).lineSequence().filter { " $uid " in it || "uid=$uid " in it }.take(60).forEach { Log.i("P2.1", "$cmd: $it") }
+            }
+        }
         assertEquals("bytes sent during local use", 0L, tx)
         assertEquals("bytes received during local use", 0L, rx)
     }
