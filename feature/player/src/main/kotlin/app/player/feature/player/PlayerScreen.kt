@@ -439,7 +439,9 @@ fun PlayerScreen(
             GestureReadout(readoutNow ?: lastReadout, gestures::resetSpeed)
         }
         if (state.buffering && !state.paused) BufferingIndicator(Modifier.align(Alignment.Center))
-        state.error?.let {
+        // Playback draws the failure card with the reason and actions (US-75.1); the raw line is
+        // only for a player without it.
+        if (playback == null) state.error?.let {
             Text(
                 it.replaceFirstChar(Char::uppercaseChar),
                 color = PlayerColors.Content,
