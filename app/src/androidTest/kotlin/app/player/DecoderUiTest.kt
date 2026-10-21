@@ -13,6 +13,8 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.ActiveDecoder
+import app.player.core.engine.DecoderMode
+import app.player.core.playerapi.PlayerIntents
 import app.player.core.engine.PlayerSessions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -27,6 +29,8 @@ import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 
 /**
  * P1.1 through the real player UI (UiAutomator, in-process, so the 3 s auto-hide of the controls
@@ -58,10 +62,11 @@ class DecoderUiTest {
         if (!f.exists()) instr.context.assets.open(name).use { i -> f.outputStream().use { i.copyTo(it) } }
     }
 
-    private fun play(name: String) {
+    private fun play(name: String, oneTime: DecoderMode? = null) {
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(file(name)), "video/mp4")
             .setClassName(context, "app.player.feature.player.PlayerActivity")
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        if (oneTime != null) PlayerIntents.withDecoder(intent, oneTime)
         context.startActivity(intent)
         val ok = waitFor { PlayerSessions.current.value?.state?.value?.let { it.video != null && it.uri?.endsWith(name) == true } == true }
         assertTrue("$name never showed video", ok)
@@ -141,13 +146,14 @@ class DecoderUiTest {
     }
 
     private fun shot(name: String) {
-        device.takeScreenshot(File(shots, "$name.png"))
+        evidenceShot(name)
         log("shot $name")
     }
 
     private fun log(s: String) = Log.i("P1.1", s)
 
     /** US-37.2 after the 4:4:4 fallback, then US-35.3 by hand: pick HW on a file only SW plays. */
+    @Ears("US-37.2", "US-35.3")
     @Test fun a_fallbackThenHandPickHw() {
         play("clip444.mp4")
         assertTrue("decoder never settled on SW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
@@ -167,6 +173,7 @@ class DecoderUiTest {
     }
 
     /** US-36.3 (badge pick remembered on reopen) and US-37.2 (info names the new decoder within 1 s). */
+    @Ears("US-36.3", "US-37.2")
     @Test fun b_badgePickRememberedAndShownInInfo() {
         play("clip420.mp4")
         log("badge before: ${badge()}")
@@ -189,6 +196,7 @@ class DecoderUiTest {
     }
 
     /** US-37.3: two captures a second apart while playing, with the engine's counters logged. */
+    @Ears("US-37.3")
     @Test fun c_liveValues() {
         play("clip420.mp4")
         openFromMenu("Info")
@@ -203,6 +211,7 @@ class DecoderUiTest {
     }
 
     /** US-37.1: the embedded subtitle section. */
+    @Ears("US-37.1")
     @Test fun d_embeddedAndExternalSubtitlesInInfo() {
         play("withsubs.mp4")
         // subs-audio loads sidecar files itself; here the external file is added directly.
@@ -216,5 +225,30 @@ class DecoderUiTest {
         assertTrue(device.wait(Until.hasObject(By.text("External")), 3000))
         shot("info-subtitles")
         close()
+    }
+
+    /** US-09.3 (library's "play with"): a one-time decoder for that launch, not remembered. */
+    @Ears("US-09.3")
+    @Test fun e_oneTimeDecoderNotRemembered() {
+        play("withsubs.mp4", oneTime = DecoderMode.SW)
+        assertTrue("one-time SW never ran, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
+        assertEquals(DecoderMode.SW, engineState()?.decoderMode)
+        close()
+        play("withsubs.mp4")
+        log("one-time SW, then a plain open: ${engineState()?.decoderMode} on ${engineState()?.activeDecoder?.label}")
+        assertTrue("plain open did not go back to HW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.HW })
+        close()
+    }
+
+    /** US-10.4: file properties from anywhere, by action, with nothing playing. */
+    @Ears("US-10.4")
+    @Test fun f_infoScreenForAFile() {
+        context.startActivity(PlayerIntents.showInfo(context, Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        assertTrue("info screen never showed the codec", device.wait(Until.hasObject(By.text("H.264")), 20_000))
+        assertTrue(device.hasObject(By.text("MP4")))
+        assertTrue(device.hasObject(By.text("AAC")))
+        assertEquals(null, PlayerSessions.current.value)
+        shot("info-screen-for-a-file")
+        device.pressBack()
     }
 }

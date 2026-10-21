@@ -41,4 +41,19 @@ class OpenSubtitlesTest {
         assertEquals(8.5, r[0].rating, 0.0)
         assertEquals("Clip.BluRay", r[0].release)
     }
+
+    @Test fun `saved beside a writable local video, else in app storage (US-46_2)`() {
+        val root = kotlin.io.path.createTempDirectory().toFile()
+        val app = File(root, "app")
+        val videos = File(root, "videos").apply { mkdirs() }
+        assertEquals(videos, OnlineSearch.saveDir("file", File(videos, "a.mkv").path, app))
+        assertEquals(app, OnlineSearch.saveDir("content", "/external/video/media/7", app))
+        videos.setWritable(false)
+        try {
+            assertEquals(app, OnlineSearch.saveDir("file", File(videos, "a.mkv").path, app))
+        } finally {
+            videos.setWritable(true)
+            root.deleteRecursively()
+        }
+    }
 }
