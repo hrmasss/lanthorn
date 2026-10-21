@@ -68,6 +68,10 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private var scrubNext: Long? = null
     private var scrubSentAt = 0L
     private var scrubTarget: Long? = null
+    private var scrubExact = false
+    // Preview only: this file's keyframes sit too far apart for a keyframe seek to land near the
+    // finger, so preview seeks go exact. Learnt from the first keyframe seek of each file.
+    private var longGop = false
     private var openFd: android.os.ParcelFileDescriptor? = null
 
     init {
@@ -200,12 +204,20 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         scrubInFlight = true
         scrubTarget = positionMs
         scrubSentAt = SystemClock.elapsedRealtime()
-        mpvCommand("seek", "${positionMs / 1000.0}", "absolute+keyframes")
-        if (preview) Log.i(TAG, "preview seek to $positionMs ms")
+        scrubExact = preview && longGop
+        mpvCommand("seek", "${positionMs / 1000.0}", if (scrubExact) "absolute+exact" else "absolute+keyframes")
+        if (preview) Log.i(TAG, "preview seek to $positionMs ms${if (scrubExact) " exact" else ""}")
     }
 
     private fun scrubLanded() = post {
         scrubInFlight = false
+        val shown = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() }
+        val sent = scrubTarget
+        if (preview) Log.i(TAG, "preview frame at $shown ms, target $sent ms")
+        if (preview && !scrubExact && sent != null && shown != null && kotlin.math.abs(shown - sent) > SCRUB_REFINE_MS) {
+            if (!longGop) Log.i(TAG, "preview: keyframe landed ${shown - sent} ms from the target, seeking exact from now on")
+            longGop = true
+        }
         val next = scrubNext
         if (next != null) {
             scrubNext = null
@@ -215,7 +227,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // Nothing newer waiting: if the keyframe is far from the target (long GOPs), refine with
         // an exact seek, so a slowing finger sees the frame it points at (US-30.1: within 2 s).
         val target = scrubTarget ?: return@post
-        val landed = mpv?.getPropertyDouble("time-pos")?.let { (it * 1000).toLong() } ?: return@post
+        val landed = shown ?: return@post
         if (kotlin.math.abs(landed - target) > SCRUB_REFINE_MS) {
             scrubTarget = null
             scrubInFlight = true
@@ -481,14 +493,16 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
         override fun event(eventId: Int) {
             when (eventId) {
-                MpvEvent.MPV_EVENT_START_FILE -> starting = true
+                MpvEvent.MPV_EVENT_START_FILE -> {
+                    starting = true
+                    post { longGop = false }
+                }
                 MpvEvent.MPV_EVENT_FILE_LOADED -> {
                     starting = false
                     _state.update { it.copy(loaded = true, error = null) }
                 }
                 MpvEvent.MPV_EVENT_VIDEO_RECONFIG -> post { refreshVideo() }
                 MpvEvent.MPV_EVENT_PLAYBACK_RESTART -> {
-                    if (preview) Log.i(TAG, "preview frame at ${_state.value.positionMs} ms")
                     scrubLanded()
                     _state.update {
                         if (it.firstFrameMs != null) it.copy(restarts = it.restarts + 1)
