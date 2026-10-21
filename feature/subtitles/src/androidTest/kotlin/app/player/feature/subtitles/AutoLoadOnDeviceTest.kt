@@ -72,11 +72,13 @@ class AutoLoadOnDeviceTest {
      * stopped and gets its surface back. Bring the video activity back and wait for video.
      */
     private suspend fun showVideoAgain() {
-        if (engine.get("vid", PropertyType.Text) != "no") return
+        val gone = scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        if (!gone && engine.get("vid", PropertyType.Text) != "no") return
         runCatching { scenario.close() }
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         scenario.onActivity { it.surface.engine = engine }
-        engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
+        // With no file open there is no video track to wait for.
+        if (engine.state.value.loaded) engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
     }
 
     /** What mpv has, for a test that waits on subtitle text after another screen was on top. */
