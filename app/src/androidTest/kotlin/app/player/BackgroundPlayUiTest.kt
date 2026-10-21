@@ -91,11 +91,32 @@ class BackgroundPlayUiTest {
         assertTrue("video never came back", waitFor(10_000) { state()?.videoBackMs != null })
         val back = state()!!
         log("video back after ${back.videoBackMs} ms at ${back.positionMs} ms")
+        // The picture itself, not only the engine's word: the screen's middle shows a frame.
+        assertTrue("no picture on the screen after coming back", waitFor(3_000) { pictureShown() })
         evidenceShot("back-in-player")
         assertTrue("engine replaced on return", PlayerSessions.current.value === engine)
         assertTrue("reloaded from the start: ${back.positionMs} ms", back.positionMs >= away.positionMs)
         // The hosted emulator makes no timing claim (timing=lenient): there the number is only logged.
         val lenient = InstrumentationRegistry.getArguments().getString("timing") == "lenient"
         if (!lenient) assertTrue("video back after ${back.videoBackMs} ms", back.videoBackMs!! <= 500)
+    }
+
+    /** True when the middle third of the screen has more than a few non-black pixels. */
+    private fun pictureShown(): Boolean {
+        val taken = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return false
+        // Screenshots can come as hardware bitmaps, which cannot be read pixel by pixel.
+        val shot = if (taken.config == android.graphics.Bitmap.Config.HARDWARE) taken.copy(android.graphics.Bitmap.Config.ARGB_8888, false).also { taken.recycle() } else taken
+        try {
+            var lit = 0
+            var seen = 0
+            for (x in shot.width / 3 until shot.width * 2 / 3 step 16) for (y in shot.height / 3 until shot.height * 2 / 3 step 16) {
+                val c = shot.getPixel(x, y)
+                if (((c shr 16) and 0xff) + ((c shr 8) and 0xff) + (c and 0xff) > 60) lit++
+                seen++
+            }
+            return lit * 10 > seen
+        } finally {
+            shot.recycle()
+        }
     }
 }

@@ -17,6 +17,7 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import app.player.PlayerControls
 import app.player.core.data.library.LibraryIndex
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerEngine
@@ -115,25 +116,14 @@ internal class PlaybackUi(private val tag: String) {
 
     // --- UI
 
-    /** Shows the controls and taps [sel]; the controls hide after a few seconds, so a few tries. */
-    fun tapControl(sel: BySelector) {
-        repeat(5) {
-            val o = device.findObject(sel) ?: run {
-                device.click(device.displayWidth / 2, device.displayHeight / 2)
-                device.wait(Until.findObject(sel), 2_000)
-            }
-            if (o != null && retrying { o.click() } != null) return
-        }
-        throw AssertionError("control not found: $sel")
-    }
+    private val controls = PlayerControls(device)
+
+    /** Shows the controls and taps [sel] once it stands still ([PlayerControls]). */
+    fun tapControl(sel: BySelector) = controls.tap(sel)
 
     /** Shows the controls if they are hidden. */
     fun showControls() {
-        repeat(4) {
-            if (device.hasObject(By.desc("More options"))) return
-            device.click(device.displayWidth / 2, device.displayHeight / 2)
-            if (device.wait(Until.hasObject(By.desc("More options")), 2_000)) return
-        }
+        controls.show()
     }
 
     fun openPlaybackSettings() {

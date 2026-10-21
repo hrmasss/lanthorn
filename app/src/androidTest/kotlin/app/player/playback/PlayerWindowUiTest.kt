@@ -19,6 +19,7 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import app.player.PlayerControls
 import app.player.core.data.history.ResumePoints
 import app.player.core.engine.PlaybackState
 import app.player.core.engine.PlayerSessions
@@ -53,6 +54,7 @@ class PlayerWindowUiTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val context = instr.targetContext
     private val device = UiDevice.getInstance(instr)
+    private val controls = PlayerControls(device)
     private val shots = File(context.getExternalFilesDir(null), "p114").apply { mkdirs() }
 
     @get:Rule val onFailure = object : TestWatcher() {
@@ -325,17 +327,8 @@ class PlayerWindowUiTest {
         waitFor(5_000) { player() == null }
     }
 
-    /** Shows the controls and taps [sel]; the controls hide after 3 s, so a few tries. */
-    private fun tapControl(sel: BySelector) {
-        repeat(4) {
-            val o = device.findObject(sel) ?: run {
-                device.click(device.displayWidth / 2, device.displayHeight / 2)
-                device.wait(Until.findObject(sel), 1_500)
-            }
-            if (o != null && retrying { o.click() } != null) return
-        }
-        throw AssertionError("control not found: $sel")
-    }
+    /** Shows the controls and taps [sel] once it stands still ([PlayerControls]). */
+    private fun tapControl(sel: BySelector) = controls.tap(sel)
 
     private fun openPlaybackSettings() {
         context.startActivity(
@@ -388,3 +381,4 @@ class PlayerWindowUiTest {
 
     private fun log(s: String) = Log.i("P1.14", s)
 }
+

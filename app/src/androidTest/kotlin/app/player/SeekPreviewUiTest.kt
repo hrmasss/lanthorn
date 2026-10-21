@@ -56,15 +56,13 @@ class SeekPreviewUiTest {
         SystemClock.sleep(2000)
         val duration = engine.value!!.state.value.durationMs
 
-        // Show the controls and find the seek bar.
-        // The hosted emulator can drop the first tap while the player is still starting: tap again.
-        device.click(device.displayWidth / 2, device.displayHeight / 2)
-        val bar = device.wait(Until.findObject(By.desc("Playback position")), 3000) ?: run {
-            device.click(device.displayWidth / 2, device.displayHeight / 2)
-            device.wait(Until.findObject(By.desc("Playback position")), 3000)
-        }
-        assertNotNull("seek bar not shown", bar)
-        val r = bar.visibleBounds
+        // Show the controls and find the seek bar once it has stopped sliding in: a drag from
+        // where it was mid-slide starts at the wrong time.
+        val controls = PlayerControls(device)
+        val position = By.desc("Playback position")
+        val r = if (controls.show(position)) controls.still(position) else null
+        assertNotNull("seek bar not shown", r)
+        r!!
         val y = r.centerY().toFloat()
         val x0 = r.left + r.width() * 0.10f
         val x1 = r.left + r.width() * 0.70f
