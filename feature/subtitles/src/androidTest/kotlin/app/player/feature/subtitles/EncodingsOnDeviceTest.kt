@@ -60,8 +60,11 @@ class EncodingsOnDeviceTest {
             controller.addFile(prepared.path, prepared.title)
             engine.seekTo(1000)
             delay(800)
-            val shown = runCatching { engine.await("sub-text", PropertyType.Text, 15_000) { it != null && it.isNotEmpty() && it != "Inside or outside the picture" } }
-                .map { engine.get("sub-text", PropertyType.Text) }.getOrNull()
+            fun readable(t: String?) = t != null && t.isNotEmpty() && t != "Inside or outside the picture"
+            // Paused, mpv may have read past the new track's packets (slow emulators): seek once more.
+            val shown = (runCatching { engine.await("sub-text", PropertyType.Text, 15_000) { readable(it) } }.isSuccess ||
+                run { engine.seekTo(1000); runCatching { engine.await("sub-text", PropertyType.Text, 15_000) { readable(it) } }.isSuccess })
+                .let { if (it) engine.get("sub-text", PropertyType.Text) else null }
             val ok = shown != null && Normalizer.normalize(shown, Normalizer.Form.NFC) == line
             evidence("US-44.1 $name: ${if (ok) "ok" else "GARBLED"} '${shown?.take(60)}'")
             if (!ok) failures += "$name: '$shown'"
