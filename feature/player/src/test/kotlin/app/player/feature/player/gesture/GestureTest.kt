@@ -34,32 +34,6 @@ import org.robolectric.annotation.Config
 class GestureTest {
     @get:Rule val rule = createComposeRule()
 
-    private class Fake : GestureEffects {
-        override var positionMs = 60_000L
-        override var durationMs = 600_000L
-        override var paused = false
-        var spd = 1.0
-        override val speed get() = spd
-        override var controlsShown = false
-        val seeks = mutableListOf<Pair<Long, Boolean>>()
-        var zoomed = 1.0
-        var pan = 0.0 to 0.0
-        var fitCrop = 0
-        override fun seek(ms: Long, exact: Boolean) { seeks += ms to exact; if (exact) positionMs = ms }
-        override fun togglePause() { paused = !paused }
-        override fun pause() { paused = true }
-        override fun setSpeed(speed: Double) { spd = speed }
-        override fun setControls(shown: Boolean) { controlsShown = shown }
-        override var brightness = 0.5f
-        override var volume = 0.5f
-        override val volumeSteps = 15
-        override var boostOn = false
-        override var boost = 1f
-        override fun setZoom(scale: Double) { zoomed = scale }
-        override fun setPan(x: Double, y: Double) { pan = x to y }
-        override fun toggleFitCrop() { fitCrop++ }
-    }
-
     private val fx = Fake()
     private val c = GestureController(fx)
 
@@ -359,4 +333,31 @@ class GestureTest {
         assertEquals(Readout.Speed(1.0, top = false), c.readout)
         rule.onNodeWithText("1x").assertIsDisplayed()
     }
+}
+
+/** Records what the gesture layer changed. Top level: the EARS report reads the enclosing class of each test. */
+private class Fake : GestureEffects {
+    override var positionMs = 60_000L
+    override var durationMs = 600_000L
+    override var paused = false
+    var spd = 1.0
+    override val speed get() = spd
+    override var controlsShown = false
+    val seeks = mutableListOf<Pair<Long, Boolean>>()
+    var zoomed = 1.0
+    var pan = 0.0 to 0.0
+    var fitCrop = 0
+    override fun seek(ms: Long, exact: Boolean) { seeks += ms to exact; if (exact) positionMs = ms }
+    override fun togglePause() { paused = !paused }
+    override fun pause() { paused = true }
+    override fun setSpeed(speed: Double) { spd = speed }
+    override fun setControls(shown: Boolean) { controlsShown = shown }
+    override var brightness = 0.5f
+    override var volume = 0.5f
+    override val volumeSteps = 15
+    override var boostOn = false
+    override var boost = 1f
+    override fun setZoom(scale: Double) { zoomed = scale }
+    override fun setPan(x: Double, y: Double) { pan = x to y }
+    override fun toggleFitCrop() { fitCrop++ }
 }
