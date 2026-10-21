@@ -17,7 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -55,6 +55,8 @@ import java.io.File
 /** The General settings page: theme, language, history and the thumbnail cache. */
 @RunWith(AndroidJUnit4::class)
 class GeneralSettingsTest {
+    // The v2 rule queues effect coroutines on the test clock. The v1 rule ran them unconfined, so a
+    // DataStore emission resumed the settings collectors on its IO thread and drew the page there.
     @get:Rule val rule = createComposeRule()
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
