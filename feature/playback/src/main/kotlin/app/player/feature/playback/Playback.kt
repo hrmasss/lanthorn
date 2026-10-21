@@ -271,10 +271,13 @@ object Playback : PlaybackControls {
                     s.loaded && !s.paused && now - savedAt >= Resume.SAVE_EVERY_MS -> save(s, "every 5 s")
                 }
                 if (s.uri == queue.currentOrNull()?.toString()) {
-                    if (s.error != null && prev?.error == null) failed(engine, s)
-                    if (s.loaded && prev?.loaded != true) launch { checkDecoders(engine, s.uri) }
-                    if (s.firstFrameMs != null && prev?.firstFrameMs == null) queue.markPlayed()
-                    if (s.ended && prev?.ended == false) {
+                    // State updates are conflated: two files in a row can arrive without the reset
+                    // between them, so a new file counts as a change on every field.
+                    val newFile = prev == null || prev.uri != s.uri
+                    if (s.error != null && (newFile || prev?.error == null)) failed(engine, s)
+                    if (s.loaded && (newFile || prev?.loaded != true)) launch { checkDecoders(engine, s.uri) }
+                    if (s.firstFrameMs != null && (newFile || prev?.firstFrameMs == null)) queue.markPlayed()
+                    if (s.ended && (newFile || prev?.ended == false)) {
                         // No decoder for any stream: mpv "plays" nothing and ends at once (US-75.1).
                         val nothingPlayed = s.video == null && (lines.any(Failures::isDecoderFailure) || s.positionMs < 1000)
                         if (nothingPlayed) failed(engine, s) else ended()
