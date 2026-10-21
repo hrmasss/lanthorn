@@ -115,20 +115,13 @@ class GestureUiTest {
 
     private fun shown(tag: String) = compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun waitUntil(ms: Long, check: () -> Boolean) {
-        val end = SystemClock.elapsedRealtime() + ms
-        while (!check()) {
-            if (SystemClock.elapsedRealtime() > end) throw AssertionError("timed out after $ms ms")
-            SystemClock.sleep(20)
-        }
-    }
+    /** Waits through the compose rule, so frames run while we wait. */
+    private fun waitUntil(ms: Long, check: () -> Boolean) = compose.waitUntil(ms) { check() }
 
     private fun copy(asset: String): Uri {
         val file = File(context.cacheDir, asset)
-        if (!file.exists()) {
-            InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
-                file.outputStream().use { input.copyTo(it) }
-            }
+        InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
+            file.outputStream().use { input.copyTo(it) }
         }
         return Uri.fromFile(file)
     }
