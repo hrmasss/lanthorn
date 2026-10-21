@@ -39,6 +39,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
+import app.player.core.engine.PlaybackService
+import app.player.core.playerapi.PlayerChrome
+import kotlinx.coroutines.flow.combine
 
 /** A resume choice waiting for the viewer (US-22.3). */
 internal data class AskResume(val engine: PlayerEngine, val uri: Uri, val positionMs: Long, val decoder: DecoderMode)
@@ -76,6 +79,9 @@ object Playback : PlaybackControls {
      */
     private const val DECODER_CHECK_MS = 4_000L
     private const val DECODER_POLL_MS = 200L
+
+    /** Next and previous as seeks when the player screen has not given its step (US-31.4). */
+    private const val DEFAULT_STEP_MS = 10_000L
 
     private val NETWORK_SCHEMES = setOf("http", "https", "rtsp", "rtmp", "smb")
 
@@ -120,6 +126,14 @@ object Playback : PlaybackControls {
 
     private var engine: PlayerEngine? = null
     private var watcher: Job? = null
+    private var media: MediaControls? = null
+    private var chrome = WeakReference<PlayerChrome>(null)
+    private val presses = MultiPress(scope) { act(MediaKeys.presses(it)) }
+
+    /** Background play from the player's menu, over the "on leaving" setting until the next open (US-59.1). */
+    private val backgroundOverride = MutableStateFlow<Boolean?>(null)
+    private val _backgroundPlay = MutableStateFlow(false)
+    override val backgroundPlay: StateFlow<Boolean> = _backgroundPlay.asStateFlow()
     private var opening: Job? = null
     private var onClose = WeakReference<() -> Unit>(null)
     private var queue = PlayQueue(emptyList<Uri>(), 0)
@@ -146,12 +160,19 @@ object Playback : PlaybackControls {
                 publishQueue()
             }
         }
+        scope.launch {
+            combine(_settings, backgroundOverride) { s, o -> o ?: (s.onLeave == OnLeave.Background) }.collect {
+                _backgroundPlay.value = it
+                PlayerSessions.keepPlayingInBackground = it
+            }
+        }
     }
 
     override fun open(engine: PlayerEngine, intent: Intent, onClose: () -> Unit): Boolean {
         val uri = intent.data ?: return false
         bind(engine)
         this.onClose = WeakReference(onClose)
+        backgroundOverride.value = null
         val given = PlayerIntents.queue(intent)
         setQueue(given?.first ?: listOf(uri), given?.second ?: 0)
         play(laterInQueue = false)
@@ -169,6 +190,11 @@ object Playback : PlaybackControls {
         window = w
         w.start()
         activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // In front again: the playback service has let go, and its notification with it.
+            override fun onStart(owner: LifecycleOwner) {
+                media?.inService = false
+            }
+
             override fun onDestroy(owner: LifecycleOwner) {
                 if (window === w) window = null
                 _locked.value = false
@@ -176,25 +202,60 @@ object Playback : PlaybackControls {
         })
     }
 
+    override fun attachChrome(chrome: PlayerChrome) {
+        this.chrome = WeakReference(chrome)
+    }
+
+    override fun toggleBackgroundPlay() {
+        backgroundOverride.value = !_backgroundPlay.value
+        Log.i(TAG, "background play ${if (backgroundOverride.value == true) "on" else "off"} from the menu")
+    }
+
     /**
-     * Media keys while the player is in front, locked or not (US-28.3). In the background the media
-     * session takes them (P1.15). Acts on the first key down and swallows the rest of the press.
+     * Keys while the player is in front, locked or not. Volume keys change brightness when set and
+     * the full player shows (US-77); in PiP they stay the system's (US-77.2). Media keys: [mediaKey].
      */
     override fun onKey(event: KeyEvent): Boolean {
-        val e = engine ?: return false
-        val action: (() -> Unit) = when (event.keyCode) {
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> e::togglePause
-            KeyEvent.KEYCODE_MEDIA_PLAY -> e::play
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> e::pause
-            KeyEvent.KEYCODE_MEDIA_NEXT -> ::next
-            KeyEvent.KEYCODE_MEDIA_PREVIOUS -> ::previous
-            else -> return false
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            val c = chrome.get() ?: return false
+            if (_settings.value.volumeKeys != VolumeKeys.Brightness || window?.inPip != false) return false
+            if (event.action == KeyEvent.ACTION_DOWN) c.stepBrightness(event.keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+            return true
         }
+        return mediaKey(event)
+    }
+
+    /**
+     * Media keys from the player screen (US-28.3, also while locked) and from the media session in
+     * background (US-31.1, US-31.4). Acts on the first key down and swallows the rest of the press.
+     */
+    internal fun mediaKey(event: KeyEvent): Boolean {
+        if (engine == null) return false
+        val action = MediaKeys.action(event.keyCode, _settings.value.nextPreviousSeek)
+        if (action == KeyAction.None) return false
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
             Log.i(TAG, "media key ${KeyEvent.keyCodeToString(event.keyCode)}, locked ${_locked.value}")
-            action()
+            if (action == KeyAction.Press) presses.press() else act(action)
         }
         return true
+    }
+
+    /** One path for keys, headset presses, the session and the notification's buttons. */
+    private fun act(action: KeyAction) {
+        val e = engine ?: return
+        Log.i(TAG, "media action ${action.name.lowercase()}")
+        val step = chrome.get()?.seekStepMs ?: DEFAULT_STEP_MS
+        when (action) {
+            KeyAction.Toggle -> e.togglePause()
+            KeyAction.Play -> e.play()
+            KeyAction.Pause -> e.pause()
+            KeyAction.Next -> next()
+            KeyAction.Previous -> previous()
+            KeyAction.Forward -> e.seekTo(e.state.value.positionMs + step)
+            KeyAction.Back -> e.seekTo((e.state.value.positionMs - step).coerceAtLeast(0))
+            KeyAction.Press, KeyAction.None -> return
+        }
+        media?.viewerActed()
     }
 
     override fun lock() {
@@ -314,8 +375,13 @@ object Playback : PlaybackControls {
         if (this.engine === engine) return
         this.engine = engine
         engine.set("loop-file", if (_settings.value.loop == LoopMode.One) "inf" else "no")
+        media?.release()
         watcher?.cancel()
         watcher = scope.launch {
+            val m = MediaControls(context, engine, this, title, ::act)
+            media = m
+            m.start()
+            PlaybackService.notificationFactory = { _, _ -> m.inService = true; m.notification() }
             launch {
                 engine.messages.collect { m ->
                     lines.addLast(m)
@@ -336,6 +402,11 @@ object Playback : PlaybackControls {
                 val pausedSaved = lastSaved?.let { it.paused && it.uri == last?.uri } == true
                 if (!pausedSaved) last?.let { withContext(NonCancellable) { write(it, "engine released") } }
                 if (this@Playback.engine === engine) this@Playback.engine = null
+                m.release()
+                if (media === m) {
+                    media = null
+                    PlaybackService.notificationFactory = null
+                }
                 watcher?.cancel()
             }
             // mpv's own pause flag: PlaybackState.paused starts true after open() and only changes

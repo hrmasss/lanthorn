@@ -76,7 +76,8 @@ class PlaybackService : Service() {
     companion object {
         private const val TAG = "PlaybackService"
         private const val CHANNEL = "playback"
-        private const val NOTIFICATION_ID = 1
+        /** The notification's id, so P1.15 can update the one [notificationFactory] made. */
+        const val NOTIFICATION_ID = 1
         const val ACTION_TOGGLE = "app.player.playback.TOGGLE"
         const val ACTION_STOP = "app.player.playback.STOP"
 
