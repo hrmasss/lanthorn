@@ -15,6 +15,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,6 +36,7 @@ class PlayerSettingsContentTest {
         LanthornPlayerTheme(dynamicColor = false) { PlayerSettingsContent(prefs, { change -> prefs = change(prefs) }) }
     }
 
+    @Ears("US-79.1")
     @Test fun `US-79_1 auto-hide switch turns it off`() {
         show()
         rule.onNodeWithTag("set-auto-hide").assertIsOn().performClick()
@@ -42,6 +44,7 @@ class PlayerSettingsContentTest {
         rule.onNodeWithTag("set-auto-hide").assertIsOff()
     }
 
+    @Ears("US-79.1")
     @Test fun `US-79_1 delay slider sets 1 to 10 s in half seconds`() {
         show()
         rule.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress) and hasAnyAncestor(hasTestTag("set-auto-hide-delay")))
@@ -49,12 +52,14 @@ class PlayerSettingsContentTest {
         assertEquals(7_500L, prefs.autoHideDelayMs)
     }
 
+    @Ears("US-78")
     @Test fun `US-78 back twice switch`() {
         show()
         rule.onNodeWithTag("set-back-twice").performScrollTo().performClick()
         assertTrue(prefs.backTwice)
     }
 
+    @Ears("US-60.4")
     @Test fun `US-60_4 keep status switch`() {
         show()
         rule.onNodeWithTag("set-keep-status").performScrollTo().performClick()

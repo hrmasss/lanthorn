@@ -15,6 +15,9 @@ import app.player.core.data.choice.PerFileChoiceDao
 import app.player.core.data.library.LibraryDao
 import app.player.core.data.library.LibraryVideo
 import app.player.core.data.library.VideoExtra
+import app.player.core.data.playlist.Playlist
+import app.player.core.data.playlist.PlaylistDao
+import app.player.core.data.playlist.PlaylistEntry
 
 /** Where the viewer left a file. Keyed by the uri string the player was opened with. */
 @Entity(tableName = "playback_position")
@@ -50,15 +53,16 @@ interface PlaybackPositionDao {
 }
 
 @Database(
-    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class, PerFileChoice::class],
-    version = 4,
+    entities = [PlaybackPosition::class, LibraryVideo::class, VideoExtra::class, PerFileChoice::class, Playlist::class, PlaylistEntry::class],
+    version = 5,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4), AutoMigration(from = 4, to = 5)],
 )
 abstract class PlayerDatabase : RoomDatabase() {
     abstract fun playbackPositions(): PlaybackPositionDao
     abstract fun library(): LibraryDao
     abstract fun perFileChoices(): PerFileChoiceDao
+    abstract fun playlists(): PlaylistDao
 
     companion object {
         @Volatile private var instance: PlayerDatabase? = null

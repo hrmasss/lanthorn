@@ -65,6 +65,7 @@ internal fun SelectionBar(
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<LibraryVideo?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf<List<LibraryVideo>?>(null) }
     TopAppBar(
         title = { Text(pluralStringResource(R.plurals.selected_count, count, count), modifier = Modifier.testTag("selection-count")) },
         navigationIcon = {
@@ -79,7 +80,10 @@ internal fun SelectionBar(
                 Icon(LibraryIcons.Share, contentDescription = stringResource(R.string.action_share))
             }
             IconButton(
-                onClick = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) actions.delete(videos) else confirmDelete = true },
+                onClick = {
+                    // The system prompt owns the rest; the deleted rows must not stay selected.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { actions.delete(videos); onClear() } else confirmDelete = true
+                },
                 enabled = videos.isNotEmpty(),
                 modifier = Modifier.testTag("selection-delete"),
             ) { Icon(LibraryIcons.Delete, contentDescription = stringResource(R.string.action_delete)) }
@@ -96,6 +100,12 @@ internal fun SelectionBar(
                             modifier = Modifier.testTag("selection-play-${mode.name}"),
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_add_to_playlist)) },
+                        onClick = { menu = false; adding = videos },
+                        enabled = videos.isNotEmpty(),
+                        modifier = Modifier.testTag("selection-add-to-playlist"),
+                    )
                     if (videos.size == 1) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_rename)) },
@@ -116,6 +126,8 @@ internal fun SelectionBar(
             }
         },
     )
+    // The bar goes when the selection clears, so the selection stays until the dialog is done.
+    adding?.let { AddToPlaylistDialog(it.forPlaylist(), onDismiss = { adding = null; onClear() }) }
     renaming?.let { video ->
         RenameDialog(video, onRename = { actions.rename(video, it); onClear() }, onDismiss = { renaming = null })
     }

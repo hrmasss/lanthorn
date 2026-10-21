@@ -9,9 +9,11 @@ import app.player.feature.info.settings.PerFileChoicesBackup
 import app.player.core.settingsapi.BackupPart
 import app.player.core.settingsapi.SettingsGroup
 import app.player.core.settingsapi.SettingsHost
+import app.player.feature.library.PlaylistExtension
 import app.player.feature.library.network.NetworkExtension
 import app.player.feature.library.settings.GeneralSettings
 import app.player.feature.library.settings.LibrarySettings
+import app.player.feature.library.settings.PlaylistsBackup
 import app.player.feature.library.settings.ResumePointsBackup
 import app.player.feature.audio.AudioExtension
 import app.player.feature.audio.AudioSettings
@@ -26,6 +28,7 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
     override val playerExtensions: List<PlayerExtension> = listOf(
         InfoExtension,
         NetworkExtension,
+        PlaylistExtension,
         SubtitlesExtension,
         AudioExtension,
         PlaybackExtension,
@@ -50,5 +53,6 @@ class PlayerApplication : Application(), PlayerExtensionHost, SettingsHost {
     override val backupParts: List<BackupPart> = listOf(
         ResumePointsBackup,
         PerFileChoicesBackup,
+        PlaylistsBackup,
     )
 }
