@@ -43,6 +43,10 @@ class GesturesOnDeviceTest {
         SubtitleController(engine.asMpv()).addFile(srt.path, "lines.srt")
         engine.seekTo(4500)
         engine.await("sub-text", PropertyType.Text) { it == "Second line" }
+        // The saved style loads from disk after the engine starts and can land after the reset
+        // above (the drag test saves a moved, scaled one): reset again now that it has loaded.
+        OnDevice.main { SubtitlesExtension.styles(OnDevice.context).reset() }
+        engine.await("sub-scale", PropertyType.Real) { it == 1.0 }
         delay(800)
     }
 
@@ -50,6 +54,8 @@ class GesturesOnDeviceTest {
         runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         if (!::scenario.isInitialized) return
         OnDevice.main { SubtitlesExtension.styles(OnDevice.context).reset() }
+        // Saves are debounced (300 ms): let the reset reach disk before the next test loads it.
+        Thread.sleep(800)
         runCatching { scenario.onActivity { it.surface.engine = null } }
         OnDevice.release(holder)
         scenario.close()
