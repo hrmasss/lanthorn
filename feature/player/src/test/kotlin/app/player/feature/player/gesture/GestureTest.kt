@@ -75,7 +75,7 @@ class GestureTest {
         assertEquals(600_000L, GestureController.seekDelta(800f, 800f, 600))
     }
 
-    @Ears("US-18")
+    @Ears("US-18.1", "US-18.2")
     @Test fun `US-18 full height is 0 to 100 percent in 1 percent steps`() {
         assertEquals(1f, GestureController.level(0f, -400f, 400f))
         assertEquals(0f, GestureController.level(1f, 400f, 400f))
@@ -83,7 +83,7 @@ class GestureTest {
         assertEquals(1f, GestureController.level(0.9f, -400f, 400f))
     }
 
-    @Ears("US-19")
+    @Ears("US-19.1", "US-19.2", "US-19.4")
     @Test fun `US-19 zones are thirds`() {
         assertEquals(Zone.Left, GestureController.zone(100f, 900f))
         assertEquals(Zone.Middle, GestureController.zone(450f, 900f))
@@ -110,7 +110,7 @@ class GestureTest {
         assertTrue(fx.paused)
     }
 
-    @Ears("US-20")
+    @Ears("US-20.1", "US-20.2")
     @Test fun `US-20 fast play and back within the release`() {
         c.prefs = GesturePrefs(fastSpeed = 2.0)
         fx.spd = 1.25
@@ -120,7 +120,7 @@ class GestureTest {
         assertEquals(1.25, fx.speed, 0.0)
     }
 
-    @Ears("US-21.2")
+    @Ears("US-21.1", "US-21.2")
     @Test fun `US-21_2 defaults`() {
         val g = GesturePrefs()
         assertTrue(g.seek && g.brightness && g.volume && g.doubleTapSkip && g.doubleTapPause && g.longPressFast && g.pinchZoom)
@@ -156,7 +156,7 @@ class GestureTest {
         assertEquals(DragKind.Volume, c.dragKind(horizontal = false, startX = 700f, width = 800f))
     }
 
-    @Ears("US-55")
+    @Ears("US-55.1", "US-55.2")
     @Test fun `US-55 zoom clamps to 25 to 400 percent and snaps near fit and 100 percent`() {
         assertEquals(1.0, GestureController.snapZoom(1.04, quick = true, native = 2.0), 0.0)
         assertEquals(2.0, GestureController.snapZoom(1.95, quick = true, native = 2.0), 0.0)
@@ -203,7 +203,7 @@ class GestureTest {
 
     // ---- touch recognition ----
 
-    @Ears("US-17")
+    @Ears("US-17.1")
     @Test fun `US-17 horizontal swipe seeks, keyframe while moving, exact on release`() {
         show()
         rule.onNodeWithTag("v").performTouchInput { swipe(Offset(200f, 200f), Offset(600f, 200f), 300) }

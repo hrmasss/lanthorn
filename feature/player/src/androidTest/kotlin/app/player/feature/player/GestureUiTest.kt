@@ -3,6 +3,8 @@ package app.player.feature.player
 import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
+import android.provider.Settings
+import android.view.WindowManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -22,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import org.junit.Assert.assertEquals
 
 /** Gestures on a real engine (emulator): readouts on screen while the finger is down. */
 class GestureUiTest {
@@ -42,7 +45,7 @@ class GestureUiTest {
 
     @After fun close() = scenario.close()
 
-    @Ears("US-17.1")
+    @Ears("US-17.1", "US-30.2")
     @Test fun seekSwipeShowsTargetAndDelta_US17_1() {
         open()
         val before = engine.state.value.positionMs
@@ -90,9 +93,13 @@ class GestureUiTest {
         compose.onNodeWithTag("video").performTouchInput { up() }
     }
 
-    @Ears("US-18.1")
+    @Ears("US-18.1", "US-18.3", "US-18.4")
     @Test fun brightnessSwipeShowsLevel_US18_1() {
         open()
+        // US-18.3: the session starts at the system brightness (no window override yet).
+        var start = 0f
+        scenario.onActivity { start = it.window.attributes.screenBrightness }
+        val systemBefore = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
         compose.onNodeWithTag("video").performTouchInput {
             down(Offset(width * 0.2f, height * 0.3f))
             repeat(10) { moveBy(Offset(0f, height * 0.03f)) }
@@ -103,7 +110,12 @@ class GestureUiTest {
         scenario.onActivity { level = it.window.attributes.screenBrightness }
         log("brightness after swipe down: window $level")
         compose.onNodeWithTag("video").performTouchInput { up() }
+        // US-18.4: only the window's level moved, never the system setting.
+        val systemAfter = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+        log("brightness: window at start $start, system $systemBefore -> $systemAfter")
+        assertEquals(WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE, start, 0f)
         assertTrue(level in 0f..1f)
+        assertEquals(systemBefore, systemAfter)
     }
 
     @Ears("US-19.2")
@@ -117,7 +129,7 @@ class GestureUiTest {
         log("double tap right: $before -> ${engine.state.value.positionMs} ms")
     }
 
-    @Ears("US-20")
+    @Ears("US-20.1")
     @Test fun holdPlaysFast_US20() {
         open()
         compose.onNodeWithTag("video").performTouchInput {
