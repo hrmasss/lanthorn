@@ -59,6 +59,10 @@ class DecoderUiTest {
         // The player is opened with file:// uris of the app's own files.
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         // Each test starts its file from 0: a row left by an earlier test resumes near the end.
+        // The earlier test's last save lands when its engine goes, so wait for that first.
+        val end = SystemClock.uptimeMillis() + 5_000
+        while (PlayerSessions.current.value != null && SystemClock.uptimeMillis() < end) SystemClock.sleep(100)
+        SystemClock.sleep(500)
         runBlocking { ResumePoints(context).clear() }
     }
 
