@@ -102,13 +102,17 @@ class DecoderUiTest {
             showControls()
             retrying { device.findObject(By.desc("More options"))?.click() }
             // On smaller screens the entry can sit below the fold of the menu.
-            val entry = device.wait(Until.findObject(By.text(label)), 1500)
-                ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
-            if (entry != null && retrying { entry.click() } != null) {
+            val entry = retrying {
+                device.wait(Until.findObject(By.text(label)), 1500)
+                    ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
+            }
+            // Find it again on each try: a recomposed menu leaves the old node stale.
+            if (entry != null && retrying { (device.findObject(By.text(label)) ?: entry).click() } != null) {
                 SystemClock.sleep(1200)
                 return
             }
-            device.pressBack()
+            // Back with nothing open leaves the player, so close only a menu that did open.
+            if (device.hasObject(By.scrollable(true))) device.pressBack()
         }
         fail("menu entry '$label' not reachable")
     }
@@ -120,14 +124,20 @@ class DecoderUiTest {
             if (device.wait(Until.hasObject(By.text(summary)), 2000) && retrying { device.findObject(By.text(summary)).click() } != null) {
                 return
             }
-            device.pressBack()
+            if (device.hasObject(By.textStartsWith("Software")) || device.hasObject(By.textStartsWith("Hardware"))) device.pressBack()
         }
         fail("decoder option '$summary' not reachable")
     }
 
     private fun badge(): String? {
-        showControls()
-        return retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
+        // The controls can hide between the tap and the read: tap again until the badge shows.
+        var desc: String? = null
+        waitFor(8000) {
+            showControls()
+            desc = retrying { device.findObject(By.descStartsWith("Decoder "))?.contentDescription }
+            desc != null
+        }
+        return desc
     }
 
     private fun shot(name: String) {
@@ -140,7 +150,7 @@ class DecoderUiTest {
     /** US-37.2 after the 4:4:4 fallback, then US-35.3 by hand: pick HW on a file only SW plays. */
     @Test fun a_fallbackThenHandPickHw() {
         play("clip444.mp4")
-        assertEquals(ActiveDecoder.SW, engineState()?.activeDecoder)
+        assertTrue("decoder never settled on SW, last ${engineState()?.activeDecoder}", waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW })
         openFromMenu("Info")
         assertTrue("info never showed SW", device.wait(Until.hasObject(By.text("SW")), 8000))
         shot("info-after-fallback")
