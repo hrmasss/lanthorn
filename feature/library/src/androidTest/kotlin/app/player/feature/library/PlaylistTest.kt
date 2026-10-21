@@ -87,9 +87,12 @@ class PlaylistTest {
         assertEquals("Added 2 videos to PL test dialog.", said[0])
 
         // Again, from selection with one new and one already there: the existing playlist is listed.
-        videos = listOf(file(2), file(3))
-        open = true
-        rule.waitUntil(5_000) { rule.onAllNodesWithTag("playlist-pick-row").fetchSemanticsNodes().isNotEmpty() }
+        rule.runOnIdle {
+            videos = listOf(file(2), file(3))
+            open = true
+        }
+        // The picker lists playlists from a Room flow; the hosted emulator can be slow to deliver it.
+        rule.waitUntil(15_000) { rule.onAllNodesWithText("PL test dialog").fetchSemanticsNodes().isNotEmpty() }
         evidenceShot("add-to-playlist-dialog")
         rule.onNodeWithText("PL test dialog").performClick()
         rule.waitUntil(5_000) { said.size == 2 }
