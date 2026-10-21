@@ -53,11 +53,19 @@ class MarksTest {
         assertTrue(marks(listOf(a1, a2, b1), ps, NOW, 7, false).values.none { it.lastPlayed })
     }
 
-    @Test fun `us_08 resume button video is the newest resume point still listed`() {
-        val a = v(1); val gone = v(2, available = false); val b = v(3)
-        val ps = mapOf(pos(a, 5_000, updated = 10), pos(gone, 5_000, updated = 30), pos(b, 5_000, updated = 20),
-            "content://media/external_primary/video/media/99" to PlaybackPosition("content://media/external_primary/video/media/99", 1, 2, 40))
-        assertEquals(3L, lastPlayed(listOf(a, gone, b), ps)?.id)
-        assertNull("US-08.3: nothing left", lastPlayed(listOf(gone), ps))
+    @Test fun `us_08 resume button video is the latest played local video`() {
+        val a = v(1); val b = v(3)
+        val stream = "https://example.com/live.m3u8"
+        val ps = mapOf(pos(a, 5_000, updated = 10), pos(b, 5_000, updated = 20), stream to PlaybackPosition(stream, 1, 2, 50))
+        assertEquals("a stream played later does not count", 3L, lastPlayed(listOf(a, b), ps)?.id)
+        assertNull("no resume points", lastPlayed(listOf(a, b), emptyMap()))
+    }
+
+    @Test fun `us_08_3 button hides when the last played file is gone or unavailable`() {
+        val a = v(1); val off = v(2, available = false)
+        val deleted = "content://media/external_primary/video/media/99"
+        val gone = mapOf(pos(a, 5_000, updated = 10), deleted to PlaybackPosition(deleted, 1, 2, 40))
+        assertNull("deleted", lastPlayed(listOf(a), gone))
+        assertNull("on removed storage", lastPlayed(listOf(a, off), mapOf(pos(a, 5_000, updated = 10), pos(off, 5_000, updated = 30))))
     }
 }

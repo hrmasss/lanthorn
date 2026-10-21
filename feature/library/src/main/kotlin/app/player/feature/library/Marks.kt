@@ -49,8 +49,14 @@ fun marks(
     }
 }
 
-/** The video for the resume button (US-08): the latest resume point whose file is still listed and available. */
+/**
+ * The video for the resume button (US-08): the latest played local video, or null when that file is
+ * gone or unavailable (US-08.3: the button hides rather than offering an older one). Streams and share
+ * files are not library videos and do not count.
+ */
 fun lastPlayed(videos: List<LibraryVideo>, positions: Map<String, PlaybackPosition>): LibraryVideo? {
-    val byUri = videos.filter { it.available }.associateBy { it.uri }
-    return positions.values.sortedByDescending { it.updatedAt }.firstNotNullOfOrNull { byUri[it.uri] }
+    val last = positions.values.filter { it.uri.startsWith(LOCAL_MEDIA) }.maxByOrNull { it.updatedAt } ?: return null
+    return videos.firstOrNull { it.uri == last.uri && it.available }
 }
+
+private const val LOCAL_MEDIA = "content://media/"
