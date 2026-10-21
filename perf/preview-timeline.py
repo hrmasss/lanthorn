@@ -16,6 +16,8 @@ from datetime import datetime
 
 STAMP = re.compile(r"^(\d\d-\d\d \d\d:\d\d:\d\d\.\d{3})")
 FRAME = re.compile(r"preview frame at (-?\d+|null) ms, target (-?\d+|null) ms")
+# Logged when the view has the frame on screen; when present these are the frames that count.
+SHOWN = re.compile(r"preview frame shown at (-?\d+|null) ms, (\d+) ms after it landed")
 FINGER = re.compile(r"P1\.6\s*:\s*finger at (\d+) ms")
 
 
@@ -34,8 +36,12 @@ def pct(values, p):
 def main(path):
     start = end = shot = None
     finger = None
-    frames = []  # (time, shown, target, finger)
+    frames = []  # (time, shown, target, finger), from mpv landing the seek
+    drawn = []  # the same, from the view showing the frame
+    draw_delay = []
+    target = None
     shot_state = None
+    rest_state = None
     for line in open(path, errors="replace"):
         t = when(line)
         if t is None:
@@ -46,7 +52,9 @@ def main(path):
             end = t
         elif "P1.6" in line and "shot mid-drag" in line:
             shot = t
-            shot_state = (frames[-1] if frames else None, finger)
+            shot_state = (t, finger)
+        elif "P1.6" in line and "shot finger resting" in line:
+            rest_state = (t, finger)
         m = FINGER.search(line)
         if m:
             finger = int(m.group(1))
@@ -56,8 +64,16 @@ def main(path):
             shown = int(m.group(1))
             target = None if m.group(2) == "null" else int(m.group(2))
             frames.append((t, shown, target, finger))
+            continue
+        m = SHOWN.search(line)
+        if m and start is not None and m.group(1) != "null":
+            drawn.append((t, int(m.group(1)), target, finger))
+            draw_delay.append(int(m.group(2)))
     if start is None or end is None:
         sys.exit("no drag start/end in the log")
+    if drawn:
+        print(f"frames counted when the view showed them; landing to shown p50 {pct(draw_delay, 50)} ms, max {max(draw_delay)} ms")
+        frames = drawn
     during = [f for f in frames if start <= f[0] <= end]
     length = end - start
     acc = [abs(s - g) for _, s, g, _ in during if g is not None]
@@ -65,13 +81,13 @@ def main(path):
     print(f"drag: {length:.1f} s, preview frames during it: {len(during)}, {len(during) / length:.1f} a second")
     print(f"frame vs its seek target: p50 {pct(acc, 50)} ms, p90 {pct(acc, 90)} ms, max {max(acc) if acc else None} ms ({len(acc)} frames)")
     print(f"frame vs finger when shown: p50 {pct(lag, 50)} ms, p90 {pct(lag, 90)} ms, max {max(lag) if lag else None} ms")
-    if shot_state:
-        f, fing = shot_state
-        print(f"mid-drag shot: last frame {f[1] if f else None} ms (target {f[2] if f else None} ms), finger at {fing} ms")
-    after = [f for f in frames if f[0] > end]
-    if after:
-        last = after[-1]
-        print(f"finger resting at {last[3]} ms: last frame {last[1]} ms")
+    for name, at in (("mid-drag shot", shot_state), ("finger-resting shot", rest_state)):
+        if at is None:
+            continue
+        at, fing = at
+        before = [f for f in frames if f[0] <= at]
+        f = before[-1] if before else None
+        print(f"{name}: last frame {f[1] if f else None} ms (target {f[2] if f else None} ms), finger at {fing} ms")
 
 
 if __name__ == "__main__":
