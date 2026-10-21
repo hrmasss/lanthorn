@@ -330,6 +330,49 @@ class AutoLoadOnDeviceTest {
         }
     }
 
+    /** US-39.1 "or the set subtitle folder": a folder picked in Subtitle settings is searched for every video. */
+    @Test fun zzzSubtitleFolderSetting_US39_1() = runBlocking {
+        fun step(s: String) = android.util.Log.i("evidence", "subtitle folder step: $s")
+        val resolver = OnDevice.context.contentResolver
+        val srt = resolver.insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Away.en.srt")
+            put(MediaStore.MediaColumns.MIME_TYPE, "application/x-subrip")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/LanthornSubs")
+        })!!
+        resolver.openOutputStream(srt)!!.use { it.write("1\n00:00:00,000 --> 00:00:10,000\nFrom the subtitle folder\n".toByteArray()) }
+        // The video sits in a folder with no subtitles of its own.
+        val away = File(OnDevice.context.cacheDir, "away").apply { deleteRecursively(); mkdirs() }
+        OnDevice.asset("wide.mkv").copyTo(File(away, "Away.mkv"), overwrite = true)
+        try {
+            GrantTestActivity.start = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/LanthornSubs")
+            GrantTestActivity.result = java.util.concurrent.CompletableFuture()
+            val picker = ActivityScenario.launch(GrantTestActivity::class.java)
+            val device = UiDevice.getInstance(OnDevice.instrumentation)
+            device.wait(Until.findObject(By.textContains("LanthornSubs")), 10_000)
+            device.wait(Until.findObject(By.text("USE THIS FOLDER").clazz("android.widget.Button")), 5_000)?.click()
+                ?: device.wait(Until.findObject(By.text("Use this folder")), 5_000)?.click()
+            (device.wait(Until.findObject(By.text("ALLOW")), 5_000) ?: device.wait(Until.findObject(By.text("Allow")), 5_000))?.click()
+            val tree = runCatching { GrantTestActivity.result.get(10, TimeUnit.SECONDS) }.getOrNull()
+            picker.close()
+            step("tree: $tree")
+            assertTrue("no folder picked", tree != null)
+            prefs.setFolder(tree)
+            showVideoAgain()
+            openClip(Uri.fromFile(File(away, "Away.mkv")), tracks = 3)
+            assertEquals("Away.en.srt", selected()?.title)
+            engine.pause()
+            engine.seekTo(1000)
+            engine.await("sub-text", PropertyType.Text, 10_000) { it == "From the subtitle folder" }
+            delay(1500)
+            shotTo("us39-subtitle-folder")
+            evidence("US-39.1 subtitle folder: Download/LanthornSubs picked in the system picker and set; Away.mkv in another folder loaded Away.en.srt from it and turned it on")
+        } finally {
+            prefs.setFolder(null)
+            resolver.delete(srt, null, null)
+            resolver.persistedUriPermissions.forEach { resolver.releasePersistableUriPermission(it.uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        }
+    }
+
     private fun shotTo(name: String) {
         val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
         val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
