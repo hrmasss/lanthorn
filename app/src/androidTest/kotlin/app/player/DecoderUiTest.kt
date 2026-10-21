@@ -9,7 +9,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Direction
-import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.data.history.ResumePoints
@@ -45,6 +44,7 @@ class DecoderUiTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
     private val context = instr.targetContext
     private val device = UiDevice.getInstance(instr)
+    private val controls = PlayerControls(device)
     private val shots = File(context.getExternalFilesDir(null), "gate").apply { mkdirs() }
 
     /** A failed step leaves the screen and the view tree behind, so a CI failure can be read later. */
@@ -99,41 +99,20 @@ class DecoderUiTest {
     }
 
     private fun showControls() {
-        if (device.hasObject(By.desc("More options"))) return
-        device.click(device.displayWidth / 2, device.displayHeight / 2)
-        device.wait(Until.hasObject(By.desc("More options")), 2000)
+        controls.show()
     }
 
     /** Runs [step], retrying when the overlay recomposed the node away between find and click. */
-    private fun <T> retrying(step: () -> T): T? {
-        repeat(3) { try { return step() } catch (_: StaleObjectException) { SystemClock.sleep(200) } }
-        return null
-    }
+    private fun <T> retrying(step: () -> T): T? = controls.retrying(step)
 
     private fun openFromMenu(label: String) {
-        repeat(3) {
-            showControls()
-            retrying { device.findObject(By.desc("More options"))?.click() }
-            // On smaller screens the entry can sit below the fold of the menu.
-            val entry = retrying {
-                device.wait(Until.findObject(By.text(label)), 1500)
-                    ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
-            }
-            // Find it again on each try: a recomposed menu leaves the old node stale.
-            if (entry != null && retrying { (device.findObject(By.text(label)) ?: entry).click() } != null) {
-                SystemClock.sleep(1200)
-                return
-            }
-            // Back with nothing open leaves the player, so close only a menu that did open.
-            if (device.hasObject(By.scrollable(true))) device.pressBack()
-        }
-        fail("menu entry '$label' not reachable")
+        if (!controls.menu(label)) fail("menu entry '$label' not reachable")
+        SystemClock.sleep(1200)
     }
 
     private fun pickDecoder(summary: String) {
         repeat(3) {
-            showControls()
-            retrying { device.findObject(By.descStartsWith("Decoder "))?.click() }
+            controls.tap(By.descStartsWith("Decoder "))
             if (device.wait(Until.hasObject(By.text(summary)), 2000) && retrying { device.findObject(By.text(summary)).click() } != null) {
                 return
             }
