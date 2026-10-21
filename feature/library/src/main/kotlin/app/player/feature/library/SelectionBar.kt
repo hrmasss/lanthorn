@@ -79,7 +79,10 @@ internal fun SelectionBar(
                 Icon(LibraryIcons.Share, contentDescription = stringResource(R.string.action_share))
             }
             IconButton(
-                onClick = { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) actions.delete(videos) else confirmDelete = true },
+                onClick = {
+                    // The system prompt owns the rest; the deleted rows must not stay selected.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) { actions.delete(videos); onClear() } else confirmDelete = true
+                },
                 enabled = videos.isNotEmpty(),
                 modifier = Modifier.testTag("selection-delete"),
             ) { Icon(LibraryIcons.Delete, contentDescription = stringResource(R.string.action_delete)) }

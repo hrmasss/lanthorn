@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.unit.dp
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -63,6 +64,7 @@ class ControlsTest {
 
     private fun show(ui: ControlsUi) = rule.setContent { LanthornPlayerTheme(dynamicColor = false) { Controls(ui, actions) } }
 
+    @Ears("US-16.1")
     @Test fun `US-16_1 every control is in place`() {
         show(ui())
         listOf(
@@ -72,6 +74,7 @@ class ControlsTest {
         ).forEach { rule.onNodeWithTag(it, useUnmergedTree = true).assertIsDisplayed() }
     }
 
+    @Ears("US-16.1")
     @Test fun `US-16_1 buttons do what they say`() {
         show(ui())
         mapOf(
@@ -84,12 +87,14 @@ class ControlsTest {
         }
     }
 
+    @Ears("US-16.4")
     @Test fun `US-16_4 tapping the total switches to remaining`() {
         show(ui())
         rule.onNodeWithTag("end-time").performClick()
         assertEquals("remaining", calls.last())
     }
 
+    @Ears("US-69.1")
     @Test fun `US-69_1 every interactive element has a description and a 48 dp target`() {
         show(ui(speed = "1.5x"))
         val clickable = rule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick)).fetchSemanticsNodes()
@@ -103,23 +108,27 @@ class ControlsTest {
         }
     }
 
+    @Ears("US-23.3")
     @Test fun `US-23_3 speed shows only when not 1x`() {
         show(ui(speed = null))
         rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "speed-badge"), useUnmergedTree = true)
             .fetchSemanticsNodes().let { assertEquals(0, it.size) }
     }
 
+    @Ears("US-23.3")
     @Test fun `US-23_3 speed badge shows the speed`() {
         show(ui(speed = "1.5x"))
         rule.onNodeWithTag("speed-badge", useUnmergedTree = true).assertIsDisplayed()
     }
 
+    @Ears("US-35.1")
     @Test fun `US-35_1 decoder badge names the active decoder`() {
         show(ui())
         val node = rule.onNodeWithTag("decoder-badge").fetchSemanticsNode()
         assertTrue(node.description(), node.description().contains("HW"))
     }
 
+    @Ears("US-60.3")
     @Test fun `US-60_3 battery and clock in the top bar`() {
         show(ui())
         val node = rule.onNodeWithTag("status", useUnmergedTree = true).fetchSemanticsNode()
@@ -127,6 +136,7 @@ class ControlsTest {
         assertTrue(node.description().contains("21:04"))
     }
 
+    @Ears("US-60.3")
     @Test fun `US-60_3 status hidden when the setting is off`() {
         show(ui(status = null))
         rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "status"), useUnmergedTree = true)

@@ -113,10 +113,57 @@ class AudioTest {
         )
     }
 
-    @Test fun `reverse is not selectable on this build`() {
+    @Ears("US-51.1")
+    @Test fun `reverse swaps the channels through pan, stereo removes it (US-51_1)`() {
         effects.setStereo(StereoMode.Reverse)
-        assertTrue(mpv.calls.isEmpty())
-        assertEquals(StereoMode.Stereo, effects.state.value.stereo)
+        effects.setStereo(StereoMode.Stereo)
+        assertEquals(
+            listOf(
+                "af remove @subsaudio-stereo",
+                "af add @subsaudio-stereo:lavfi=[pan=stereo|c0=c1|c1=c0]",
+                "af remove @subsaudio-stereo",
+            ),
+            mpv.calls,
+        )
+    }
+
+    @Ears("US-50.1")
+    @Test fun `nine named presets and a custom one, ten bands each (US-50_1)`() {
+        val named = EqPreset.entries.filter { it != EqPreset.Custom }
+        assertEquals(9, named.size)
+        named.forEach { p -> assertEquals(p.name, Eq.BANDS, p.bandsDb!!.size); assertTrue(p.bandsDb.all { it in Eq.MIN_DB..Eq.MAX_DB }) }
+        assertEquals(EqPreset.Flat, EffectsState().preset)
+        assertFalse(EffectsState().eqOn)
+    }
+
+    @Ears("US-50.1")
+    @Test fun `a preset sets every band, a moved band makes the curve custom (US-50_1)`() {
+        effects.setEq(true)
+        effects.setPreset(EqPreset.Rock)
+        assertEquals(EqPreset.Rock.bandsDb, sink.applied.last().bandsDb)
+        effects.setBand(4, 7f)
+        val s = effects.state.value
+        assertEquals(EqPreset.Custom, s.preset)
+        assertEquals(7f, s.customDb[4])
+        effects.setPreset(EqPreset.Flat)
+        assertEquals(EqPreset.Flat.bandsDb, effects.state.value.bandsDb)
+        effects.setPreset(EqPreset.Custom)
+        assertEquals(s.customDb, effects.state.value.bandsDb)
+    }
+
+    @Ears("US-50.3")
+    @Test fun `saved equalizer comes back as it was (US-50_3)`() {
+        val custom = List(Eq.BANDS) { i -> i - 4f }
+        effects.restore(EqSaved(on = true, preampDb = -3f, preset = EqPreset.Custom, customDb = custom))
+        val s = effects.state.value
+        assertTrue(s.eqOn)
+        assertEquals(-3f, s.preampDb)
+        assertEquals(custom, s.bandsDb)
+        assertEquals(EqSaved(true, -3f, EqPreset.Custom, custom), s.saved)
+        assertEquals(custom, sink.applied.last().bandsDb)
+        effects.restore(EqSaved(on = false, preset = EqPreset.Jazz))
+        assertEquals(EqPreset.Jazz.bandsDb, effects.state.value.bandsDb)
+        assertFalse(sink.applied.last().processing)
     }
 
     @Ears("US-51.2")

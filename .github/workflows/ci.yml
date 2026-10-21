@@ -53,7 +53,10 @@ jobs:
           PLAYER_KEYSTORE_PASSWORD: ${{ secrets.PLAYER_KEYSTORE_PASSWORD }}
           PLAYER_KEY_ALIAS: ${{ secrets.PLAYER_KEY_ALIAS }}
           PLAYER_KEY_PASSWORD: ${{ secrets.PLAYER_KEY_PASSWORD }}
-        run: ./gradlew assembleDebug assembleRelease assembleBench assembleDebugAndroidTest testDebugUnitTest lint --console=plain
+        # One more try after 30 s for a network hiccup; a real failure fails both.
+        run: |
+          tasks="assembleDebug assembleRelease assembleBench assembleDebugAndroidTest testDebugUnitTest lint"
+          ./gradlew $tasks --console=plain || { sleep 30; ./gradlew $tasks --console=plain; }
 
       - name: APK sizes
         run: find app/build/outputs/apk -name '*.apk' -printf '%s\t%p\n' | sort -n | tee -a "$GITHUB_STEP_SUMMARY"
