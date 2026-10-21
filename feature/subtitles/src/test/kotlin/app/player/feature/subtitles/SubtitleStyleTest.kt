@@ -1,11 +1,13 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SubtitleStyleTest {
     private fun SubtitleStyle.props() = toMpv().toMap()
 
+    @Ears("US-42.2")
     @Test fun `defaults are white bold, shadow, no outline, no box (US-42_2)`() {
         val p = SubtitleStyle().props()
         assertEquals("#FFFFFFFF", p["sub-color"])
@@ -18,6 +20,7 @@ class SubtitleStyleTest {
         assertEquals("no", p["sub-use-margins"])
     }
 
+    @Ears("US-42.1")
     @Test fun `outline, box and opacity map to mpv (US-42_1)`() {
         val outlined = SubtitleStyle(outline = true, outlineSize = 4f, outlineColor = 0xFF123456).props()
         assertEquals("4.0", outlined["sub-border-size"])
@@ -28,6 +31,7 @@ class SubtitleStyleTest {
         assertEquals("0", SubtitleStyle(shadow = false).props()["sub-shadow-offset"])
     }
 
+    @Ears("US-43.1", "US-43.2")
     @Test fun `alignment and margin 0 to 50 percent, fit to video (US-43)`() {
         val p = SubtitleStyle(align = SubAlign.Left, bottomMarginPercent = 25f, fitToVideo = false).props()
         assertEquals("left", p["sub-align-x"])
@@ -37,17 +41,21 @@ class SubtitleStyleTest {
         assertEquals("360", SubtitleStyle(bottomMarginPercent = 90f).props()["sub-margin-y"])
     }
 
+    @Ears("US-42.1")
     @Test fun `font size is the style's size (US-42_1)`() {
         assertEquals("46", SubtitleStyle().props()["sub-font-size"])
         assertEquals("80", SubtitleStyle(size = 80).props()["sub-font-size"])
     }
 
+    @Ears("US-42.3")
     @Test fun `an edit sends only the properties it changes (US-42_3)`() {
         val before = SubtitleStyle().toMpv().toMap()
         val after = SubtitleStyle(color = 0xFFFFEB3B).toMpv()
         assertEquals(listOf("sub-color" to "#FFFFEB3B"), SubtitleStyles.changed(before, after))
         assertEquals(after.size, SubtitleStyles.changed(emptyMap(), after).size)
     }
+
+    @Ears("US-43.2")
 
     @Test fun `bottom margin never goes under the navigation handle`() {
         assertEquals("43", SubtitleStyle(bottomMarginPercent = 0f).toMpv(minBottomMarginPercent = 6f).toMap()["sub-margin-y"])
