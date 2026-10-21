@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,7 +26,9 @@ import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /** "Add to playlist" in the player's menu (US-12.1): the playing file goes into a playlist. */
@@ -46,9 +49,11 @@ object PlaylistExtension : PlayerExtension {
         @Composable
         override fun Content(host: PanelHost) {
             val context = LocalContext.current
-            val uri = host.engine.state.value.uri
+            // Only the uri: the state also ticks with the position.
+            val uri by remember(host.engine) { host.engine.state.map { it.uri }.distinctUntilChanged() }
+                .collectAsState(initial = null)
             var video by remember(uri) { mutableStateOf<Pair<String, String>?>(null) }
-            LaunchedEffect(uri) { if (uri != null) video = uri to nameOf(context, uri) }
+            LaunchedEffect(uri) { uri?.let { video = it to nameOf(context, it) } }
             val v = video ?: return
             AddToPlaylist(listOf(v), onDismiss = host::close, notify = host::notify) { list ->
                 Column(Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
