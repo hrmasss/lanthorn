@@ -48,9 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import app.player.core.data.choice.PerFileChoices
 import app.player.core.engine.PlayerSessions
 import java.nio.charset.Charset
@@ -101,12 +101,13 @@ object SubtitlesExtension : PlayerExtension {
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
-        // A new file starts at its remembered delay (US-41.4), else the default (US-41.3).
+        // A new file starts at its remembered delay (US-41.4), else the default (US-41.3). Applied once
+        // the file has loaded, also when the same file opens again: set earlier, a slow load could lose it.
         val controller = SubtitleController(engine.asMpv())
         val store = SubtitleStyleStore(context)
         val perFile = choices(context)
         val job = scope.launch {
-            engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+            engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.mapNotNull { it.second }.collect { uri ->
                 val remembered = perFile.get(uri, DELAY_KEY)?.toLongOrNull()
                 controller.setDelayMs(remembered ?: store.defaultDelayMs.first())
             }

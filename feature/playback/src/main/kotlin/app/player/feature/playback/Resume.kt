@@ -28,10 +28,20 @@ object Resume {
     /** How often a playing file's position is written, so a killed process loses at most this (US-22.5: 10 s). */
     const val SAVE_EVERY_MS = 5_000L
 
-    /** The row to write for [state], or null when there is nothing worth saving. */
-    fun toSave(state: PlaybackState, now: Long): PlaybackPosition? {
+    /** Live protocols: a position in them means nothing on the next open. */
+    private val LIVE_SCHEMES = setOf("rtmp", "rtmps", "rtsp", "rtsps", "rtp", "udp", "srt", "mms")
+
+    fun isLiveScheme(uri: String?): Boolean = uri?.substringBefore("://", "")?.lowercase() in LIVE_SCHEMES
+
+    /**
+     * The row to write for [state], or null when there is nothing worth saving. Live and unseekable
+     * streams get none: mpv says [seekable] false, the protocol is live, or [live] marks a network
+     * stream whose duration was unknown when it loaded.
+     */
+    fun toSave(state: PlaybackState, now: Long, seekable: Boolean? = null, live: Boolean = false): PlaybackPosition? {
         val uri = state.uri ?: return null
         if (!state.loaded || state.error != null || state.durationMs <= 0) return null
+        if (seekable == false || live || isLiveScheme(uri)) return null
         val finished = state.ended || state.positionMs >= state.durationMs * FINISHED_SHARE
         val position = if (finished) state.durationMs else state.positionMs / 1000 * 1000
         return PlaybackPosition(uri, position.coerceAtLeast(0), state.durationMs, now)
@@ -40,6 +50,7 @@ object Resume {
     /** Where to start a file that has [saved] as its resume point. */
     fun startAt(saved: PlaybackPosition?, mode: ResumeMode, laterInQueue: Boolean, firstOnly: Boolean): StartAt {
         if (saved == null || mode == ResumeMode.No) return StartAt.Beginning
+        if (isLiveScheme(saved.uri)) return StartAt.Beginning
         if (firstOnly && laterInQueue) return StartAt.Beginning
         if (saved.positionMs < 1000) return StartAt.Beginning
         if (saved.durationMs > 0 && saved.positionMs >= saved.durationMs * FINISHED_SHARE) return StartAt.Beginning

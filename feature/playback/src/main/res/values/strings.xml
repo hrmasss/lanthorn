@@ -30,6 +30,13 @@
     <string name="failure_codec">This file uses a format no decoder here can play.</string>
     <string name="failure_damaged">The file is damaged or is not a video.</string>
     <string name="failure_permission">The app has no permission to read this file.</string>
+    <string name="failure_codec_named">This file uses a format no decoder here can play (%1$s).</string>
+    <string name="failure_unknown_name">Unknown file</string>
+    <string name="failure_missing_why">Android has no file at this location any more. It was moved, renamed or deleted, or the card or drive it was on is not connected.</string>
+    <string name="failure_codec_why">The file opened, but neither the hardware decoders nor the software decoder can read its video or sound. Another app may play it, or it can be converted to H.264 or H.265.</string>
+    <string name="failure_damaged_why">The file could not be read as a video or song. It is cut short, damaged, or not a media file despite its name.</string>
+    <string name="failure_permission_why">Android did not let this app read the file. Open it again from the app that shared it, or allow access to videos in the app\'s settings.</string>
+    <string name="failure_technical">Technical details</string>
     <string name="failure_skip">Skip</string>
     <string name="failure_info">Info</string>
 
