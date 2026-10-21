@@ -296,6 +296,9 @@ fun PlayerScreen(
     // changed delay applies from the next time the controls show (US-79.2).
     val hideAfter = autoHideDelay(prefs.autoHide, prefs.autoHideDelayMs, state.paused, talkBack, openPanel != null || scrubbing)
     AutoHideEffect(controls, touches, hideAfter) { controls = false }
+    LaunchedEffect(controls, hideAfter) {
+        android.util.Log.i("PlayerChrome", "auto-hide: controls $controls, after $hideAfter (paused ${state.paused}, panel ${openPanel != null}, scrubbing $scrubbing, talkback $talkBack)")
+    }
     SystemBarsEffect(activity, controls)
     KeepScreenOnEffect(activity, on = !state.paused || prefs.keepScreenOnPaused)
     LaunchedEffect(note) {
