@@ -6,12 +6,15 @@ import android.os.SystemClock
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.data.choice.PerFileChoices
 import app.player.core.data.choice.RememberPerFile
+import app.player.core.engine.ActiveDecoder
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
@@ -36,8 +39,8 @@ class VideoMenuTest {
     private lateinit var engine: PlayerEngine
     private val clip by lazy { copy("clip.mp4") }
 
-    private fun open() {
-        scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip))
+    private fun open(uri: Uri = clip) {
+        scenario = ActivityScenario.launch(PlayerActivity.intent(context, uri))
         compose.waitUntil(15_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 300 }
         engine = PlayerSessions.current.value!!
     }
@@ -107,6 +110,50 @@ class VideoMenuTest {
         log("aspect menu 4:3 -> video-out-params/aspect $aspect")
         assertEquals(4.0 / 3, aspect, 0.01)
         shot("p116-fit-panel")
+    }
+
+    /** US-53.1 from the controls: the fit button moves to the next mode and names it for 1 s. */
+    @Ears("US-53.1")
+    @Test fun fitButtonNamesTheModeForOneSecond_US53_1() {
+        open()
+        repeat(3) {
+            if (!shown("fit")) {
+                compose.onNodeWithTag("video").performClick()
+                runCatching { compose.waitUntil(3_000) { shown("fit") } }
+            }
+        }
+        compose.onNodeWithTag("fit").performClick()
+        compose.waitUntil(2_000) { shown("note") }
+        val t0 = SystemClock.elapsedRealtime()
+        compose.onNodeWithText("Stretch").assertExists()
+        compose.waitUntil(2_000) { prop("keepaspect", PropertyType.Flag) == false }
+        shot("p116-fit-button-note")
+        compose.waitUntil(4_000) { !shown("note") }
+        val shownMs = SystemClock.elapsedRealtime() - t0
+        log("fit button: Stretch named for about $shownMs ms")
+        assertTrue("note gone after $shownMs ms", shownMs >= 700)
+        assertWithin("fit name shown", shownMs, 1_500)
+    }
+
+    /** US-38.2: deinterlace on from the player menu, on SW (HW cannot run it), applied within 1 s. */
+    @Ears("US-38.2")
+    @Test fun deinterlaceFromMenu_US38_2() {
+        open(copy("interlaced.mp4"))
+        engine.setDecoder(DecoderMode.SW)
+        compose.waitUntil(8_000) { engine.state.value.activeDecoder == ActiveDecoder.SW }
+        engine.set("deinterlace", "no")
+        compose.waitUntil(3_000) { prop("deinterlace-active", PropertyType.Flag) == false }
+        menu()
+        compose.onNodeWithTag("menu-deinterlace").performScrollTo().performClick()
+        compose.waitUntil(3_000) { shown("deinterlace-panel") }
+        val t0 = SystemClock.elapsedRealtime()
+        compose.onNodeWithTag("deint-On").performClick()
+        compose.waitUntil(3_000) { prop("deinterlace-active", PropertyType.Flag) == true }
+        val ms = SystemClock.elapsedRealtime() - t0
+        log("deinterlace On from the menu: active after $ms ms")
+        shot("p116-deinterlace-on")
+        assertWithin("deinterlace from the menu", ms, 1_000)
+        assertTrue(scenario.state.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
     }
 
     /** Picks crop in the fit panel, leaves, resets mpv's panscan, opens the same file again. */

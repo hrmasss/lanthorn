@@ -1,14 +1,18 @@
 package app.player.feature.player
 
 import android.content.Context
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import android.view.WindowInsets
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.ActiveDecoder
@@ -86,6 +90,22 @@ class PlayerChromeTest {
         assertTrue(shown("back"))
         shot("01-controls")
         shot("03-paused")
+    }
+
+    /** A tap in the middle of a landscape screen shows the controls (the hidden seek preview sat there). */
+    @Ears("US-16.2")
+    @Test fun tapInLandscapeCentreShowsControls_US16_2() {
+        scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE }
+        compose.waitUntil(5_000) { var land = false; scenario.onActivity { land = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }; land }
+        compose.waitForIdle()
+        if (shown("back")) {
+            compose.onNodeWithTag("video").performClick()
+            compose.waitUntil(3_000) { !shown("back") }
+        }
+        compose.onNodeWithTag("video").performTouchInput { click(center) }
+        compose.waitUntil(3_000) { shown("back") }
+        shot("landscape-centre-tap")
+        scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
     @Ears("US-16.5")
