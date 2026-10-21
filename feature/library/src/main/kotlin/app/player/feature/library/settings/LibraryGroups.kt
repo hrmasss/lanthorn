@@ -1,6 +1,7 @@
 package app.player.feature.library.settings
 
 import android.content.Context
+import app.player.feature.library.rememberMainScope
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -24,7 +25,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -96,7 +96,7 @@ object LibrarySettings : SettingsGroup {
         val context = LocalContext.current
         val store = remember { LibraryPrefsStore(context) }
         val prefs by store.prefs.collectAsStateWithLifecycle(LibraryPrefs())
-        val scope = rememberCoroutineScope()
+        val scope = rememberMainScope()
         SettingsPage(highlight, listOf("h", CACHE, NEW_DAYS, MARK_LAST, RESUME)) {
             item("h") { SettingsHeader(stringResource(R.string.settings_section_list)) }
             item(CACHE) {
@@ -187,7 +187,7 @@ object GeneralSettings : SettingsGroup {
         val context = LocalContext.current
         val resources = LocalResources.current
         val locale = LocalConfiguration.current.locales[0]
-        val scope = rememberCoroutineScope()
+        val scope = rememberMainScope()
         val appearancePrefs = remember { AppearancePrefs(context) }
         val history = remember { HistoryPrefs(context) }
         val appearance by appearancePrefs.appearance.collectAsStateWithLifecycle(Appearance())
@@ -393,7 +393,7 @@ internal suspend fun clearHistory(context: Context) {
 private fun ImportDialog(backup: JSONObject, onDone: (report: String?) -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     val hasSettings = (backup.optJSONObject("settings")?.length() ?: 0) > 0
     val hasHistory = (backup.optJSONObject("history")?.length() ?: 0) > 0
     var settings by remember { mutableStateOf(hasSettings) }

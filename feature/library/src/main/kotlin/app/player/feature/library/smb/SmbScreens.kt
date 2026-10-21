@@ -1,6 +1,7 @@
 package app.player.feature.library.smb
 
 import android.content.Context
+import app.player.feature.library.rememberMainScope
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -42,7 +43,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,7 +75,7 @@ data class FoundServer(val name: String, val host: String, val port: Int)
 @Composable
 internal fun SmbServersScreen(onOpen: (SmbServer) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     val store = remember { SmbServers(context) }
     val saved by store.servers.collectAsStateWithLifecycle(emptyList())
     val found = rememberDiscovery(context)
@@ -140,7 +140,7 @@ internal fun SmbServersScreen(onOpen: (SmbServer) -> Unit, onBack: () -> Unit) {
 private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSaved: (SmbServer) -> Unit) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    val scope = rememberCoroutineScope()
+    val scope = rememberMainScope()
     var name by rememberSaveable { mutableStateOf(prefill?.name.orEmpty()) }
     var address by rememberSaveable {
         mutableStateOf(prefill?.let { if (it.port == 445) it.host else "${it.host}:${it.port}" }.orEmpty())
