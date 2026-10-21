@@ -343,6 +343,7 @@ class AutoLoadOnDeviceTest {
     }
 
     /** US-39.1 "or the set subtitle folder": a folder picked in Subtitle settings is searched for every video. */
+    @Ears("US-39.1")
     @Test fun zzzSubtitleFolderSetting_US39_1() = runBlocking {
         fun step(s: String) = android.util.Log.i("evidence", "subtitle folder step: $s")
         val resolver = OnDevice.context.contentResolver
