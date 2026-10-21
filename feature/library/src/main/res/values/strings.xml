@@ -147,7 +147,11 @@
     <string name="smb_name">Name (optional)</string>
     <string name="smb_connect">Connect</string>
     <string name="smb_connecting">Connecting</string>
-    <string name="smb_connect_failed">Could not connect: %1$s</string>
+    <string name="smb_err_login">The user name or password is wrong.</string>
+    <string name="smb_err_share">The server has no share by that name.</string>
+    <string name="smb_err_denied">This user may not open that share.</string>
+    <string name="smb_err_unreachable">The server did not answer. Check the address and that you are on the same network.</string>
+    <string name="smb_err_other">Could not open the share.</string>
     <string name="smb_empty">No folders or videos here.</string>
 
     <string name="folders_title">Folders</string>
