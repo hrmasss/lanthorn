@@ -88,6 +88,27 @@ internal object LibraryIcons {
         }
     }
 
+    /** Three dots joined by two lines: share. */
+    val Share: ImageVector by lazy {
+        shapes("Share") {
+            circle(18f, 5f, 3f)
+            circle(6f, 12f, 3f)
+            circle(18f, 19f, 3f)
+            // Bars from the left dot to each right dot, 1.6 wide.
+            moveTo(6.6f, 10.6f); lineTo(17.4f, 4.3f); lineTo(18.2f, 5.7f); lineTo(7.4f, 12f); close()
+            moveTo(7.4f, 12f); lineTo(18.2f, 18.3f); lineTo(17.4f, 19.7f); lineTo(6.6f, 13.4f); close()
+        }
+    }
+
+    /** A bin with a lid: delete. */
+    val Delete: ImageVector by lazy {
+        shapes("Delete") {
+            roundRect(4f, 4.5f, 20f, 6.5f, 1f)
+            roundRect(9.5f, 2.5f, 14.5f, 5f, 1f)
+            roundRect(6f, 7.5f, 18f, 21f, 2f)
+        }
+    }
+
     /** Three sliders: choose the fields shown. */
     val Fields: ImageVector by lazy {
         shapes("Fields") {

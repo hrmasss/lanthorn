@@ -42,7 +42,6 @@ import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -125,9 +124,10 @@ object AudioExtension : PlayerExtension {
                     engine.set("aid", remembered?.toString() ?: "auto")
                 }
             },
-            // US-48.3: every new file starts at the default delay.
+            // US-48.3: every new file starts at the default delay, applied once it has loaded.
             scope.launch {
-                engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { delay.setBase(prefs.defaultDelayMs) }
+                engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first && it.second != null }
+                    .collect { delay.setBase(prefs.defaultDelayMs) }
             },
         )
         bluetooth.start()
