@@ -63,7 +63,7 @@ Android 16, and is free software under GPL-3.0-or-later.
 
 ### Network
 
-- Play a URL: http, https, rtsp, rtmp, HLS and DASH. The link on the clipboard is filled in, and
+- Play a URL: http, https, rtmp, HLS and DASH. The link on the clipboard is filled in, and
   played links are kept in a history you can edit or turn off.
 - Stream errors say why (not found, timeout, unsupported) and offer a retry. Custom user agent.
 - Browse and play from SMB 2 and 3 shares. Servers on the network are found for you, or added by
