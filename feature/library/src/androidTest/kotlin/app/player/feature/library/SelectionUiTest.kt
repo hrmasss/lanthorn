@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.data.library.LibraryVideo
+import app.player.core.engine.DecoderMode
 import app.player.core.designsystem.theme.LanthornTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -70,5 +71,22 @@ class SelectionUiTest {
         rule.onNodeWithTag("selection-more").performClick()
         // Rename needs exactly one video.
         assertEquals(0, rule.onAllNodesWithTag("selection-rename").fetchSemanticsNodes().size)
+    }
+
+    @Test fun us_09_3_play_with_passes_the_chosen_decoder() {
+        var played: Pair<List<Long>, DecoderMode>? = null
+        rule.setContent {
+            LanthornTheme {
+                SelectionBar(
+                    2, listOf(video(1), video(2)), rememberFileActions {}, {}, {}, {},
+                    onPlayWith = { vs, mode -> played = vs.map { it.id } to mode },
+                )
+            }
+        }
+        rule.onNodeWithTag("selection-more").performClick()
+        rule.onNodeWithText("Play with HW").assertExists()
+        rule.onNodeWithText("Play with HW+").assertExists()
+        rule.onNodeWithText("Play with SW").performClick()
+        assertEquals(listOf(1L, 2L) to DecoderMode.SW, played)
     }
 }

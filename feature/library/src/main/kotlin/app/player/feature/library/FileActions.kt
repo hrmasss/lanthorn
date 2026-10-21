@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import app.player.core.data.library.LibraryVideo
+import app.player.core.playerapi.PlayerIntents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,12 +59,10 @@ class FileActions internal constructor(
 
     /**
      * US-10.4: the info panel of US-37 for one file, shown by feature/info's own screen
-     * (action [SHOW_INFO], file as data), so the library needs no dependency on it.
+     * ([PlayerIntents.showInfo]), so the library needs no dependency on it.
      */
     fun properties(video: LibraryVideo) {
-        val intent = Intent(SHOW_INFO, video.uri.toUri())
-            .setPackage(context.packageName)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = PlayerIntents.showInfo(context, video.uri.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         try {
             context.startActivity(intent)
         } catch (e: ActivityNotFoundException) {
@@ -143,11 +142,6 @@ class FileActions internal constructor(
     private fun done(message: Int) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         onChanged()
-    }
-
-    companion object {
-        /** Agreed with engine (work/questions.md): feature/info's info screen. */
-        const val SHOW_INFO = "app.player.action.SHOW_INFO"
     }
 
     // US-10.5: never fail silently.

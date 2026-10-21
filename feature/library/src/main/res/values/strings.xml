@@ -44,6 +44,9 @@
     <string name="action_delete">Delete</string>
     <string name="action_rename">Rename</string>
     <string name="action_properties">Properties</string>
+    <string name="play_with_hw">Play with HW</string>
+    <string name="play_with_hw_plus">Play with HW+</string>
+    <string name="play_with_sw">Play with SW</string>
     <string name="properties_unavailable">File details are not available in this build.</string>
     <string name="selection_clear">Clear selection</string>
     <string name="selection_all">Select all</string>

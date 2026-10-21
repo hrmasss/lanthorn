@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.ImeAction
 import app.player.core.data.library.LibraryVideo
 import app.player.core.designsystem.component.ConfirmDialog
 import app.player.core.designsystem.icon.LanthornIcons
+import app.player.core.engine.DecoderMode
 
 /** Selection kept across rotation. */
 @Composable
@@ -43,6 +44,12 @@ fun rememberSelection(): MutableState<Set<String>> = rememberSaveable(
  * The top bar while something is selected (US-09, US-10, US-74). [videos] is what the selection
  * stands for, in list order (folders expanded). Rename and properties need exactly one video.
  */
+private val PLAY_WITH = listOf(
+    DecoderMode.HW to R.string.play_with_hw,
+    DecoderMode.HW_PLUS to R.string.play_with_hw_plus,
+    DecoderMode.SW to R.string.play_with_sw,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SelectionBar(
@@ -52,6 +59,8 @@ internal fun SelectionBar(
     onPlay: (List<LibraryVideo>) -> Unit,
     onSelectAll: () -> Unit,
     onClear: () -> Unit,
+    /** US-09.3: plays the selection with one decoder for this launch only. */
+    onPlayWith: (List<LibraryVideo>, DecoderMode) -> Unit = { vs, _ -> onPlay(vs) },
 ) {
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<LibraryVideo?>(null) }
@@ -79,6 +88,14 @@ internal fun SelectionBar(
                     Icon(LanthornIcons.More, contentDescription = stringResource(R.string.more_options))
                 }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    PLAY_WITH.forEach { (mode, label) ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(label)) },
+                            onClick = { menu = false; onPlayWith(videos, mode); onClear() },
+                            enabled = videos.isNotEmpty(),
+                            modifier = Modifier.testTag("selection-play-${mode.name}"),
+                        )
+                    }
                     if (videos.size == 1) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.action_rename)) },

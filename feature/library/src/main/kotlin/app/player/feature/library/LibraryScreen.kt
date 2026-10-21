@@ -42,19 +42,19 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -88,11 +88,12 @@ import app.player.core.data.library.childrenOf
 import app.player.core.designsystem.component.EmptyState
 import app.player.core.designsystem.icon.LanthornIcons
 import app.player.core.designsystem.theme.BrandPolygon
+import app.player.core.engine.DecoderMode
 import app.player.feature.library.network.StreamDialog
-import app.player.feature.library.smb.SmbBrowseScreen
-import app.player.feature.library.smb.SmbServersScreen
 import app.player.feature.library.settings.SettingsGroupScreen
 import app.player.feature.library.settings.SettingsHome
+import app.player.feature.library.smb.SmbBrowseScreen
+import app.player.feature.library.smb.SmbServersScreen
 
 private const val PERF_TAG = "LibraryPerf"
 
@@ -102,6 +103,8 @@ fun LibraryRoute(
     onPlay: (Uri) -> Unit,
     /** Opens [uris] as the player's queue at [index] (US-09.2, US-24.1). */
     onPlayQueue: (uris: List<Uri>, index: Int) -> Unit = { uris, i -> onPlay(uris[i]) },
+    /** Opens [uris] as the queue with one decoder for this launch (US-09.3). */
+    onPlayWith: (uris: List<Uri>, decoder: DecoderMode) -> Unit = { uris, _ -> onPlayQueue(uris, 0) },
 ) {
     val context = LocalContext.current
     val nav = rememberNavController()
@@ -261,6 +264,7 @@ private fun LibraryHome(
                     videos = selectedVideos(selection, shownFolders, shownVideos, content.videos),
                     actions = actions,
                     onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onPlayWith = { vs, mode -> onPlayWith(vs.map { it.uri.toUri() }, mode) },
                     onSelectAll = { selection = shownFolders.map(SelectionKey::of).toSet() + shownVideos.map(SelectionKey::of) },
                     onClear = { selection = emptySet() },
                 )
@@ -352,6 +356,7 @@ private fun FolderScreen(
                     videos = selectedVideos(selection, subfolders, videos, content.videos),
                     actions = actions,
                     onPlay = { vs -> onPlayQueue(vs.map { it.uri.toUri() }, 0) },
+                    onPlayWith = { vs, mode -> onPlayWith(vs.map { it.uri.toUri() }, mode) },
                     onSelectAll = { selection = subfolders.map(SelectionKey::of).toSet() + videos.map(SelectionKey::of) },
                     onClear = { selection = emptySet() },
                 )
