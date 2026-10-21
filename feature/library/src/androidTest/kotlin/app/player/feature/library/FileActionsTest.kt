@@ -15,6 +15,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 /** The intents the file actions send. The info screen itself is proven in app's `DecoderUiTest.f_infoScreenForAFile`. */
 @RunWith(AndroidJUnit4::class)
@@ -66,5 +68,27 @@ class FileActionsTest {
         val send = started.single().getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
         assertEquals(Intent.ACTION_SEND, send.action)
         assertEquals("video/x-matroska", send.type)
+    }
+
+    @Ears("US-10.5")
+    @Test fun us_10_5_a_denied_rename_is_said_not_silent() {
+        val said = LinkedBlockingQueue<Int>()
+        var prompts = 0
+        val denying = FileActions(
+            context, { _, then -> prompts++; then(false) }, {}, MainScope(),
+            notify = { said += it },
+            write = { _, _ -> throw SecurityException("not ours") },
+        )
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { denying.rename(video(7), "New name.mp4") }
+        assertEquals(R.string.rename_denied, said.poll(10, TimeUnit.SECONDS))
+        assertEquals("one system prompt", 1, prompts)
+    }
+
+    @Ears("US-10.5")
+    @Test fun us_10_5_a_denied_delete_is_said_not_silent() {
+        val said = LinkedBlockingQueue<Int>()
+        val denying = FileActions(context, { _, then -> then(false) }, {}, MainScope(), notify = { said += it })
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { denying.delete(listOf(video(7), video(8))) }
+        assertEquals(R.string.delete_denied, said.poll(10, TimeUnit.SECONDS))
     }
 }

@@ -37,6 +37,10 @@ class FileActions internal constructor(
     private val launchSender: (IntentSenderRequest, (Boolean) -> Unit) -> Unit,
     private val onChanged: () -> Unit,
     private val scope: kotlinx.coroutines.CoroutineScope,
+    /** Tells the viewer how an action ended; a toast in the app, recorded in tests. */
+    private val notify: (message: Int) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() },
+    /** The MediaStore rename; tests swap it to reach the permission paths. */
+    private val write: ((Uri, String) -> Unit)? = null,
 ) {
     /** US-74: the system share sheet with these videos; the receiver may read them for this share only. */
     fun share(videos: List<LibraryVideo>) {
@@ -135,17 +139,18 @@ class FileActions internal constructor(
     }
 
     private fun update(uri: Uri, name: String) {
+        write?.let { return it(uri, name) }
         val values = ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, name) }
         if (context.contentResolver.update(uri, values, null, null) != 1) error("not renamed")
     }
 
     private fun done(message: Int) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        notify(message)
         onChanged()
     }
 
     // US-10.5: never fail silently.
-    private fun failed(message: Int) = Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    private fun failed(message: Int) = notify(message)
 }
 
 @Composable
