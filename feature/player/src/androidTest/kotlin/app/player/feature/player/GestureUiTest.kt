@@ -15,6 +15,8 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,6 +42,7 @@ class GestureUiTest {
 
     @After fun close() = scenario.close()
 
+    @Ears("US-17.1")
     @Test fun seekSwipeShowsTargetAndDelta_US17_1() {
         open()
         val before = engine.state.value.positionMs
@@ -75,6 +78,7 @@ class GestureUiTest {
         assertTrue("elapsed follows the finger", kotlin.math.abs(secs * 1000 - duration * 0.6) <= 2_000)
     }
 
+    @Ears("US-18.2")
     @Test fun volumeSwipeShowsLevel_US18_2() {
         open()
         compose.onNodeWithTag("video").performTouchInput {
@@ -86,6 +90,7 @@ class GestureUiTest {
         compose.onNodeWithTag("video").performTouchInput { up() }
     }
 
+    @Ears("US-18.1")
     @Test fun brightnessSwipeShowsLevel_US18_1() {
         open()
         compose.onNodeWithTag("video").performTouchInput {
@@ -101,6 +106,7 @@ class GestureUiTest {
         assertTrue(level in 0f..1f)
     }
 
+    @Ears("US-19.2")
     @Test fun doubleTapRightSkips_US19_2() {
         open()
         val before = engine.state.value.positionMs
@@ -111,6 +117,7 @@ class GestureUiTest {
         log("double tap right: $before -> ${engine.state.value.positionMs} ms")
     }
 
+    @Ears("US-20")
     @Test fun holdPlaysFast_US20() {
         open()
         compose.onNodeWithTag("video").performTouchInput {
@@ -123,6 +130,7 @@ class GestureUiTest {
         compose.onNodeWithTag("video").performTouchInput { up() }
     }
 
+    @Ears("US-55.1")
     @Test fun pinchShowsZoom_US55_1() {
         open()
         compose.onNodeWithTag("video").performTouchInput {
@@ -145,11 +153,10 @@ class GestureUiTest {
         return Uri.fromFile(file)
     }
 
+    /** Saved per test by core/testing, so the EARS report links it to the criterion. */
     private fun shot(name: String) {
         SystemClock.sleep(150)
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 
     private fun log(line: String) {

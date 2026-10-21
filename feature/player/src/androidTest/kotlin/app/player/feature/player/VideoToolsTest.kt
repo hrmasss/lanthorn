@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
+import app.player.core.testing.Ears
 import app.player.feature.player.tools.Deinterlace
 import app.player.feature.player.tools.FitMode
 import app.player.feature.player.tools.PictureAdjust
@@ -42,6 +43,7 @@ class VideoToolsTest {
 
     @After fun close() = scenario.close()
 
+    @Ears("US-53.1")
     @Test fun fitModes_US53_1() = runBlocking<Unit> {
         open("clip.mp4")
         // Each mode is read once the picture has its expected shape (or after 3 s, and the asserts
@@ -66,6 +68,7 @@ class VideoToolsTest {
         assertTrue("100% is smaller than fit", margins.getValue(FitMode.Original).sum() > margins.getValue(FitMode.Fit).sum())
     }
 
+    @Ears("US-54.1")
     @Test fun aspectOverride_US54_1() = runBlocking<Unit> {
         open("clip.mp4")
         val before = engine.get("video-out-params/aspect", PropertyType.Real)!!
@@ -78,6 +81,7 @@ class VideoToolsTest {
         waitUntil(1_000) { runBlocking { engine.get("video-out-params/aspect", PropertyType.Real) }?.let { abs(it - before) < 0.01 } == true }
     }
 
+    @Ears("US-55")
     @Test fun zoomAndPan_US55() = runBlocking<Unit> {
         open("clip.mp4")
         tools.setZoom(4.0)
@@ -98,6 +102,7 @@ class VideoToolsTest {
         assertEquals(-0.1, py, 1e-6)
     }
 
+    @Ears("US-56.4")
     @Test fun rotationMetadata_US56_4() = runBlocking<Unit> {
         open("rotated.mp4")
         waitUntil(3_000) { tools.rotation.value != null }
@@ -114,6 +119,7 @@ class VideoToolsTest {
         assertTrue("portrait after rotation: ${shownW}x$shownH", shownH > shownW)
     }
 
+    @Ears("US-57")
     @Test fun mirrorFlipNight_US57() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
@@ -143,6 +149,7 @@ class VideoToolsTest {
         assertTrue("off restores the frame", plain.sameAs(back))
     }
 
+    @Ears("US-57.3")
     @Test fun pictureAdjustZeroIsIdentical_US57_3() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()
@@ -161,6 +168,7 @@ class VideoToolsTest {
         assertEquals("zeros give back the frame", 0, back)
     }
 
+    @Ears("US-38.1")
     @Test fun deinterlaceDefaultsToAuto_US38_1() = runBlocking<Unit> {
         open("clip.mp4")
         val mode = engine.get("deinterlace", PropertyType.Text)
@@ -168,6 +176,7 @@ class VideoToolsTest {
         assertEquals("auto", mode)
     }
 
+    @Ears("US-38")
     @Test fun deinterlaceModes_US38() = runBlocking<Unit> {
         open("interlaced.mp4")
         // Deinterlacing needs frames in memory: zero-copy HW cannot run it (US-35.4).
@@ -205,6 +214,7 @@ class VideoToolsTest {
         assertTrue("comb lines reduced: off ${comb(off)} on ${comb(on)}", comb(on) < comb(off))
     }
 
+    @Ears("US-54.1")
     @Test fun aspectRatiosDrawn_US54_1() = runBlocking<Unit> {
         open("clip.mp4")
         for ((name, ratio) in listOf("1:1" to 1.0, "21:9" to 21.0 / 9, "custom 1.85" to 1.85)) {
@@ -218,6 +228,7 @@ class VideoToolsTest {
         }
     }
 
+    @Ears("US-55.1")
     @Test fun zoomDrawn_US55_1() = runBlocking<Unit> {
         open("clip.mp4")
         val fit = drawn()
@@ -236,6 +247,7 @@ class VideoToolsTest {
     }
 
     /** US-57.1, US-57.2 on the whole screen: a subtitle and the controls stay as they are. */
+    @Ears("US-57")
     @Test fun mirrorAndNightFullScreen_US57() = runBlocking<Unit> {
         open("clip.mp4")
         engine.command("sub-add", copyFile("sub.srt").path, "select")
@@ -262,6 +274,7 @@ class VideoToolsTest {
     }
 
     /** US-57.3 as an emulator regression number; the 100 ms claim is for the phone. */
+    @Ears("US-57.3")
     @Test fun pictureAdjustTiming_US57_3() = runBlocking<Unit> {
         open("clip.mp4")
         engine.pause()

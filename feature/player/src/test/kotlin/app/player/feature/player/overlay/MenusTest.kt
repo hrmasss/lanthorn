@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -27,6 +28,7 @@ import org.robolectric.annotation.Config
 class MenusTest {
     @get:Rule val rule = createComposeRule()
 
+    @Ears("US-32.1")
     @Test fun `US-32_1 every shortcut shows its state`() {
         val active = setOf(Shortcut.Loop, Shortcut.NightMode)
         var clicked: Shortcut? = null
@@ -45,6 +47,7 @@ class MenusTest {
         rule.onNodeWithTag("sc-Shuffle").assertIsNotEnabled()
     }
 
+    @Ears("US-32.2")
     @Test fun `US-32_2 choose and reorder shortcuts`() {
         var shown by mutableStateOf(listOf(Shortcut.Speed, Shortcut.Loop, Shortcut.Mute))
         // Inside a scrolling column, as in the Player settings sheet.
@@ -61,6 +64,7 @@ class MenusTest {
         assertEquals(listOf(Shortcut.Loop, Shortcut.Speed, Shortcut.Mirror), shown)
     }
 
+    @Ears("US-32.2")
     @Test fun `US-32_2 stored order round-trips and drops unknown ids`() {
         val list = listOf(Shortcut.Mirror, Shortcut.Speed)
         assertEquals(list, Shortcut.parse(Shortcut.format(list)))

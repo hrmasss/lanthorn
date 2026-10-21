@@ -15,6 +15,8 @@ import app.player.core.data.choice.RememberPerFile
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -63,6 +65,7 @@ class VideoMenuTest {
 
     private fun <T : Any> prop(name: String, type: PropertyType<T>): T? = runBlocking { engine.get(name, type) }
 
+    @Ears("US-32.1")
     @Test fun shortcutsInMenu_US32_1() {
         open()
         menu()
@@ -75,6 +78,7 @@ class VideoMenuTest {
         shot("p116-shortcuts-on")
     }
 
+    @Ears("US-57")
     @Test fun pictureMenu_US57() {
         open()
         menu()
@@ -90,6 +94,7 @@ class VideoMenuTest {
         shot("p116-picture-panel")
     }
 
+    @Ears("US-53", "US-54")
     @Test fun fitAspectMenu_US53_US54() {
         open()
         menu()
@@ -122,6 +127,7 @@ class VideoMenuTest {
         return prop("panscan", PropertyType.Real) ?: -1.0
     }
 
+    @Ears("US-53.2")
     @Test fun fitRememberedPerFile_US53_2() {
         runBlocking { RememberPerFile(context).set(true) }
         val panscan = pickCropAndReopen()
@@ -129,6 +135,7 @@ class VideoMenuTest {
         assertEquals(1.0, panscan, 0.0)
     }
 
+    @Ears("US-53.2")
     @Test fun fitNotRememberedWhenOff_US53_2() {
         runBlocking { RememberPerFile(context).set(false) }
         val panscan = pickCropAndReopen()
@@ -136,6 +143,7 @@ class VideoMenuTest {
         assertEquals(0.0, panscan, 0.0)
     }
 
+    @Ears("US-65.3")
     @Test fun settingsInsidePlayer_US65_3() {
         open()
         menu()
@@ -159,11 +167,10 @@ class VideoMenuTest {
         return Uri.fromFile(file)
     }
 
+    /** Saved per test by core/testing, so the EARS report links it to the criterion. */
     private fun shot(name: String) {
         SystemClock.sleep(300)
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 
     private fun log(line: String) {

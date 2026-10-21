@@ -12,6 +12,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.pinch
+import app.player.core.testing.Ears
 import app.player.feature.player.settings.GesturePrefs
 import app.player.feature.player.settings.TouchAction
 import org.junit.Assert.assertEquals
@@ -66,6 +67,7 @@ class GestureTest {
 
     // ---- rules ----
 
+    @Ears("US-17.1")
     @Test fun `US-17_1 full width swipe seeks 90 s, linear`() {
         assertEquals(90_000L, GestureController.seekDelta(800f, 800f, 90))
         assertEquals(45_000L, GestureController.seekDelta(400f, 800f, 90))
@@ -73,6 +75,7 @@ class GestureTest {
         assertEquals(600_000L, GestureController.seekDelta(800f, 800f, 600))
     }
 
+    @Ears("US-18")
     @Test fun `US-18 full height is 0 to 100 percent in 1 percent steps`() {
         assertEquals(1f, GestureController.level(0f, -400f, 400f))
         assertEquals(0f, GestureController.level(1f, 400f, 400f))
@@ -80,12 +83,14 @@ class GestureTest {
         assertEquals(1f, GestureController.level(0.9f, -400f, 400f))
     }
 
+    @Ears("US-19")
     @Test fun `US-19 zones are thirds`() {
         assertEquals(Zone.Left, GestureController.zone(100f, 900f))
         assertEquals(Zone.Middle, GestureController.zone(450f, 900f))
         assertEquals(Zone.Right, GestureController.zone(800f, 900f))
     }
 
+    @Ears("US-19.1", "US-19.3")
     @Test fun `US-19_1 and US-19_3 skip runs add a step per tap`() {
         c.prefs = GesturePrefs(skipStepSec = 10)
         assertTrue(c.doubleTap(Zone.Left, 1_000))
@@ -98,12 +103,14 @@ class GestureTest {
         assertFalse("other side", c.continuesSkip(Zone.Right, 1_600))
     }
 
+    @Ears("US-19.4")
     @Test fun `US-19_4 double tap middle toggles pause`() {
         c.prefs = GesturePrefs()
         c.doubleTap(Zone.Middle, 0)
         assertTrue(fx.paused)
     }
 
+    @Ears("US-20")
     @Test fun `US-20 fast play and back within the release`() {
         c.prefs = GesturePrefs(fastSpeed = 2.0)
         fx.spd = 1.25
@@ -113,6 +120,7 @@ class GestureTest {
         assertEquals(1.25, fx.speed, 0.0)
     }
 
+    @Ears("US-21.2")
     @Test fun `US-21_2 defaults`() {
         val g = GesturePrefs()
         assertTrue(g.seek && g.brightness && g.volume && g.doubleTapSkip && g.doubleTapPause && g.longPressFast && g.pinchZoom)
@@ -121,6 +129,7 @@ class GestureTest {
         assertEquals(TouchAction.ToggleControls, g.touchAction)
     }
 
+    @Ears("US-21.3")
     @Test fun `US-21_3 touch actions`() {
         c.prefs = GesturePrefs(touchAction = TouchAction.Pause)
         c.singleTap()
@@ -139,6 +148,7 @@ class GestureTest {
         assertTrue(fx.controlsShown && fx.paused)
     }
 
+    @Ears("US-21.4")
     @Test fun `US-21_4 a gesture that is off is not started`() {
         c.prefs = GesturePrefs(seek = false, brightness = false)
         assertNull(c.dragKind(horizontal = true, startX = 400f, width = 800f))
@@ -146,6 +156,7 @@ class GestureTest {
         assertEquals(DragKind.Volume, c.dragKind(horizontal = false, startX = 700f, width = 800f))
     }
 
+    @Ears("US-55")
     @Test fun `US-55 zoom clamps to 25 to 400 percent and snaps near fit and 100 percent`() {
         assertEquals(1.0, GestureController.snapZoom(1.04, quick = true, native = 2.0), 0.0)
         assertEquals(2.0, GestureController.snapZoom(1.95, quick = true, native = 2.0), 0.0)
@@ -159,6 +170,7 @@ class GestureTest {
         assertEquals(0.25, fx.zoomed, 0.0)
     }
 
+    @Ears("US-55.3")
     @Test fun `US-55_3 pan stops at the picture edges`() {
         c.prefs = GesturePrefs(pan = true, quickZoom = false)
         c.twoFingerStart(TwoFingerKind.Pinch)
@@ -169,6 +181,7 @@ class GestureTest {
         assertEquals(0.25, fx.pan.first, 1e-9)
     }
 
+    @Ears("US-76.1")
     @Test fun `US-76_1 two fingers change speed 0_1x per 10 percent of height`() {
         c.prefs = GesturePrefs(twoFingerSpeed = true)
         fx.spd = 1.0
@@ -181,6 +194,7 @@ class GestureTest {
         assertEquals(1.0, fx.speed, 0.0)
     }
 
+    @Ears("US-76.2")
     @Test fun `US-76_2 speed gesture is chosen over pan when span holds`() {
         c.prefs = GesturePrefs(twoFingerSpeed = true, pan = true)
         assertEquals(TwoFingerKind.Speed, c.twoFingerKind(spanChange = 2f, dy = 40f, slop = 8f))
@@ -189,6 +203,7 @@ class GestureTest {
 
     // ---- touch recognition ----
 
+    @Ears("US-17")
     @Test fun `US-17 horizontal swipe seeks, keyframe while moving, exact on release`() {
         show()
         rule.onNodeWithTag("v").performTouchInput { swipe(Offset(200f, 200f), Offset(600f, 200f), 300) }
@@ -199,6 +214,7 @@ class GestureTest {
         assertNull(c.readout)
     }
 
+    @Ears("US-17.4")
     @Test fun `US-17_4 swipe from the edge is left to the system`() {
         show()
         rule.onNodeWithTag("v").performTouchInput { swipe(Offset(5f, 200f), Offset(500f, 200f), 300) }
@@ -206,6 +222,7 @@ class GestureTest {
         assertTrue(fx.seeks.isEmpty())
     }
 
+    @Ears("US-18.1")
     @Test fun `US-18_1 left half vertical swipe sets brightness`() {
         show()
         fx.brightness = 0.2f
@@ -214,6 +231,7 @@ class GestureTest {
         assertEquals(0.7f, fx.brightness, 0.011f)
     }
 
+    @Ears("US-18.2")
     @Test fun `US-18_2 right half vertical swipe sets volume`() {
         show()
         fx.volume = 0.8f
@@ -222,6 +240,7 @@ class GestureTest {
         assertEquals(0.333f, fx.volume, 0.04f)
     }
 
+    @Ears("US-49.1")
     @Test fun `US-49_1 swipe up past maximum volume raises the boost to 200 percent`() {
         fx.boostOn = true
         fx.volume = 0.8f
@@ -235,6 +254,7 @@ class GestureTest {
         assertEquals(Readout.Level(LevelKind.Volume, 200), c.readout)
     }
 
+    @Ears("US-49.1")
     @Test fun `US-49_1 swipe down lowers the boost to 100 percent before the system volume`() {
         fx.boostOn = true
         fx.volume = 1f
@@ -248,6 +268,7 @@ class GestureTest {
         assertEquals(0.8f, fx.volume, 0.04f)
     }
 
+    @Ears("US-49.1")
     @Test fun `US-49_1 boost off stops the swipe at the system maximum`() {
         fx.volume = 0.8f
         c.dragStart(DragKind.Volume)
@@ -257,6 +278,7 @@ class GestureTest {
         assertEquals(Readout.Level(LevelKind.Volume, 100), c.readout)
     }
 
+    @Ears("US-21.4")
     @Test fun `US-21_4 switched-off swipe does nothing and shows nothing`() {
         show(GesturePrefs(volume = false))
         fx.volume = 0.8f
@@ -266,6 +288,7 @@ class GestureTest {
         assertNull(c.readout)
     }
 
+    @Ears("US-16.2")
     @Test fun `US-16_2 single tap toggles controls`() {
         show()
         rule.onNodeWithTag("v").performTouchInput { click(Offset(400f, 200f)) }
@@ -274,6 +297,7 @@ class GestureTest {
         assertTrue(fx.controlsShown)
     }
 
+    @Ears("US-19.2")
     @Test fun `US-19_2 double tap on the right skips forward`() {
         show()
         rule.onNodeWithTag("v").performTouchInput { doubleClick(Offset(700f, 200f)) }
@@ -283,6 +307,7 @@ class GestureTest {
         assertFalse("a double tap is not also a single tap", fx.controlsShown)
     }
 
+    @Ears("US-20.1")
     @Test fun `US-20_1 hold plays fast until release`() {
         show()
         rule.onNodeWithTag("v").performTouchInput {
@@ -297,6 +322,7 @@ class GestureTest {
         assertEquals(1.0, fx.speed, 0.0)
     }
 
+    @Ears("US-55.1")
     @Test fun `US-55_1 pinch zooms`() {
         show()
         rule.onNodeWithTag("v").performTouchInput {
@@ -306,6 +332,7 @@ class GestureTest {
         assertTrue("zoom ${fx.zoomed}", fx.zoomed > 4.0 - 1e-9 || fx.zoomed > 2.5)
     }
 
+    @Ears("US-55.1")
     @Test fun `US-55_1 pinch shows the zoom percentage while it runs`() {
         c.twoFingerStart(TwoFingerKind.Pinch)
         c.twoFinger(TwoFingerKind.Pinch, 2f, 0f, 0f, 800f, 400f)
@@ -316,6 +343,7 @@ class GestureTest {
         assertEquals(Readout.Zoom(25), c.readout)
     }
 
+    @Ears("US-55.4")
     @Test fun `US-55_4 double tap with double-tap zoom on toggles fit and crop`() {
         show(GesturePrefs(doubleTapZoom = true))
         rule.onNodeWithTag("v").performTouchInput { doubleClick(Offset(700f, 200f)) }

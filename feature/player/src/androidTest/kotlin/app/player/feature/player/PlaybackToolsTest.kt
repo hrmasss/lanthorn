@@ -9,6 +9,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
+import app.player.core.testing.Ears
 import app.player.feature.player.tools.PlaybackTools
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -34,6 +35,7 @@ class PlaybackToolsTest {
 
     @After fun close() = scenario.close()
 
+    @Ears("US-23.1")
     @Test fun speedAppliesWithPitchKept_US23_1() = runBlocking<Unit> {
         open("clip.mp4")
         val speed = tools.speed
@@ -53,6 +55,7 @@ class PlaybackToolsTest {
         assertTrue("rate $rate", rate in 1.35..1.65)
     }
 
+    @Ears("US-24.2")
     @Test fun loopFileRestartsWithoutGap_US24_2() {
         open("clip.mp4")
         tools.setLoopFile(true)
@@ -72,6 +75,7 @@ class PlaybackToolsTest {
         assertTrue(engine.state.value.ended.not())
     }
 
+    @Ears("US-25.1")
     @Test fun abRepeatLoopsBetweenPoints_US25_1() {
         open("clip.mp4")
         tools.setA(2_000)
@@ -94,6 +98,7 @@ class PlaybackToolsTest {
         assertTrue("cleared", engine.state.value.positionMs > 4_300)
     }
 
+    @Ears("US-27.2")
     @Test fun chaptersListAndJump_US27_2() = runBlocking<Unit> {
         open("chapters.mkv")
         val chapters = tools.chapters()
@@ -105,6 +110,7 @@ class PlaybackToolsTest {
         log("jumped to chapter 3 at ${engine.state.value.positionMs} ms")
     }
 
+    @Ears("US-33.1")
     @Test fun screenshotSavesVideoFrameAsPng_US33_1() = runBlocking<Unit> {
         open("clip.mp4")
         val t0 = SystemClock.elapsedRealtime()
@@ -129,6 +135,7 @@ class PlaybackToolsTest {
      * US-33.1 "without subtitles": with a subtitle on screen, the saved PNG has no subtitle text,
      * while mpv's own subtitle-including capture of the same paused frame does.
      */
+    @Ears("US-33.1")
     @Test fun screenshotLeavesSubtitlesOut_US33_1() = runBlocking<Unit> {
         open("clip.mp4")
         engine.command("sub-add", copy("sub.srt").path!!, "select")

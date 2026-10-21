@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.testing.Ears
 import app.player.feature.player.abMs
 import app.player.feature.player.tools.Chapter
 import app.player.feature.player.tools.SleepTimer
@@ -32,6 +33,7 @@ class ToolPanelsTest {
     private fun show(content: @androidx.compose.runtime.Composable () -> Unit) =
         rule.setContent { LanthornPlayerTheme(dynamicColor = false) { content() } }
 
+    @Ears("US-23.1")
     @Test fun `US-23_1 presets and slider set the speed in 0_05 steps`() {
         var speed = 1.0
         show { SpeedContent(1.0) { speed = it } }
@@ -44,6 +46,7 @@ class ToolPanelsTest {
         assertEquals(0.25, speed, 1e-9)
     }
 
+    @Ears("US-25.1")
     @Test fun `US-25_1 A then B, clear`() {
         val calls = mutableListOf<String>()
         show { AbContent(null, null, { calls += "a" }, { calls += "b" }, { calls += "clear" }) }
@@ -53,6 +56,7 @@ class ToolPanelsTest {
         assertEquals(listOf("a"), calls)
     }
 
+    @Ears("US-25.1")
     @Test fun `US-25_1 with A set, B and clear work`() {
         val calls = mutableListOf<String>()
         show { AbContent(2_000, null, { calls += "a" }, { calls += "b" }, { calls += "clear" }) }
@@ -62,6 +66,7 @@ class ToolPanelsTest {
         assertEquals(listOf("b", "clear"), calls)
     }
 
+    @Ears("US-26.1")
     @Test fun `US-26_1 presets start the timer, finish switch passes through`() {
         val started = mutableListOf<Pair<Int, Boolean>>()
         show { SleepContent(null, { m, f -> started += m to f }, {}) }
@@ -72,6 +77,7 @@ class ToolPanelsTest {
         assertEquals(listOf(30 to false, 45 to true), started)
     }
 
+    @Ears("US-26.3")
     @Test fun `US-26_3 running timer shows time left and cancels`() {
         var cancelled = false
         val now = android.os.SystemClock.elapsedRealtime()
@@ -81,6 +87,7 @@ class ToolPanelsTest {
         assertEquals(true, cancelled)
     }
 
+    @Ears("US-27")
     @Test fun `US-27 chapters list titles and times, tap picks`() {
         var picked: Chapter? = null
         val chapters = listOf(Chapter(0, "One", 0), Chapter(1, null, 65_000), Chapter(2, "Three", 120_000))
@@ -92,6 +99,7 @@ class ToolPanelsTest {
         assertEquals(2, picked?.index)
     }
 
+    @Ears("US-25.2", "US-27.1")
     @Test fun `US-25_2 and US-27_1 marks drawn on the seek bar`() {
         show {
             Controls(

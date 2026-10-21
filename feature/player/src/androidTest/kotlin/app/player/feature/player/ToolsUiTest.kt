@@ -13,6 +13,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
+import app.player.core.testing.Ears
+import app.player.core.testing.evidenceShot
 import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.tools.SleepTimer
@@ -57,6 +59,7 @@ class ToolsUiTest {
         compose.onNodeWithTag("menu-$item").performScrollTo().performClick()
     }
 
+    @Ears("US-23")
     @Test fun speedFromMenuShowsInTopBar_US23() = runBlocking<Unit> {
         open("clip.mp4")
         menu("speed")
@@ -70,6 +73,7 @@ class ToolsUiTest {
         shot("p113-speed-badge")
     }
 
+    @Ears("US-23.2")
     @Test fun defaultSpeedForNewVideos_US23_2() = runBlocking<Unit> {
         PlayerSettings.get(context).update { it.copy(defaultSpeed = 1.25) }
         SystemClock.sleep(500)
@@ -78,6 +82,7 @@ class ToolsUiTest {
         log("default speed 1.25: new video started at ${engine.get("speed", PropertyType.Real)}")
     }
 
+    @Ears("US-25.2")
     @Test fun abMarksOnSeekBar_US25_2() = runBlocking<Unit> {
         open("clip.mp4")
         menu("ab-repeat")
@@ -97,6 +102,7 @@ class ToolsUiTest {
         assertTrue(a != "no" && b != "no")
     }
 
+    @Ears("US-27")
     @Test fun chaptersInMenuAndOnBar_US27() = runBlocking<Unit> {
         open("chapters.mkv")
         menu("chapters")
@@ -110,6 +116,7 @@ class ToolsUiTest {
         shot("p113-chapter-ticks")
     }
 
+    @Ears("US-26.1")
     @Test fun sleepTimerPausesWhenItRunsOut_US26_1() {
         open("clip.mp4")
         // A 1-minute timer started 52 s ago runs out in 8 s: enough to open the menu and see it.
@@ -123,6 +130,7 @@ class ToolsUiTest {
         assertEquals(null, SleepTimer.running.value)
     }
 
+    @Ears("US-26.2")
     @Test fun sleepTimerFinishesCurrentVideo_US26_2() {
         open("clip.mp4")
         engine.seekTo(15_000)
@@ -135,6 +143,7 @@ class ToolsUiTest {
         assertTrue(engine.state.value.positionMs > 19_000)
     }
 
+    @Ears("US-33.2")
     @Test fun screenshotOffersShare_US33_2() {
         open("clip.mp4")
         menu("screenshot")
@@ -157,11 +166,10 @@ class ToolsUiTest {
         return Uri.fromFile(file)
     }
 
+    /** Saved per test by core/testing, so the EARS report links it to the criterion. */
     private fun shot(name: String) {
         SystemClock.sleep(400)
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
-        val dir = File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 
     private fun log(line: String) {
