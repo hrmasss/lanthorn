@@ -1,0 +1,32 @@
+# Libraries the release app must never ship (NF-8: no analytics, ads, telemetry, crash reporting or
+# update checks). Matched as a substring of each line of the resolved release dependency tree.
+com.google.firebase
+com.google.android.gms:play-services-ads
+com.google.android.gms:play-services-analytics
+com.google.android.gms:play-services-measurement
+com.google.android.play:app-update
+com.google.android.play:review
+com.crashlytics
+io.sentry
+io.bugsnag
+com.bugsnag
+com.facebook
+com.appsflyer
+com.adjust
+com.mixpanel
+com.amplitude
+com.segment
+com.flurry
+com.onesignal
+com.applovin
+com.unity3d.ads
+com.ironsource
+com.mopub
+com.yandex
+com.huawei.hms
+io.branch
+com.instabug
+com.datadoghq
+io.opentelemetry
+androidx.ui:ui-text-google-fonts
+androidx.compose.ui:ui-text-google-fonts
