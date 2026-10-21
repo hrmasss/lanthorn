@@ -71,6 +71,9 @@ class PlayerChromeTest {
     @Test fun controlsStayWhilePaused_US16_3() {
         showControls("back")
         compose.onNodeWithTag("play-pause").performClick()
+        // The pause reaches the screen from mpv's thread; until then the playing timer runs.
+        compose.waitUntil(5_000) { PlayerSessions.current.value?.state?.value?.paused == true }
+        compose.waitForIdle()
         // Past the 3 s auto-hide on the rule's clock, and in wall time.
         compose.mainClock.advanceTimeBy(5_000)
         SystemClock.sleep(2_000)
