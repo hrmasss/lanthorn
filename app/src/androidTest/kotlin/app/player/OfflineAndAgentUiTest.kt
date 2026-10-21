@@ -51,12 +51,17 @@ class OfflineAndAgentUiTest {
     @After fun tearDown() {
         offline(false)
         runBlocking { NetworkPrefs(context).setUserAgent("") }
+        // Paused first, so leaving does not hand the engine to background play (P1.15): the next
+        // test class must get a fresh engine, not this one still on a closed stream.
+        PlayerSessions.current.value?.pause()
+        SystemClock.sleep(300)
         instr.runOnMainSync {
             val reg = ActivityLifecycleMonitorRegistry.getInstance()
             listOf(Stage.RESUMED, Stage.PAUSED, Stage.STARTED, Stage.STOPPED)
                 .flatMap { reg.getActivitiesInStage(it) }.forEach(Activity::finish)
         }
-        SystemClock.sleep(1_000)
+        waitFor(5_000) { PlayerSessions.current.value == null }
+        SystemClock.sleep(500)
     }
 
     private fun shell(command: String): String =
@@ -145,11 +150,10 @@ class OfflineAndAgentUiTest {
         }
     }
 
-    // US-61.5, not run yet: it fails today. One request per stream carries mpv's own agent
-    // ("libmpv"), most likely the seek preview's second engine (PlayerEngine.preview), which no
-    // extension configures. Once that engine gets the agent, add @Test and @Ears("US-61.5") here.
-    @Suppress("unused")
-    fun us_61_5_the_custom_user_agent_goes_with_every_stream_request() {
+    // Both engines count: the player's and the seek preview's, which copies the player's network
+    // options (it used to send mpv's own "libmpv").
+    @Ears("US-61.5")
+    @Test fun us_61_5_the_custom_user_agent_goes_with_every_stream_request() {
         val agent = "LanthornEarsTest/1.0"
         runBlocking { NetworkPrefs(context).setUserAgent(agent) }
         RangeServer(asset("withsubs.mp4")).use { server ->

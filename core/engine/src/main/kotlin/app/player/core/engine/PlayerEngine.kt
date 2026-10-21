@@ -348,7 +348,14 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     fun command(vararg args: String) = post { mpvCommand(*args) }
 
     /** Sets an mpv property. Values are passed as mpv parses them: "yes", "1.5", "auto". */
-    fun set(name: String, value: String) = post { setProperty(name, value) }
+    fun set(name: String, value: String) {
+        if (name in NETWORK_OPTIONS) networkOptions[name] = value
+        post { setProperty(name, value) }
+    }
+
+    // What the player's features set for network requests (US-61.5): a seek preview engine for
+    // the same stream sends the same user agent and timeout.
+    private val networkOptions = ConcurrentHashMap<String, String>()
     fun set(name: String, value: Boolean) = set(name, if (value) "yes" else "no")
     fun set(name: String, value: Long) = set(name, value.toString())
     fun set(name: String, value: Double) = set(name, value.toString())
@@ -749,7 +756,11 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
          * A second, video-only engine for seek preview frames (US-30.1). Not shared: the caller
          * owns it, gives it a small [VideoSurfaceView] and releases it.
          */
-        fun preview(context: Context): PlayerEngine = PlayerEngine(context, preview = true)
+        fun preview(context: Context, of: PlayerEngine? = PlayerSessions.current.value): PlayerEngine =
+            PlayerEngine(context, preview = true).also { p -> of?.networkOptions?.forEach { (k, v) -> p.set(k, v) } }
+
+        /** mpv options that shape a stream's requests; a preview engine copies them from the player's. */
+        private val NETWORK_OPTIONS = setOf("user-agent", "network-timeout", "http-header-fields", "referrer", "cookies", "tls-verify")
         private val OBSERVED = listOf(
             "time-pos" to MpvFormat.MPV_FORMAT_DOUBLE,
             "duration" to MpvFormat.MPV_FORMAT_DOUBLE,

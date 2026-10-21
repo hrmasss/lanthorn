@@ -16,7 +16,9 @@ import app.player.core.testing.evidenceShot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.FixMethodOrder
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 import java.io.File
 import java.net.ServerSocket
 import kotlin.concurrent.thread
@@ -26,6 +28,9 @@ import kotlin.concurrent.thread
  * and after starting the app, letting the library load, and playing a local file, must not move.
  * The test runs in the app's process, so the counters are the app's.
  */
+// Local use first: the stream control opens a connection, which must not be live during the zero check.
+// CI runs this class last, alone, in a fresh process (instrumented.yml).
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @RunWith(AndroidJUnit4::class)
 class NoTrafficUiTest {
     private val instr = InstrumentationRegistry.getInstrumentation()
@@ -64,8 +69,8 @@ class NoTrafficUiTest {
     private fun settle(uid: Int) {
         var last = TrafficStats.getUidRxBytes(uid) + TrafficStats.getUidTxBytes(uid)
         var stillSince = SystemClock.elapsedRealtime()
-        val end = stillSince + 20_000
-        while (SystemClock.elapsedRealtime() < end && SystemClock.elapsedRealtime() - stillSince < 3_000) {
+        val end = stillSince + 90_000
+        while (SystemClock.elapsedRealtime() < end && SystemClock.elapsedRealtime() - stillSince < 10_000) {
             SystemClock.sleep(200)
             val now = TrafficStats.getUidRxBytes(uid) + TrafficStats.getUidTxBytes(uid)
             if (now != last) {
@@ -81,7 +86,7 @@ class NoTrafficUiTest {
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         val uid = Process.myUid()
         assertTrue("traffic counters unsupported here", TrafficStats.getUidTxBytes(uid) != TrafficStats.UNSUPPORTED.toLong())
-        // The baseline waits until the counters hold still for 3 s, so a late packet from an earlier
+        // The baseline waits until the counters hold still for 10 s, so a late packet from an earlier
         // test in this process is not counted as local use.
         settle(uid)
         val tx0 = TrafficStats.getUidTxBytes(uid)
