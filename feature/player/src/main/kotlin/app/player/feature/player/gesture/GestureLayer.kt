@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
+import app.player.core.playerapi.SubtitleGestures
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,9 +28,11 @@ private const val LONG_PRESS_MS = 500L
 /**
  * Turns touches on the video into [GestureController] calls. One finger: tap, double tap, seek,
  * brightness, volume, long press. Two fingers: pinch, pan, speed. Nothing is drawn here.
+ * A gesture whose first touch lands on shown subtitle text goes to [subtitles] instead (US-45):
+ * sideways steps a line, vertical moves the text, pinch scales it. Taps and long press stay ours.
  */
 @Composable
-fun Modifier.playerGestures(controller: GestureController): Modifier {
+fun Modifier.playerGestures(controller: GestureController, subtitles: () -> SubtitleGestures? = { null }): Modifier {
     val config = LocalViewConfiguration.current
     val scope = rememberCoroutineScope()
     return pointerInput(controller) {
@@ -54,6 +57,10 @@ fun Modifier.playerGestures(controller: GestureController): Modifier {
             var twoStartSpan = 0f
             var twoStartCentroid = Offset.Zero
             var twoSeen = false
+            val sub = if (atEdge) null else subtitles()?.takeIf { it.hit(start.x, start.y, w.toInt(), h.toInt()) }
+            var subDrag: Boolean? = null // true: vertical move, false: sideways step (already sent)
+            var subLastY = start.y
+            var subLastSpan = 0f
 
             while (true) {
                 val waitMs = if (!moved && !fast && !twoSeen && controller.prefs.longPressFast) {
@@ -71,6 +78,15 @@ fun Modifier.playerGestures(controller: GestureController): Modifier {
                 val pressed = event.changes.filter { it.pressed }
                 if (pressed.isEmpty()) break
 
+                if (sub != null && pressed.size >= 2 && !fast && subDrag == null) {
+                    // US-45.3: pinch on subtitle text scales it.
+                    val span = span(pressed)
+                    if (twoSeen && subLastSpan > 0f) sub.scale(span / subLastSpan)
+                    twoSeen = true
+                    subLastSpan = span
+                    event.changes.forEach(PointerInputChange::consume)
+                    continue
+                }
                 if (pressed.size >= 2 && !fast && drag == null) {
                     // Two fingers.
                     val span = span(pressed)
@@ -99,6 +115,20 @@ fun Modifier.playerGestures(controller: GestureController): Modifier {
                 val d = change.position - start
                 if (!moved && d.getDistance() > slop) moved = true
                 if (fast || ignored) continue
+                if (sub != null && moved) {
+                    if (subDrag == null) {
+                        subDrag = abs(d.y) >= abs(d.x)
+                        // US-45.1: one sideways swipe, one line; right is forward, as for seeking.
+                        if (subDrag == false) sub.step(if (d.x > 0) 1 else -1)
+                    }
+                    if (subDrag == true) {
+                        // US-45.2: follow the finger.
+                        sub.drag(change.position.y - subLastY, h.toInt(), end = false)
+                        subLastY = change.position.y
+                    }
+                    change.consume()
+                    continue
+                }
                 if (moved && drag == null) {
                     if (atEdge) {
                         ignored = true
@@ -118,6 +148,8 @@ fun Modifier.playerGestures(controller: GestureController): Modifier {
             }
 
             when {
+                subDrag == true -> sub?.drag(0f, h.toInt(), end = true)
+                sub != null && (subDrag == false || twoSeen) -> Unit
                 fast -> controller.fastEnd()
                 drag != null -> controller.dragEnd(drag!!)
                 two != null -> controller.twoFingerEnd()

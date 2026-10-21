@@ -200,6 +200,7 @@ fun PlayerScreen(
     val windowBrightness = brightness
     val currentPreview by rememberUpdatedState(preview)
     val volumeBoost by rememberUpdatedState(extensions.firstNotNullOfOrNull { it.volumeBoost })
+    val subtitleGestures by rememberUpdatedState(extensions.firstNotNullOfOrNull { it.subtitleGestures })
     val gestures = remember(engine) {
         GestureController(object : GestureEffects {
             override val positionMs get() = engine.state.value.positionMs
@@ -485,7 +486,7 @@ fun PlayerScreen(
                 .testTag("video")
                 .onSizeChanged { viewSize = it }
                 // While locked, playback's Overlay owns every touch (US-28): no gestures here.
-                .then(if (locked) Modifier else Modifier.playerGestures(gestures))
+                .then(if (locked) Modifier else Modifier.playerGestures(gestures) { subtitleGestures })
                 .semantics {
                     contentDescription = videoDesc
                     customActions = a11yActions

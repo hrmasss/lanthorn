@@ -114,8 +114,9 @@ class EngineStallUiTest {
         sampling.interrupt()
         sampling.join(3_000)
         log("NF-5 stall: Back left the player in $ms ms (shell key events included) while the engine thread was held; main thread blocked at most $worst ms")
-        // Android reports an ANR after 5 s without input handling; the surface hand-back waits at most 2 s.
-        assertTrue("main thread blocked $worst ms", worst < 2_500)
+        // Android reports an ANR after 5 s without input handling; a stuck engine gets 300 ms per
+        // surface hand-back, so leaving stays well under a second of blocked main thread.
+        assertTrue("main thread blocked $worst ms", worst < 1_500)
     }
 
     private fun onHardware(): PlayerEngine {

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.pinch
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.playerapi.SubtitleGestures
 import app.player.core.testing.Ears
 import app.player.feature.player.settings.GesturePrefs
 import app.player.feature.player.settings.TouchAction
@@ -37,9 +38,11 @@ class GestureTest {
     private val fx = Fake()
     private val c = GestureController(fx)
 
+    private val subs = FakeSubtitles()
+
     private fun show(prefs: GesturePrefs = GesturePrefs()) {
         c.prefs = prefs
-        rule.setContent { Box(Modifier.fillMaxSize().testTag("v").playerGestures(c)) }
+        rule.setContent { Box(Modifier.fillMaxSize().testTag("v").playerGestures(c) { subs }) }
     }
 
     // ---- rules ----
@@ -189,6 +192,51 @@ class GestureTest {
         assertEquals(105_000L to true, fx.seeks.last())
         assertTrue(fx.seeks.dropLast(1).all { !it.second })
         assertNull(c.readout)
+    }
+
+    // ---- subtitle text (US-45): the line sits at y 330 to 380 ----
+
+    @Ears("US-45.1")
+    @Test fun `US-45_1 sideways swipe on subtitle text steps one line, right is next`() {
+        show()
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(300f, 350f), Offset(600f, 350f), 300) }
+        rule.waitForIdle()
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(500f, 350f), Offset(200f, 350f), 300) }
+        rule.waitForIdle()
+        assertEquals(listOf(1, -1), subs.steps)
+        assertTrue("no seek", fx.seeks.isEmpty())
+    }
+
+    @Ears("US-45.2")
+    @Test fun `US-45_2 vertical drag on subtitle text moves it, not the volume`() {
+        show()
+        fx.volume = 0.5f
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(600f, 360f), Offset(600f, 160f), 300) }
+        rule.waitForIdle()
+        assertEquals(-200f, subs.dragged, 30f)
+        assertTrue("ended", subs.dragEnded)
+        assertEquals(0.5f, fx.volume)
+    }
+
+    @Ears("US-45.3")
+    @Test fun `US-45_3 pinch on subtitle text scales it, not the picture`() {
+        show()
+        val zoom = fx.zoomed
+        rule.onNodeWithTag("v").performTouchInput {
+            pinch(Offset(350f, 350f), Offset(150f, 350f), Offset(450f, 350f), Offset(650f, 350f), 300)
+        }
+        rule.waitForIdle()
+        assertEquals(5f, subs.scaled, 0.6f)
+        assertEquals(zoom, fx.zoomed, 1e-9)
+    }
+
+    @Ears("US-45.1")
+    @Test fun `US-45 a swipe away from subtitle text still seeks`() {
+        show()
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(200f, 150f), Offset(600f, 150f), 300) }
+        rule.waitForIdle()
+        assertTrue(subs.steps.isEmpty())
+        assertEquals(105_000L to true, fx.seeks.last())
     }
 
     @Ears("US-17.4")
@@ -363,6 +411,17 @@ class GestureTest {
 }
 
 /** Records what the gesture layer changed. Top level: the EARS report reads the enclosing class of each test. */
+private class FakeSubtitles : SubtitleGestures {
+    val steps = mutableListOf<Int>()
+    var dragged = 0f
+    var dragEnded = false
+    var scaled = 1f
+    override fun hit(x: Float, y: Float, width: Int, height: Int) = y in 330f..380f
+    override fun step(direction: Int) { steps += direction }
+    override fun drag(dy: Float, height: Int, end: Boolean) { dragged += dy; if (end) dragEnded = true }
+    override fun scale(factor: Float) { scaled *= factor }
+}
+
 private class Fake : GestureEffects {
     override var positionMs = 60_000L
     override var durationMs = 600_000L
