@@ -89,7 +89,9 @@ class SeekPreviewUiTest {
         val t0 = SystemClock.elapsedRealtime()
         val restartsBefore = engine.value!!.state.value.restarts
         touch(MotionEvent.ACTION_UP, x1, y, down)
-        while (engine.value!!.state.value.restarts == restartsBefore && SystemClock.elapsedRealtime() - t0 < 5000) SystemClock.sleep(10)
+        // A keyframe seek sent during the drag can land first; wait for the release's own frame.
+        fun atTarget() = engine.value!!.state.value.let { it.restarts != restartsBefore && abs(it.positionMs - target) < 1500 }
+        while (!atTarget() && SystemClock.elapsedRealtime() - t0 < 8000) SystemClock.sleep(10)
         val landed = SystemClock.elapsedRealtime() - t0
         SystemClock.sleep(300)
         val pos = engine.value!!.state.value.positionMs
