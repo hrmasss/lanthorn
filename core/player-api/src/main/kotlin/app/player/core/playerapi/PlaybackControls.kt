@@ -1,5 +1,6 @@
 package app.player.core.playerapi
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -97,8 +98,12 @@ object PlayerIntents {
     fun decoderOf(intent: Intent): DecoderMode? =
         intent.getStringExtra(EXTRA_DECODER)?.let { runCatching { DecoderMode.valueOf(it) }.getOrNull() }
 
-    /** Shows the US-37 info screen for [uri] (feature/info), from anywhere, without a feature dependency. */
-    fun showInfo(uri: Uri): Intent = Intent(ACTION_SHOW_INFO).setData(uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    /**
+     * Shows the US-37 info screen for [uri] (feature/info), from anywhere, without a feature
+     * dependency. Scoped to this app: Android 14+ delivers no implicit intent to an unexported activity.
+     */
+    fun showInfo(context: Context, uri: Uri): Intent = Intent(ACTION_SHOW_INFO).setData(uri)
+        .setPackage(context.packageName).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
     const val ACTION_SHOW_INFO = "app.player.action.SHOW_INFO"
 }

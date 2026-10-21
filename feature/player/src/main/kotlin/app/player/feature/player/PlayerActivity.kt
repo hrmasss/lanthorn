@@ -74,10 +74,10 @@ class PlayerActivity : ComponentActivity() {
         // Back from background play with the same file: keep going, do not reload (US-59.3).
         val now = engine.state.value
         if (now.loaded && intent.data != null && now.uri == intent.data.toString()) return
+        engine.launchDecoder = PlayerIntents.decoderOf(intent)
         if (playerExtensions.firstNotNullOfOrNull { it.playback }?.open(engine, intent, ::finish) == true) return
         val uri = intent.data ?: return
-        val oneTime = PlayerIntents.decoderOf(intent)
-        lifecycleScope.launch { engine.open(uri, decoder = oneTime ?: decoders.choose(uri.toString())) }
+        lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }
     }
 
     override fun onStart() {

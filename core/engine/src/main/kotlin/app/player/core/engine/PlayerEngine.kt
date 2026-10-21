@@ -127,13 +127,19 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     }
 
     /**
+     * A decoder for every file of the current launch (US-09.3 "play with"), set by the activity
+     * from the launching intent, so any opener (the queue too) honours it. Never remembered.
+     */
+    @Volatile var launchDecoder: DecoderMode? = null
+
+    /**
      * Opens a file and starts playback at [startMs]. Accepts content://, file:// and plain paths.
      * [decoder] is the mode for this file, normally from [DecoderSettings.choose]; null keeps the
-     * current one.
+     * current one. [launchDecoder], when set, wins over both.
      */
     fun open(uri: Uri, startMs: Long = 0, decoder: DecoderMode? = null) {
         openedAt = SystemClock.elapsedRealtime()
-        val mode = decoder ?: _state.value.decoderMode
+        val mode = launchDecoder ?: decoder ?: _state.value.decoderMode
         // open() starts playback (pause=no below). Say so now: when mpv was already unpaused it
         // sends no change event, and the default `paused = true` would stick for the whole file.
         _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode, paused = false)

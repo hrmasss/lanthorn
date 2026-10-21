@@ -235,7 +235,7 @@ class DecoderUiTest {
 
     /** US-10.4: file properties from anywhere, by action, with nothing playing. */
     @Test fun f_infoScreenForAFile() {
-        context.startActivity(PlayerIntents.showInfo(Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(PlayerIntents.showInfo(context, Uri.fromFile(file("withsubs.mp4"))).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         assertTrue("info screen never showed the codec", device.wait(Until.hasObject(By.text("H.264")), 20_000))
         assertTrue(device.hasObject(By.text("MP4")))
         assertTrue(device.hasObject(By.text("AAC")))
