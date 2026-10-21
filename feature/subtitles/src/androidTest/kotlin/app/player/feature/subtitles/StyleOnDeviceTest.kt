@@ -28,6 +28,8 @@ class StyleOnDeviceTest {
     private val holder = Any()
 
     @Before fun open() = runBlocking {
+        // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
+        SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         styles = OnDevice.main { SubtitlesExtension.styles(OnDevice.context) }
@@ -50,6 +52,7 @@ class StyleOnDeviceTest {
     }
 
     @After fun close() {
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         if (!::scenario.isInitialized) return
         OnDevice.main { styles.reset() }
         runCatching { scenario.onActivity { it.surface.engine = null } }

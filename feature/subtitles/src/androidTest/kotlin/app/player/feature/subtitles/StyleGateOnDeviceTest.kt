@@ -31,6 +31,8 @@ class StyleGateOnDeviceTest {
     private var scenario: ActivityScenario<*>? = null
 
     @Before fun start() {
+        // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false) }
         val e = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         engine = e
         styles = OnDevice.main { SubtitlesExtension.styles(OnDevice.context) }
@@ -38,6 +40,7 @@ class StyleGateOnDeviceTest {
     }
 
     @After fun close() {
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         runCatching { OnDevice.main { styles.reset() } }
         runCatching { scenario?.close() }
         OnDevice.release(holder)

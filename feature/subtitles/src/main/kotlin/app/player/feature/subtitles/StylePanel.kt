@@ -91,7 +91,7 @@ internal fun LazyListScope.styleEditor(
     item(key = "font") {
         Label(stringResource(R.string.subs_font))
         // Lazy, with end padding, so the last chip scrolls fully into view.
-        LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(families, key = { it }) { family ->
                 FilterChip(
                     selected = style.font == family,
@@ -101,7 +101,7 @@ internal fun LazyListScope.styleEditor(
                 )
             }
         }
-        OutlinedButton(onClick = onPickFontFolder, modifier = Modifier.padding(horizontal = 24.dp)) {
+        OutlinedButton(onClick = onPickFontFolder, modifier = Modifier.padding(horizontal = 16.dp)) {
             Text(stringResource(R.string.subs_font_folder))
         }
     }
@@ -135,7 +135,7 @@ internal fun LazyListScope.styleEditor(
     }
     item(key = "align") {
         Label(stringResource(R.string.subs_alignment))
-        SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 24.dp)) {
+        SingleChoiceSegmentedButtonRow(Modifier.padding(horizontal = 16.dp)) {
             SubAlign.entries.forEachIndexed { i, a ->
                 SegmentedButton(
                     selected = style.align == a,
@@ -172,7 +172,7 @@ private val PALETTE = listOf(
 private fun Swatches(selected: Long, tag: String, onPick: (Long) -> Unit) {
     LazyRow(
         Modifier.padding(vertical = 4.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(PALETTE) { c ->
@@ -191,12 +191,12 @@ private fun Swatches(selected: Long, tag: String, onPick: (Long) -> Unit) {
 
 @Composable
 private fun Label(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp))
+    Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp))
 }
 
 @Composable
 private fun SliderRow(value: Float, range: ClosedFloatingPointRange<Float>, tag: String, onChange: (Float) -> Unit) {
-    Slider(value, onChange, valueRange = range, modifier = Modifier.padding(horizontal = 24.dp).testTag(tag))
+    Slider(value, onChange, valueRange = range, modifier = Modifier.padding(horizontal = 16.dp).testTag(tag))
 }
 
 @Composable

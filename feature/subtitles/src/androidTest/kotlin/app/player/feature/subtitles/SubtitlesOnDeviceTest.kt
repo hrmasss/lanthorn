@@ -29,6 +29,8 @@ class SubtitlesOnDeviceTest {
     private val holder = Any()
 
     @Before fun open() = runBlocking {
+        // These tests pick tracks themselves: keep P1.25's automatic pick out of the way.
+        SubtitlePrefsStore(OnDevice.context).setShowAutomatically(false)
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         engine = OnDevice.acquire(holder) { SubtitlesExtension.onEngineCreated(OnDevice.context, it) }
         scenario.onActivity { it.surface.engine = engine }
@@ -47,6 +49,7 @@ class SubtitlesOnDeviceTest {
     }
 
     @After fun close() {
+        runBlocking { SubtitlePrefsStore(OnDevice.context).setShowAutomatically(true) }
         if (!::scenario.isInitialized) return
         scenario.onActivity { it.surface.engine = null }
         OnDevice.release(holder)
