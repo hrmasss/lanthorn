@@ -62,6 +62,7 @@ import app.player.core.engine.PropertyType
 import app.player.core.engine.VideoSurfaceView
 import app.player.core.playerapi.MenuGroup
 import app.player.core.playerapi.PanelHost
+import app.player.core.playerapi.PlayerChrome
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
@@ -90,6 +91,7 @@ import app.player.core.engine.ActiveDecoder
 import app.player.feature.player.gesture.GestureController
 import app.player.feature.player.gesture.GestureEffects
 import app.player.feature.player.gesture.GestureReadout
+import app.player.feature.player.gesture.LevelKind
 import app.player.feature.player.gesture.Readout
 import app.player.feature.player.gesture.playerGestures
 import android.media.AudioManager
@@ -137,6 +139,7 @@ internal object OwnPanel {
 internal data class Note(val text: String, val durationMs: Long, val action: Pair<String, () -> Unit>? = null, val at: Long = SystemClock.elapsedRealtime())
 
 private const val SEEK_STEP_MS = 10_000L
+private const val KEY_READOUT_MS = 1_000L
 private const val NOTE_MS = 2_000L
 private const val FIT_NOTE_MS = 1_000L
 
@@ -284,6 +287,25 @@ fun PlayerScreen(
     // Playback's controls (feature/playback through core/player-api): queue, lock, rotate.
     val playback = remember(extensions) { extensions.firstNotNullOfOrNull { it.playback } }
     val off = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    // Volume keys as brightness and next/previous keys as seeks (US-77.1, US-31.4): playback reads
+    // the keys and calls back here. Each key press shows the level bar for a moment.
+    var brightnessKeys by remember { mutableIntStateOf(0) }
+    // Playback holds it weakly, so the screen keeps it for as long as it shows.
+    val chrome = remember(gestures) {
+        object : PlayerChrome {
+            override fun stepBrightness(up: Boolean) {
+                gestures.stepBrightness(up)
+                brightnessKeys++
+            }
+            override val seekStepMs get() = SEEK_STEP_MS
+        }
+    }
+    LaunchedEffect(playback, chrome) { playback?.attachChrome(chrome) }
+    LaunchedEffect(brightnessKeys) {
+        if (brightnessKeys == 0) return@LaunchedEffect
+        delay(KEY_READOUT_MS)
+        if ((gestures.readout as? Readout.Level)?.kind == LevelKind.Brightness) gestures.clearReadout()
+    }
     // Loop, shuffle and background play belong to playback; the shortcuts call its hooks.
     val loopOn by (playback?.loop ?: off).collectAsStateWithLifecycle(context = Main)
     val shuffleOn by (playback?.shuffle ?: off).collectAsStateWithLifecycle(context = Main)
@@ -302,7 +324,7 @@ fun PlayerScreen(
     val audioEntry = entries.firstOrNull { it.id == PlayerMenuEntry.AUDIO_TRACKS }
     val deinterlaceMode by remember(engine) { engine.observe("deinterlace", PropertyType.Text) }.collectAsStateWithLifecycle(context = Main)
     val hasChapters = chapters.isNotEmpty()
-    val items = remember(entries, hasChapters) {
+    val items = remember(entries, hasChapters, playback) {
         val own = listOfNotNull(
             MenuItem("fit-aspect", MenuGroup.Video, 100, { stringResource(R.string.video_fit_aspect) }) { openPanel = OwnPanel.FIT },
             MenuItem("picture", MenuGroup.Video, 110, { stringResource(R.string.video_picture) }) { openPanel = OwnPanel.PICTURE },
@@ -314,6 +336,12 @@ fun PlayerScreen(
             MenuItem("screenshot", MenuGroup.Tools, 140, { stringResource(R.string.tool_screenshot) }) {
                 openPanel = null
                 screenshotRequests++
+            },
+            // US-59.1: playback's background play, switched from the menu.
+            playback?.let { p ->
+                MenuItem("background-play", MenuGroup.Tools, 150, { stringResource(R.string.sc_background) }, { p.backgroundPlay.collectAsStateWithLifecycle(context = Main).value }) {
+                    p.toggleBackgroundPlay()
+                }
             },
             MenuItem("player-settings", MenuGroup.Tools, 900, { stringResource(R.string.menu_player_settings) }) { openPanel = OwnPanel.SETTINGS },
         )

@@ -21,9 +21,18 @@ import app.player.core.playerapi.PlayerMenuEntry
 import app.player.feature.player.R
 import app.player.feature.player.settings.RadioRow
 import app.player.feature.player.settings.SectionHeader
+import app.player.feature.player.settings.SwitchRow
 
 /** A row in the menu: one of a feature's entries, or one of the player's own. */
-internal class MenuItem(val id: String, val group: MenuGroup, val order: Int, val label: @Composable () -> String, val onClick: () -> Unit)
+internal class MenuItem(
+    val id: String,
+    val group: MenuGroup,
+    val order: Int,
+    val label: @Composable () -> String,
+    /** Non-null makes the row an on/off switch; a tap runs [onClick] and the menu stays open. */
+    val checked: (@Composable () -> Boolean)? = null,
+    val onClick: () -> Unit,
+)
 
 /** Features' menu entries minus the two that became top-bar buttons, plus the player's own items. */
 internal fun menuItems(entries: List<PlayerMenuEntry>, own: List<MenuItem>, open: (String) -> Unit): List<MenuItem> =
@@ -41,6 +50,11 @@ internal fun MenuContent(items: List<MenuItem>, header: @Composable () -> Unit =
         items.groupBy { it.group }.forEach { (group, rows) ->
             SectionHeader(stringResource(group.title))
             rows.forEach { item ->
+                val checked = item.checked
+                if (checked != null) {
+                    SwitchRow(item.label(), checked(), { item.onClick() }, Modifier.testTag("menu-${item.id}"))
+                    return@forEach
+                }
                 Text(
                     item.label(),
                     style = MaterialTheme.typography.bodyLarge,

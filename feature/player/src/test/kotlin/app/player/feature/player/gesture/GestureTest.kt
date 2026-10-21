@@ -208,6 +208,23 @@ class GestureTest {
         assertEquals(0.7f, fx.brightness, 0.011f)
     }
 
+    @Ears("US-77.1")
+    @Test fun `US-77_1 a volume key steps brightness 5 percent and shows the level bar`() {
+        fx.brightness = 0.42f
+        c.stepBrightness(up = true)
+        assertEquals(0.47f, fx.brightness, 0.001f)
+        assertEquals(Readout.Level(LevelKind.Brightness, 47), c.readout)
+        c.stepBrightness(up = false)
+        c.stepBrightness(up = false)
+        assertEquals(0.37f, fx.brightness, 0.001f)
+        fx.brightness = 0.98f
+        c.stepBrightness(up = true)
+        assertEquals(1f, fx.brightness, 0.001f)
+        fx.brightness = 0.02f
+        c.stepBrightness(up = false)
+        assertEquals(0f, fx.brightness, 0.001f)
+    }
+
     @Ears("US-18.2")
     @Test fun `US-18_2 right half vertical swipe sets volume`() {
         show()
