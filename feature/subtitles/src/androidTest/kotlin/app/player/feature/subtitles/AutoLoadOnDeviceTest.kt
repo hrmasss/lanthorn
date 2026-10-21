@@ -74,11 +74,13 @@ class AutoLoadOnDeviceTest {
      * stopped and gets its surface back. Bring the video activity back and wait for video.
      */
     private suspend fun showVideoAgain() {
-        if (engine.get("vid", PropertyType.Text) != "no") return
+        val gone = scenario.state == androidx.lifecycle.Lifecycle.State.DESTROYED
+        if (!gone && engine.get("vid", PropertyType.Text) != "no") return
         runCatching { scenario.close() }
         scenario = ActivityScenario.launch(VideoTestActivity::class.java)
         scenario.onActivity { it.surface.engine = engine }
-        engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
+        // With no file open there is no video track to wait for.
+        if (engine.state.value.loaded) engine.await("vid", PropertyType.Text, 10_000) { it != null && it != "no" }
     }
 
     /** What mpv has, for a test that waits on subtitle text after another screen was on top. */
@@ -117,13 +119,12 @@ class AutoLoadOnDeviceTest {
     /** US-39.1: one clip per format, each with one subtitle file beside it; each loads and turns on. */
     @Ears("US-39.1")
     @Test fun eachFormatLoadsOnDevice_US39_1() = runBlocking {
-        data class Case(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
         val cases = listOf(
-            Case("ass", mapOf("fmt.ass" to "Clip.ass"), "ASS format line", "ass"),
-            Case("vtt", mapOf("fmt.vtt" to "Clip.vtt"), "VTT format line", "webvtt"),
-            Case("microdvd", mapOf("fmt-microdvd.sub" to "Clip.sub"), "MicroDVD format line", "microdvd"),
-            Case("vobsub", mapOf("fmt-vobsub.idx" to "Clip.idx", "fmt-vobsub.sub" to "Clip.sub"), null, "dvd_subtitle"),
-            Case("pgs", mapOf("fmt-pgs.sup" to "Clip.sup"), null, "hdmv_pgs_subtitle"),
+            FormatCase("ass", mapOf("fmt.ass" to "Clip.ass"), "ASS format line", "ass"),
+            FormatCase("vtt", mapOf("fmt.vtt" to "Clip.vtt"), "VTT format line", "webvtt"),
+            FormatCase("microdvd", mapOf("fmt-microdvd.sub" to "Clip.sub"), "MicroDVD format line", "microdvd"),
+            FormatCase("vobsub", mapOf("fmt-vobsub.idx" to "Clip.idx", "fmt-vobsub.sub" to "Clip.sub"), null, "dvd_subtitle"),
+            FormatCase("pgs", mapOf("fmt-pgs.sup" to "Clip.sup"), null, "hdmv_pgs_subtitle"),
         )
         val assets = OnDevice.instrumentation.context.assets
         for (c in cases) {
@@ -138,10 +139,19 @@ class AutoLoadOnDeviceTest {
             assertEquals("${c.label}: external tracks ${external.map { it.title to it.codec }}", 1, external.size)
             assertEquals(c.label, c.codec, external[0].codec)
             assertEquals(c.label, external[0].id, selected()?.id)
-            engine.pause()
-            engine.seekTo(1000)
-            delay(1500)
-            if (c.text != null) engine.await("sub-text", PropertyType.Text, 5_000) { it == c.text }
+            if (c.text != null) {
+                engine.pause()
+                engine.seekTo(1000)
+                delay(1500)
+                engine.await("sub-text", PropertyType.Text, 5_000) { it == c.text }
+            } else {
+                // Bitmap subtitles: play from the start into the line, as a viewer does, then hold the frame.
+                engine.seekTo(0)
+                engine.play()
+                engine.await("time-pos", PropertyType.Real, 10_000) { (it ?: 0.0) >= 1.2 }
+                engine.pause()
+                delay(1500)
+            }
             shotTo("us39-format-${c.label}")
             evidence("US-39.1 ${c.label}: ${external[0].title} loaded as ${external[0].codec} and on${c.text?.let { ", shows '$it'" } ?: " (bitmap, screenshot)"}")
             engine.play()
@@ -331,7 +341,54 @@ class AutoLoadOnDeviceTest {
         }
     }
 
+    /** US-39.1 "or the set subtitle folder": a folder picked in Subtitle settings is searched for every video. */
+    @Ears("US-39.1")
+    @Test fun zzzSubtitleFolderSetting_US39_1() = runBlocking {
+        fun step(s: String) = android.util.Log.i("evidence", "subtitle folder step: $s")
+        val resolver = OnDevice.context.contentResolver
+        val srt = resolver.insert(MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "Away.en.srt")
+            put(MediaStore.MediaColumns.MIME_TYPE, "application/x-subrip")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/LanthornSubs")
+        })!!
+        resolver.openOutputStream(srt)!!.use { it.write("1\n00:00:00,000 --> 00:00:10,000\nFrom the subtitle folder\n".toByteArray()) }
+        // The video sits in a folder with no subtitles of its own.
+        val away = File(OnDevice.context.cacheDir, "away").apply { deleteRecursively(); mkdirs() }
+        OnDevice.asset("wide.mkv").copyTo(File(away, "Away.mkv"), overwrite = true)
+        try {
+            GrantTestActivity.start = android.provider.DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:Download/LanthornSubs")
+            GrantTestActivity.result = java.util.concurrent.CompletableFuture()
+            val picker = ActivityScenario.launch(GrantTestActivity::class.java)
+            val device = UiDevice.getInstance(OnDevice.instrumentation)
+            device.wait(Until.findObject(By.textContains("LanthornSubs")), 10_000)
+            device.wait(Until.findObject(By.text("USE THIS FOLDER").clazz("android.widget.Button")), 5_000)?.click()
+                ?: device.wait(Until.findObject(By.text("Use this folder")), 5_000)?.click()
+            (device.wait(Until.findObject(By.text("ALLOW")), 5_000) ?: device.wait(Until.findObject(By.text("Allow")), 5_000))?.click()
+            val tree = runCatching { GrantTestActivity.result.get(10, TimeUnit.SECONDS) }.getOrNull()
+            picker.close()
+            step("tree: $tree")
+            assertTrue("no folder picked", tree != null)
+            prefs.setFolder(tree)
+            showVideoAgain()
+            openClip(Uri.fromFile(File(away, "Away.mkv")), tracks = 3)
+            assertEquals("Away.en.srt", selected()?.title)
+            engine.pause()
+            engine.seekTo(1000)
+            engine.await("sub-text", PropertyType.Text, 10_000) { it == "From the subtitle folder" }
+            delay(1500)
+            shotTo("us39-subtitle-folder")
+            evidence("US-39.1 subtitle folder: Download/LanthornSubs picked in the system picker and set; Away.mkv in another folder loaded Away.en.srt from it and turned it on")
+        } finally {
+            prefs.setFolder(null)
+            resolver.delete(srt, null, null)
+            resolver.persistedUriPermissions.forEach { resolver.releasePersistableUriPermission(it.uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        }
+    }
+
     private fun shotTo(name: String) {
         evidenceShot(name)
     }
 }
+
+/** One subtitle format for [AutoLoadOnDeviceTest.eachFormatLoadsOnDevice_US39_1]. Top level and last, so the EARS report's source scan keeps the tests above in their class. */
+private data class FormatCase(val label: String, val files: Map<String, String>, val text: String?, val codec: String)
