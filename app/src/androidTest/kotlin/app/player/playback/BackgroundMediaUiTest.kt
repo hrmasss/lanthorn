@@ -154,7 +154,8 @@ class BackgroundMediaUiTest {
         waitFor(3_000) { row = runBlocking { ResumePoints(context).get(uri.toString()) }; row != null }
         log("stop on leaving: paused at $at, row $row")
         assertNotNull("no resume point after leaving", row)
-        assertTrue("row ${row!!.positionMs} not at the pause $at", row!!.positionMs in at - 1_000..at)
+        // Rows are whole seconds, and the save can see the position one update before the pause.
+        assertTrue("row ${row!!.positionMs} not at the pause $at", row!!.positionMs in at - 1_500..at)
         SystemClock.sleep(1_500)
         assertEquals("moved while left paused", at, state()!!.positionMs)
     }
