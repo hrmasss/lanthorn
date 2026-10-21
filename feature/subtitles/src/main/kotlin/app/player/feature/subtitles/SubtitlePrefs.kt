@@ -17,30 +17,48 @@ data class SubtitlePrefs(
     val preferredLanguage: String = "",
     /** A folder the viewer picked where subtitles are also looked for, as a tree uri. */
     val subtitleFolder: String = "",
+    /** Subtitle gestures (US-45), each on by default. */
+    val gestures: SubtitleGestureSwitches = SubtitleGestureSwitches(),
 )
 
 internal class SubtitlePrefsStore(context: Context) {
     val store = context.applicationContext.subtitleStore
 
     val prefs: Flow<SubtitlePrefs> = store.data.map {
-        SubtitlePrefs(it[AUTO] ?: true, it[LANGUAGE].orEmpty(), it[FOLDER].orEmpty())
+        SubtitlePrefs(
+            it[AUTO] ?: true,
+            it[LANGUAGE].orEmpty(),
+            it[FOLDER].orEmpty(),
+            SubtitleGestureSwitches(it[GESTURE_SWIPE] ?: true, it[GESTURE_DRAG] ?: true, it[GESTURE_PINCH] ?: true),
+        )
     }
 
     suspend fun current(): SubtitlePrefs = prefs.first()
     suspend fun setShowAutomatically(on: Boolean) = store.edit { it[AUTO] = on }
     suspend fun setLanguage(code: String) = store.edit { it[LANGUAGE] = code }
+    suspend fun setGestures(g: SubtitleGestureSwitches) = store.edit {
+        it[GESTURE_SWIPE] = g.swipe
+        it[GESTURE_DRAG] = g.drag
+        it[GESTURE_PINCH] = g.pinch
+    }
     suspend fun setFolder(tree: Uri?) = store.edit { if (tree == null) it.remove(FOLDER) else it[FOLDER] = tree.toString() }
 
     suspend fun reset() = store.edit {
         it.remove(AUTO)
         it.remove(LANGUAGE)
         it.remove(FOLDER)
+        it.remove(GESTURE_SWIPE)
+        it.remove(GESTURE_DRAG)
+        it.remove(GESTURE_PINCH)
     }
 
     companion object {
         val AUTO = booleanPreferencesKey("show_automatically")
         val LANGUAGE = stringPreferencesKey("preferred_language")
         val FOLDER = stringPreferencesKey("subtitle_folder")
+        val GESTURE_SWIPE = booleanPreferencesKey("gesture_swipe")
+        val GESTURE_DRAG = booleanPreferencesKey("gesture_drag")
+        val GESTURE_PINCH = booleanPreferencesKey("gesture_pinch")
     }
 }
 
