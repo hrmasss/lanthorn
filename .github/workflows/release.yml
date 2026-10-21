@@ -1,0 +1,103 @@
+name: Release
+
+# A "v*" tag builds the signed release APKs (one per ABI plus a universal one), checks their
+# signature, and opens a draft GitHub release with the APKs, SHA256SUMS and the notes from
+# docs/release-notes/<tag>.md. A person publishes the draft.
+#
+# Any other run is a dry run: a branch push that changes this file, or a manual run. It builds and
+# signs the same way and checks everything, but uploads no APK and creates no release.
+
+on:
+  push:
+    tags: ['v*']
+    branches-ignore: [main]
+    paths: ['.github/workflows/release.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Version and notes
+        run: |
+          version=$(sed -n 's/^ *versionName = "\(.*\)"$/\1/p' app/build.gradle.kts)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          if [ -n "$TAG" ] && [ "$TAG" != "v$version" ]; then
+            echo "::error::tag $TAG does not match versionName $version"; exit 1
+          fi
+          notes="docs/release-notes/v$version.md"
+          [ -f "$notes" ] || { echo "::error::no $notes"; exit 1; }
+          echo "NOTES=$notes" >> "$GITHUB_ENV"
+
+      - name: Release key
+        env:
+          KEYSTORE_B64: ${{ secrets.PLAYER_KEYSTORE_B64 }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] || { echo "::error::PLAYER_KEYSTORE_B64 is not set"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "PLAYER_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build
+        env:
+          PLAYER_KEYSTORE_PASSWORD: ${{ secrets.PLAYER_KEYSTORE_PASSWORD }}
+          PLAYER_KEY_ALIAS: ${{ secrets.PLAYER_KEY_ALIAS }}
+          PLAYER_KEY_PASSWORD: ${{ secrets.PLAYER_KEY_PASSWORD }}
+        # One more try after 30 s for a network hiccup; a real failure fails both.
+        run: |
+          args="assembleRelease -Pplayer.universal=true --console=plain"
+          ./gradlew :app:$args || { sleep 30; ./gradlew :app:$args; }
+
+      - name: Name, verify, checksum
+        run: |
+          out=dist; mkdir -p "$out"
+          for abi in arm64-v8a armeabi-v7a x86_64 universal; do
+            src="app/build/outputs/apk/release/app-$abi-release.apk"
+            [ -f "$src" ] || { echo "::error::missing $src"; exit 1; }
+            cp "$src" "$out/lanthorn-$VERSION-$abi.apk"
+          done
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          # Every APK carries the release key: one certificate, the same for all four.
+          for f in "$out"/*.apk; do
+            "$apksigner" verify --print-certs "$f" | grep 'certificate SHA-256 digest' | sort -u > "$f.cert"
+            [ "$(wc -l < "$f.cert")" = 1 ] || { echo "::error::$f: not signed by exactly one key"; exit 1; }
+          done
+          [ "$(cat "$out"/*.cert | sort -u | wc -l)" = 1 ] || { echo "::error::APKs signed by different keys"; exit 1; }
+          if grep -qi 'Android Debug' <("$apksigner" verify --print-certs "$out/lanthorn-$VERSION-universal.apk"); then
+            echo "::error::signed with the debug key"; exit 1
+          fi
+          cert=$(sed 's/.*: //' "$out/lanthorn-$VERSION-universal.apk.cert")
+          rm "$out"/*.cert
+          (cd "$out" && sha256sum *.apk > SHA256SUMS)
+          {
+            echo "### Lanthorn $VERSION ${TAG:-(dry run)}"
+            echo "Signing certificate SHA-256: \`$cert\`"
+            echo '```'; cat "$out/SHA256SUMS"; echo '```'
+            echo '```'; ls -l "$out"; echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Draft release
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/*.apk dist/SHA256SUMS \
+            --draft --verify-tag --title "Lanthorn $VERSION" --notes-file "$NOTES"

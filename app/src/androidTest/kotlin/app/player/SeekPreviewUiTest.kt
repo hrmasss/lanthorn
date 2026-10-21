@@ -57,10 +57,11 @@ class SeekPreviewUiTest {
         val duration = engine.value!!.state.value.durationMs
 
         // Show the controls and find the seek bar once it has stopped sliding in: a drag from
-        // where it was mid-slide starts at the wrong time.
+        // where it was mid-slide starts at the wrong time. The controls can hide again between
+        // show() and the second look on a slow emulator (3 s auto-hide), so try again then.
         val controls = PlayerControls(device)
         val position = By.desc("Playback position")
-        val r = if (controls.show(position)) controls.still(position) else null
+        val r = (1..3).firstNotNullOfOrNull { if (controls.show(position)) controls.still(position) else null }
         assertNotNull("seek bar not shown", r)
         r!!
         val y = r.centerY().toFloat()
