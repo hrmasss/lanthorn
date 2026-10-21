@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -139,45 +140,66 @@ fun Controls(ui: ControlsUi, actions: ControlsActions, modifier: Modifier = Modi
 @Composable
 private fun TopBar(ui: ControlsUi, actions: ControlsActions, modifier: Modifier) {
     val narrow = LocalConfiguration.current.screenWidthDp < 600
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        OverlayIconButton(LanthornIcons.Back, stringResource(R.string.player_back), actions.back, Modifier.testTag("back"))
-        // Narrow (portrait): battery and clock go under the title so the name keeps the room.
-        Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
-            OverlayTitle(ui.title, Modifier.testTag("title"))
-            if (narrow) ui.status?.let { StatusText(it) }
+    val back = @Composable { OverlayIconButton(LanthornIcons.Back, stringResource(R.string.player_back), actions.back, Modifier.testTag("back")) }
+    val more = @Composable { OverlayIconButton(LanthornIcons.More, stringResource(R.string.player_more), actions.openMenu, Modifier.testTag("more")) }
+    if (narrow) {
+        // Portrait: the title gets a row of its own, so the name is readable (also at large font
+        // sizes); status, badges and the track buttons go on the row below.
+        Column(modifier) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                back()
+                OverlayTitle(ui.title, Modifier.weight(1f).padding(horizontal = 4.dp).testTag("title"))
+                more()
+            }
+            Row(Modifier.padding(start = 52.dp), verticalAlignment = Alignment.CenterVertically) {
+                ui.status?.let { StatusText(it) }
+                Spacer(Modifier.weight(1f))
+                TopBadges(ui, actions)
+            }
         }
-        if (!narrow) ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
-        ui.speed?.let {
-            val desc = stringResource(R.string.player_speed_badge, it)
-            Text(
-                it,
-                color = PlayerColors.Content,
-                style = MaterialTheme.typography.labelLarge.tabular(),
-                modifier = Modifier
-                    .padding(horizontal = 8.dp)
-                    .semantics { contentDescription = desc }
-                    .testTag("speed-badge"),
-            )
+    } else {
+        Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+            back()
+            OverlayTitle(ui.title, Modifier.weight(1f).padding(horizontal = 4.dp).testTag("title"))
+            ui.status?.let { StatusText(it, Modifier.padding(horizontal = 8.dp)) }
+            TopBadges(ui, actions)
+            more()
         }
-        val decoderDesc = stringResource(R.string.player_decoder_badge, ui.decoder)
-        // No badge until a decoder runs ("-"), so the chip never shows an empty circle.
-        if (ui.decoder != "-") OverlayChip(
-            ui.decoder,
-            selected = false,
-            onClick = actions.openDecoder,
+    }
+}
+
+/** Speed and decoder badges, audio and subtitle buttons. */
+@Composable
+private fun TopBadges(ui: ControlsUi, actions: ControlsActions) {
+    ui.speed?.let {
+        val desc = stringResource(R.string.player_speed_badge, it)
+        Text(
+            it,
+            color = PlayerColors.Content,
+            style = MaterialTheme.typography.labelLarge.tabular(),
             modifier = Modifier
-                .minimumInteractiveComponentSize()
-                .widthIn(min = 64.dp)
-                .semantics { contentDescription = decoderDesc }
-                .testTag("decoder-badge"),
+                .padding(horizontal = 8.dp)
+                .semantics { contentDescription = desc }
+                .testTag("speed-badge"),
         )
-        ui.audioButton?.let {
-            OverlayIconButton(LanthornIcons.Audio, it, actions.openAudio, Modifier.testTag("audio-button"))
-        }
-        ui.subtitleButton?.let {
-            OverlayIconButton(LanthornIcons.Subtitles, it, actions.openSubtitles, Modifier.testTag("subtitle-button"))
-        }
-        OverlayIconButton(LanthornIcons.More, stringResource(R.string.player_more), actions.openMenu, Modifier.testTag("more"))
+    }
+    val decoderDesc = stringResource(R.string.player_decoder_badge, ui.decoder)
+    // No badge until a decoder runs ("-"), so the chip never shows an empty circle.
+    if (ui.decoder != "-") OverlayChip(
+        ui.decoder,
+        selected = false,
+        onClick = actions.openDecoder,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .widthIn(min = 64.dp)
+            .semantics { contentDescription = decoderDesc }
+            .testTag("decoder-badge"),
+    )
+    ui.audioButton?.let {
+        OverlayIconButton(LanthornIcons.Audio, it, actions.openAudio, Modifier.testTag("audio-button"))
+    }
+    ui.subtitleButton?.let {
+        OverlayIconButton(LanthornIcons.Subtitles, it, actions.openSubtitles, Modifier.testTag("subtitle-button"))
     }
 }
 
@@ -290,7 +312,7 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
 
 /**
  * Chapter ticks and the A-B range over the seek bar. Draws only; touches go through to the bar.
- * Ticks are black 60% so they read on both the track and the progress.
+ * Ticks are a light line inside a dark outline, so they read over bright and dark video alike.
  */
 @Composable
 private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifier) {
@@ -299,9 +321,11 @@ private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifi
         val cy = size.height / 2
         val tick = 2.dp.toPx()
         val tall = 12.dp.toPx()
+        val outline = 1.dp.toPx()
         marks.forEach { f ->
             val x = size.width * f.coerceIn(0f, 1f)
-            drawRect(PlayerColors.Scrim, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
+            drawRect(Color.Black, Offset(x - tick / 2 - outline, cy - tall / 2 - outline), Size(tick + outline * 2, tall + outline * 2))
+            drawRect(Color.White, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
         }
         if (a != null) {
             val xa = size.width * a.coerceIn(0f, 1f)

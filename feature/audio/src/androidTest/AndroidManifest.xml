@@ -9,6 +9,7 @@
     <application>
         <activity android:name="app.player.feature.audio.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" />
+        <activity android:name="app.player.feature.audio.PanelTestActivity" android:exported="false" android:screenOrientation="landscape" android:theme="@android:style/Theme.Material.Light.NoActionBar.Fullscreen" />
         <activity android:name="app.player.feature.audio.SettingsTestActivity" android:exported="false" android:theme="@android:style/Theme.Material.Light.NoActionBar" />
     </application>
 </manifest>

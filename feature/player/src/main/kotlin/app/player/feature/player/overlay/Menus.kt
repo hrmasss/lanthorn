@@ -35,8 +35,9 @@ internal fun menuItems(entries: List<PlayerMenuEntry>, own: List<MenuItem>, open
 
 /** The overflow menu: every item grouped Video, Audio, Subtitle, Tools. */
 @Composable
-internal fun MenuContent(items: List<MenuItem>) {
+internal fun MenuContent(items: List<MenuItem>, header: @Composable () -> Unit = {}) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
+        header()
         items.groupBy { it.group }.forEach { (group, rows) ->
             SectionHeader(stringResource(group.title))
             rows.forEach { item ->

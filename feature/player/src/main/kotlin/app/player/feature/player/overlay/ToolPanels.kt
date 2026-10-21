@@ -67,13 +67,18 @@ internal fun SpeedContent(speed: Double, set: (Double) -> Unit) {
             steps = 74,
             modifier = Modifier.padding(horizontal = 24.dp).testTag("speed-slider"),
         )
-        FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Even rows of equal chips, so no preset is left alone on a row.
+        FlowRow(
+            Modifier.padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 3,
+        ) {
             SPEED_PRESETS.forEach { p ->
                 FilterChip(
                     selected = kotlin.math.abs(speed - p) < 0.001,
                     onClick = { set(p) },
-                    label = { Text(speedText(p) + "x") },
-                    modifier = Modifier.testTag("speed-${speedText(p)}"),
+                    label = { Text(speedText(p) + "x", maxLines = 1) },
+                    modifier = Modifier.weight(1f).testTag("speed-${speedText(p)}"),
                 )
             }
         }
@@ -121,10 +126,15 @@ internal fun SleepContent(running: SleepTimer.Running?, start: (Int, Boolean) ->
                 OutlinedButton(onClick = cancel, modifier = Modifier.testTag("sleep-cancel")) { Text(stringResource(R.string.tool_sleep_cancel)) }
             }
         }
-        FlowRow(Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            Modifier.padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 2,
+        ) {
             SleepTimer.PRESETS.forEach { m ->
-                FilledTonalButton(onClick = { start(m, finish) }, modifier = Modifier.testTag("sleep-$m")) {
-                    Text(stringResource(R.string.tool_sleep_minutes, m))
+                FilledTonalButton(onClick = { start(m, finish) }, modifier = Modifier.weight(1f).testTag("sleep-$m")) {
+                    Text(stringResource(R.string.tool_sleep_minutes, m), maxLines = 1)
                 }
             }
         }

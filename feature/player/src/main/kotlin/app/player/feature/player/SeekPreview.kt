@@ -3,6 +3,7 @@ package app.player.feature.player
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.player.core.engine.PlayerEngine
@@ -52,7 +54,9 @@ fun rememberSeekPreview(uri: String?): SeekPreviewState? {
 @Composable
 fun SeekPreview(state: SeekPreviewState, targetMs: Long, modifier: Modifier = Modifier, visible: Boolean = true) {
     LaunchedEffect(targetMs, visible) { if (visible) state.show(targetMs) }
-    val shown = if (visible) modifier.testTag("seek-preview") else modifier.alpha(0f).clearAndSetSemantics {}
+    // Hidden, it is laid out off-screen, not only transparent: the surface stays attached, but a
+    // transparent view would still take the taps meant for the player (landscape centre).
+    val shown = if (visible) modifier.testTag("seek-preview") else modifier.offset { IntOffset(-100_000, 0) }.alpha(0f).clearAndSetSemantics {}
     Column(shown, horizontalAlignment = Alignment.CenterHorizontally) {
         AndroidView(
             factory = { VideoTextureView(it).apply { engine = state.engine } },

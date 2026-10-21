@@ -11,6 +11,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.ActiveDecoder
 import app.player.core.engine.DecoderMode
+import app.player.core.testing.Ears
 import app.player.feature.player.tools.Deinterlace
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -34,6 +35,7 @@ class DeinterlacePanelTest {
         }
     }
 
+    @Ears("US-35.4")
     @Test fun `US-35_4 on HW the choices are disabled, one line names the decoder, the button switches to it`() {
         show(ActiveDecoder.HW)
         listOf("Auto", "On", "Off").forEach { rule.onNodeWithTag("deint-$it").assertIsNotEnabled() }
@@ -43,6 +45,7 @@ class DeinterlacePanelTest {
         assertNull(picked)
     }
 
+    @Ears("US-38.2")
     @Test fun `US-38_2 on HW+ the choices work and no switch is offered`() {
         show(ActiveDecoder.HW_PLUS)
         rule.onNodeWithTag("deint-On").assertIsEnabled().performClick()
@@ -50,6 +53,7 @@ class DeinterlacePanelTest {
         assertEquals(0, rule.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "deint-switch")).fetchSemanticsNodes().size)
     }
 
+    @Ears("US-38.2")
     @Test fun `US-38_2 SW runs it too`() {
         show(ActiveDecoder.SW)
         rule.onNodeWithTag("deint-Off").assertIsEnabled().performClick()

@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.player.feature.player.overlay.Shortcut
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,6 +41,8 @@ data class PlayerPrefs(
     /** US-23.2: speed new videos start at, 0.25 to 4.0. */
     val defaultSpeed: Double = 1.0,
     val gestures: GesturePrefs = GesturePrefs(),
+    /** US-32.2: shown shortcuts in order, comma separated ids. */
+    val shortcuts: String = Shortcut.DEFAULT,
 ) {
     companion object {
         const val MIN_DELAY_MS = 1_000L
@@ -81,6 +84,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
                 p[BACK_TWICE] = next.backTwice
                 p[DEFAULT_SPEED] = next.defaultSpeed.coerceIn(0.25, 4.0)
                 writeGestures(p, next.gestures)
+                p[SHORTCUTS] = next.shortcuts
             }
         }
     }
@@ -97,6 +101,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
             backTwice = this[BACK_TWICE] ?: d.backTwice,
             defaultSpeed = this[DEFAULT_SPEED] ?: d.defaultSpeed,
             gestures = readGestures(this),
+            shortcuts = this[SHORTCUTS] ?: d.shortcuts,
         )
     }
 
@@ -161,6 +166,7 @@ class PlayerSettings private constructor(private val store: DataStore<Preference
         private val STATUS_KEEP = booleanPreferencesKey("status_keep_visible")
         private val BACK_TWICE = booleanPreferencesKey("back_twice")
         private val DEFAULT_SPEED = doublePreferencesKey("default_speed")
+        private val SHORTCUTS = stringPreferencesKey("shortcuts")
 
         @Volatile private var instance: PlayerSettings? = null
 

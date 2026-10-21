@@ -69,7 +69,9 @@ class StreamDialogTest {
         assertEquals(listOf("http://10.0.2.2:8000/clip.mp4"), runBlocking { prefs.history.first() })
 
         // The URL is also still in the field; look in the history list only.
-        rule.onNode(hasText("http://10.0.2.2:8000/clip.mp4") and hasAnyAncestor(hasTestTag("stream-history"))).assertExists()
+        // Unmerged: the row merges its text into the clickable row once it settles.
+        val inHistory = hasText("http://10.0.2.2:8000/clip.mp4") and hasAnyAncestor(hasTestTag("stream-history"))
+        rule.waitUntil(3_000) { rule.onAllNodes(inHistory, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithContentDescription("Remove http://10.0.2.2:8000/clip.mp4 from recent").performClick()
         rule.waitUntil(3_000) { runBlocking { prefs.history.first() }.isEmpty() }
     }

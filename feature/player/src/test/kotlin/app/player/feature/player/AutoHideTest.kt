@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.createComposeRule
+import app.player.core.testing.Ears
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -30,6 +31,7 @@ class AutoHideTest {
         rule.mainClock.advanceTimeByFrame()
     }
 
+    @Ears("US-16.3")
     @Test fun `US-16_3 hides 3 s after showing, not before`() {
         start()
         rule.mainClock.advanceTimeBy(2_950)
@@ -38,6 +40,7 @@ class AutoHideTest {
         assertFalse(shown)
     }
 
+    @Ears("US-16.3")
     @Test fun `US-16_3 a touch restarts the 3 s`() {
         start()
         rule.mainClock.advanceTimeBy(2_000)
@@ -53,6 +56,7 @@ class AutoHideTest {
         assertFalse(shown)
     }
 
+    @Ears("US-16.3")
     @Test fun `US-16_3 never hides while paused (no delay)`() {
         delayMs = null
         start()
@@ -60,6 +64,7 @@ class AutoHideTest {
         assertTrue(shown)
     }
 
+    @Ears("US-79.2")
     @Test fun `US-79_2 a new delay applies from the next showing`() {
         delayMs = 6_500
         start()

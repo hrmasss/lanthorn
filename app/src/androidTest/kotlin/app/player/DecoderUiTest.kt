@@ -201,6 +201,9 @@ class DecoderUiTest {
         play("clip420.mp4")
         openFromMenu("Info")
         assertTrue(device.wait(Until.hasObject(By.text("Dropped frames")), 3000))
+        // A slow emulator can reach the end of the 30 s clip by now: capture from near the start.
+        PlayerSessions.current.value!!.seekTo(2000)
+        waitFor(5000) { engineState()?.let { it.positionMs in 2000..4000 && !it.paused } == true }
         val s1 = engineState(); shot("info-live-1")
         SystemClock.sleep(1000)
         val s2 = engineState(); shot("info-live-2")
