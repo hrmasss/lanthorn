@@ -77,7 +77,7 @@ internal fun speedLabel(speed: Double?): String? {
     return "${text}x"
 }
 
-/** File name without extension, for the title (recon/ux-map.md, Player). */
+/** File name without extension, for the title (US-16.1). */
 internal fun titleOf(uri: String?): String {
     if (uri == null) return ""
     val decoded = android.net.Uri.decode(uri)

@@ -45,8 +45,8 @@ class StreamInfoTest {
         assertEquals(1, info.subtitles.size)
         val sub = info.subtitles.single().toMap()
         assertEquals("External", sub["Source"])
-        assertEquals("subrip", sub["Format"])
+        assertEquals("SRT", sub["Format"])
         assertEquals("fr", sub["Language"])
-        assertTrue(info.audio.single().toMap()["Channels"] == "2")
+        assertEquals("Stereo", info.audio.single().toMap()["Channels"])
     }
 }

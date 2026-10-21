@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- The bench reads its media from /sdcard/Movies/PlayerBench, the same files MX is measured on.
+    <!-- The bench reads its media from /sdcard/Movies/PlayerBench, the same files the comparison player is measured on.
          Debug and bench builds only; release gets media access from the library item (P1.17). -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission

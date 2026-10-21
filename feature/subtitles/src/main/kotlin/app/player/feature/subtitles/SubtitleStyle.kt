@@ -32,7 +32,7 @@ data class SubtitleStyle(
     val scale: Float = 1f,
 ) {
     /** The mpv properties for this style, in the order they are set. */
-    fun toMpv(): List<Pair<String, String>> = buildList {
+    fun toMpv(minBottomMarginPercent: Float = 0f): List<Pair<String, String>> = buildList {
         add("sub-font" to font)
         // Not plain `size`: inside buildList that is the list's own size.
         add("sub-font-size" to this@SubtitleStyle.size.toString())
@@ -52,11 +52,14 @@ data class SubtitleStyle(
             }
         }
         add("sub-border-color" to hex(outlineColor))
-        add("sub-shadow-offset" to if (shadow) "2" else "0")
-        add("sub-shadow-color" to "#80000000")
+        // A firm shadow: 2 px at half opacity vanished over bright video (gate on P1.28).
+        add("sub-shadow-offset" to if (shadow) "3" else "0")
+        add("sub-shadow-color" to "#E0000000")
         add("sub-align-x" to align.mpv)
         add("sub-justify" to align.mpv)
-        add("sub-margin-y" to (bottomMarginPercent.coerceIn(0f, MAX_MARGIN_PERCENT) / 100f * SCRIPT_HEIGHT).roundToInt().toString())
+        // Never under the gesture handle or navigation bar: at least [minBottomMarginPercent].
+        val margin = maxOf(bottomMarginPercent.coerceIn(0f, MAX_MARGIN_PERCENT), minBottomMarginPercent)
+        add("sub-margin-y" to (margin / 100f * SCRIPT_HEIGHT).roundToInt().toString())
         // "Fit to video": keep text subtitles inside the picture, not in the black bars (US-43.2).
         add("sub-use-margins" to yesNo(!fitToVideo))
     }

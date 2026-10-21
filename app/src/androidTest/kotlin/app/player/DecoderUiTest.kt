@@ -162,6 +162,7 @@ class DecoderUiTest {
     @Test fun c_liveValues() {
         play("clip420.mp4")
         openFromMenu("Info")
+        assertTrue(device.wait(Until.hasObject(By.text("Dropped frames")), 3000))
         val s1 = engineState(); shot("info-live-1")
         SystemClock.sleep(1000)
         val s2 = engineState(); shot("info-live-2")
@@ -172,12 +173,17 @@ class DecoderUiTest {
     }
 
     /** US-37.1: the embedded subtitle section. */
-    @Test fun d_embeddedSubtitleInInfo() {
+    @Test fun d_embeddedAndExternalSubtitlesInInfo() {
         play("withsubs.mp4")
-        openFromMenu("Info")
-        device.findObject(By.scrollable(true))?.scroll(androidx.test.uiautomator.Direction.DOWN, 1f)
+        // subs-audio loads sidecar files itself; here the external file is added directly.
+        val srt = File(context.filesDir, "withsubs.fr.srt").apply { writeText("1\n00:00:00,000 --> 00:00:30,000\nSous-titre externe\n\n") }
+        PlayerSessions.current.value!!.command("sub-add", srt.path, "auto", "external", "fr")
         SystemClock.sleep(800)
-        assertTrue(device.wait(Until.hasObject(By.text("mov_text")), 3000))
+        openFromMenu("Info")
+        repeat(2) { device.findObject(By.scrollable(true))?.scroll(androidx.test.uiautomator.Direction.DOWN, 1f) }
+        SystemClock.sleep(800)
+        assertTrue(device.wait(Until.hasObject(By.text("MP4 text")), 3000))
+        assertTrue(device.wait(Until.hasObject(By.text("External")), 3000))
         shot("info-subtitles")
         close()
     }

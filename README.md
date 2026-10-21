@@ -1,8 +1,9 @@
-# Player
+# Lanthorn
 
 A local-first Android video player built on libmpv. No ads, no tracking. GPL-3.0.
 
-"Player" is a codename.
+> **Work in progress.** Not released yet; expect breaking changes. The first release will be
+> published under GitHub Releases.
 
 ## Build
 
