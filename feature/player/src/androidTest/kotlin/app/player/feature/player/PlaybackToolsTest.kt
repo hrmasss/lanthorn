@@ -141,16 +141,34 @@ class PlaybackToolsTest {
         engine.command("screenshot-to-file", withSubs.path, "subtitles")
         engine.get("pause", PropertyType.Flag)
         val reference = android.graphics.BitmapFactory.decodeFile(withSubs.path)
-        val textSaved = whiteRows(saved)
-        val textReference = whiteRows(reference)
-        log("US-33.1 subtitle text pixels: saved frame $textSaved, mpv capture with subtitles $textReference (same frame, ${saved.width}x${saved.height})")
+        // Same paused frame: the two captures match on the picture above the subtitle band and
+        // differ only where mpv's capture draws the subtitle text.
+        val bandTop = saved.height * 3 / 4
+        val diffBand = differing(saved, reference, bandTop, saved.height)
+        val diffAbove = differing(saved, reference, 0, bandTop)
+        log("US-33.1 pixels differing from mpv's capture with subtitles: subtitle band $diffBand, picture above $diffAbove (${saved.width}x${saved.height})")
         File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }.let { dir ->
             context.contentResolver.openInputStream(uri)!!.use { input -> File(dir, "p113-screenshot-saved.png").outputStream().use { input.copyTo(it) } }
             withSubs.copyTo(File(dir, "p113-screenshot-with-subs-reference.png"), overwrite = true)
         }
         context.contentResolver.delete(uri, null, null)
-        assertTrue("reference shows the subtitle", textReference > 50)
-        assertTrue("saved frame has no subtitle text", textSaved * 10 < textReference)
+        assertTrue("same frame above the band", diffAbove <= 20)
+        assertTrue("the saved frame lacks the subtitle the reference shows", diffBand >= 40)
+    }
+
+    /** Pixels in rows [from, to) whose channels differ by more than 60. */
+    private fun differing(a: android.graphics.Bitmap, b: android.graphics.Bitmap, from: Int, to: Int): Int {
+        var n = 0
+        for (y in from until to) for (x in 0 until minOf(a.width, b.width)) {
+            val p = a.getPixel(x, y); val q = b.getPixel(x, y)
+            val d = maxOf(
+                kotlin.math.abs(android.graphics.Color.red(p) - android.graphics.Color.red(q)),
+                kotlin.math.abs(android.graphics.Color.green(p) - android.graphics.Color.green(q)),
+                kotlin.math.abs(android.graphics.Color.blue(p) - android.graphics.Color.blue(q)),
+            )
+            if (d > 60) n++
+        }
+        return n
     }
 
     /** Near-white pixels in the bottom third, where the subtitle sits. */

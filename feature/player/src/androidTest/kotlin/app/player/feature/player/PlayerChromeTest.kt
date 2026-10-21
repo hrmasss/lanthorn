@@ -47,7 +47,11 @@ class PlayerChromeTest {
 
     @Test fun controlsHideAfterThreeSecondsWhilePlaying_US16_3() {
         compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        // The hosted emulator can drop the first tap while the player is still starting: tap again.
+        runCatching { compose.waitUntil(3_000) { shown("back") } }.onFailure {
+            compose.onNodeWithTag("video").performClick()
+            compose.waitUntil(3_000) { shown("back") }
+        }
         val shownAt = SystemClock.elapsedRealtime()
         // No screenshot while the overlay is about to animate out: taking one during a layout
         // pass made Espresso's idle check fail on the hosted emulator. 01-controls comes from
