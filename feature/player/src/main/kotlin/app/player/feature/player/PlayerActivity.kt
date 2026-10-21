@@ -99,7 +99,8 @@ class PlayerActivity : ComponentActivity() {
         super.onStop()
         if (isChangingConfigurations) return
         // Background play (US-59.1) hands the engine to the playback service; otherwise pause.
-        if (PlayerSessions.keepPlayingInBackground && !engine.state.value.paused) PlaybackService.start(this) else engine.pause()
+        // Closing the player (Back) stops: the engine goes with the activity, so there is nothing to hand over.
+        if (PlayerSessions.keepPlayingInBackground && !isFinishing && !engine.state.value.paused) PlaybackService.start(this) else engine.pause()
     }
 
     override fun onDestroy() {

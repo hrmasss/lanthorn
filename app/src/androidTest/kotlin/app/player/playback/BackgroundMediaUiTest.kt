@@ -99,7 +99,7 @@ class BackgroundMediaUiTest {
         play(listOf("clip420.mp4"))
         // On leaving is PiP by default; the menu's switch turns background play on (US-59.1).
         instr.runOnMainSync { Playback.toggleBackgroundPlay() }
-        assertTrue("menu switch not on", Playback.backgroundPlay.value)
+        assertTrue("menu switch not on", waitFor(3_000) { Playback.backgroundPlay.value })
         device.pressHome()
         assertTrue("player not stopped after Home", waitFor(5_000) { stage(Stage.STOPPED) })
         val before = state()!!.positionMs
@@ -271,6 +271,19 @@ class BackgroundMediaUiTest {
         assertTrue("volume key in PiP did not change the volume", waitFor(3_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) != before })
         assertEquals("brightness stepped in PiP", 2, steps.size)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, before, 0)
+    }
+
+    @Ears("US-59.1")
+    @Test fun h_backWithBackgroundOnClosesThePlayer() {
+        play(listOf("clip420.mp4"))
+        instr.runOnMainSync { Playback.toggleBackgroundPlay() }
+        assertTrue("menu switch not on", waitFor(3_000) { Playback.backgroundPlay.value })
+        // Back closes the player: playback stops, no service is left holding it, nothing crashes.
+        device.pressBack()
+        device.pressBack()
+        assertTrue("player still there after Back", waitFor(5_000) { player() == null })
+        assertTrue("engine still live after Back", waitFor(3_000) { PlayerSessions.current.value == null })
+        assertTrue("media notification left after Back", waitFor(3_000) { mediaNotification() == null })
     }
 
     // --- helpers
