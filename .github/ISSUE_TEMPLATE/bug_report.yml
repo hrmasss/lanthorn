@@ -1,0 +1,64 @@
+name: Bug report
+description: Something does not work or plays wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please do not include personal data: no names, account details,
+        private file names or paths you would rather not share.
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: Pixel 8, Galaxy S23, ...
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      placeholder: "16"
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in Android settings, Apps, Lanthorn, or the release you installed.
+    validations:
+      required: true
+  - type: input
+    id: media
+    attributes:
+      label: File type and codecs
+      description: Container, video and audio codec, resolution, subtitle format if relevant. The info panel in the player shows these.
+      placeholder: MKV, HEVC 10-bit 2160p, AAC 5.1, ASS subtitles
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Optional. Output of `adb logcat` around the problem. Check it for anything personal before pasting.
+      render: text

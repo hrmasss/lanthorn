@@ -1,5 +1,5 @@
-Player
-Copyright (C) 2026 the Player contributors.
+Lanthorn
+Copyright (C) 2026 the Lanthorn contributors.
 Licensed under the GNU General Public License v3.0 or later. See LICENSE.
 
 This app bundles or links the following third-party software:
@@ -17,5 +17,10 @@ This app bundles or links the following third-party software:
 
 - AndroidX and Jetpack Compose, Apache-2.0.
 - Kotlin and kotlinx.coroutines, Apache-2.0.
+- smbj (https://github.com/hierynomus/smbj), Apache-2.0, for SMB shares. With its dependencies:
+  - asn-one (https://github.com/hierynomus/asn-one), Apache-2.0.
+  - Bouncy Castle bcprov (https://www.bouncycastle.org), Bouncy Castle Licence (MIT-style).
+  - SLF4J API (https://www.slf4j.org), MIT.
+  - MBassador (https://github.com/bennidi/mbassador), MIT.
 - Material Symbols (a few glyphs, as Compose vectors in core/designsystem), Apache-2.0.
   https://github.com/google/material-design-icons
