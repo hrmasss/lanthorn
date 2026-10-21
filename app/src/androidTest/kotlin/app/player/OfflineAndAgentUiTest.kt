@@ -51,12 +51,17 @@ class OfflineAndAgentUiTest {
     @After fun tearDown() {
         offline(false)
         runBlocking { NetworkPrefs(context).setUserAgent("") }
+        // Paused first, so leaving does not hand the engine to background play (P1.15): the next
+        // test class must get a fresh engine, not this one still on a closed stream.
+        PlayerSessions.current.value?.pause()
+        SystemClock.sleep(300)
         instr.runOnMainSync {
             val reg = ActivityLifecycleMonitorRegistry.getInstance()
             listOf(Stage.RESUMED, Stage.PAUSED, Stage.STARTED, Stage.STOPPED)
                 .flatMap { reg.getActivitiesInStage(it) }.forEach(Activity::finish)
         }
-        SystemClock.sleep(1_000)
+        waitFor(5_000) { PlayerSessions.current.value == null }
+        SystemClock.sleep(500)
     }
 
     private fun shell(command: String): String =
