@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,7 +40,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     constructor(context: Context) : this(context, preview = false)
 
     private val appContext = context.applicationContext
-    private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine") }
+    @Volatile private var engineThread: Thread? = null
+    private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine").also { engineThread = it } }
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
@@ -315,22 +317,44 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     fun set(name: String, value: Long) = set(name, value.toString())
     fun set(name: String, value: Double) = set(name, value.toString())
 
-    /** Reads an mpv property once, on the engine thread. Null if unavailable or released. */
-    suspend fun <T : Any> get(name: String, type: PropertyType<T>): T? = suspendCancellableCoroutine { cont ->
+    /**
+     * Reads an mpv property once, on the engine thread. Null if unavailable, released, or when the
+     * engine thread does not answer within 5 s (then its stack is logged: what it is stuck on).
+     */
+    suspend fun <T : Any> get(name: String, type: PropertyType<T>): T? {
+        var answered = false
+        val value = withTimeoutOrNull(GET_TIMEOUT_MS) { readOnEngine(name, type).also { answered = true } }
+        if (!answered && !released) {
+            Log.w(TAG, "get($name) timed out; engine thread at:\n" + engineThread?.stackTrace?.take(12)?.joinToString("\n") { "  at $it" })
+        }
+        return value
+    }
+
+    private suspend fun <T : Any> readOnEngine(name: String, type: PropertyType<T>): T? = suspendCancellableCoroutine { cont ->
         if (released) {
             cont.resume(null)
             return@suspendCancellableCoroutine
         }
-        post {
-            val lib = mpv
-            @Suppress("UNCHECKED_CAST")
-            val value: T? = when (type) {
-                PropertyType.Text -> lib?.getPropertyString(name)
-                PropertyType.Flag -> lib?.getPropertyBoolean(name)
-                PropertyType.Int64 -> lib?.getPropertyInt(name)?.toLong()
-                PropertyType.Real -> lib?.getPropertyDouble(name)
-            } as T?
-            cont.resume(value)
+        val queued = execute {
+            var value: T? = null
+            try {
+                val lib = mpv
+                @Suppress("UNCHECKED_CAST")
+                value = when (type) {
+                    PropertyType.Text -> lib?.getPropertyString(name)
+                    PropertyType.Flag -> lib?.getPropertyBoolean(name)
+                    PropertyType.Int64 -> lib?.getPropertyInt(name)?.toLong()
+                    PropertyType.Real -> lib?.getPropertyDouble(name)
+                } as T?
+            } catch (e: Exception) {
+                Log.w(TAG, "get($name) failed", e)
+            } finally {
+                // Always answer: an exception must not leave the caller waiting.
+                if (cont.isActive) cont.resume(value)
+            }
+        }
+        if (!queued) {
+            cont.resume(null)
         }
     }
 
@@ -615,6 +639,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         private const val DECODER_SETTLE_TRIES = 50
         // A newer seek cancels the one in flight, so replacing slow seeks early means no frame ever
         // lands on a slow decoder. Wait this long for a seek to finish before giving up on it.
+        private const val GET_TIMEOUT_MS = 5000L
         private const val SCRUB_STALL_MS = 5000L
         // Longest a landed preview frame holds the next seek back when the view never reports it.
         private const val SHOW_WAIT_MS = 500L
