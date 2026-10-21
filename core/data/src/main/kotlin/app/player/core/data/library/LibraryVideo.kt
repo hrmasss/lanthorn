@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
  * One video in the library index, mirrored from MediaStore. The index is a cache: MediaStore is the
  * source of truth, and the index lets the library draw its first frame without querying it (NF-1).
  */
-@Entity(tableName = "library_video", indices = [Index("folder")])
+@Entity(tableName = "library_video", indices = [Index("folder"), Index("uri")])
 data class LibraryVideo(
     /** MediaStore `_ID`. Stable while the file exists. */
     @PrimaryKey val id: Long,

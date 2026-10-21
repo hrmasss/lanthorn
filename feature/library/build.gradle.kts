@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":core:settings-api"))
     implementation(project(":core:player-api"))
     implementation(libs.smbj)
+    implementation(libs.reorderable)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.json)
     androidTestImplementation(platform(libs.compose.bom))
