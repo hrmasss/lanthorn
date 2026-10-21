@@ -66,7 +66,7 @@ class GesturesOnDeviceTest {
         val (w, h) = viewSize()
         // The line sits low and centred; the top of the picture is not subtitle text.
         val onLine = (h * 3 / 4 until h step 4).any { y -> OnDevice.main { gestures.hit(w / 2f, y.toFloat(), w, h) } }
-        assertTrue("no hit on the shown line", onLine)
+        assertTrue("no hit on the shown line: ${OnDevice.main { SubtitlesExtension.touch?.describe(w, h) }}", onLine)
         assertFalse(OnDevice.main { gestures.hit(w / 2f, h * 0.1f, w, h) })
         evidenceShot("us45-line-shown")
         OnDevice.main { gestures.step(1) }

@@ -30,6 +30,13 @@ internal class SubtitleTouch(
         return textBox(shown, styles(), dims, minBottomMarginPercent, width, height).contains(x, y)
     }
 
+    /** The inputs and the box [hit] uses, for a test's failure message. */
+    internal fun describe(width: Int, height: Int): String {
+        val dims = Osd.parse(osd.value) ?: Osd(width, height)
+        val box = text.value?.let { textBox(it, styles(), dims, minBottomMarginPercent, width, height) }
+        return "text=${text.value} osd=${osd.value} view=${width}x$height minMargin=$minBottomMarginPercent style=${styles()} box=$box"
+    }
+
     /** US-45.1: the previous (-1) or next (+1) line's start. */
     fun step(direction: Int) {
         if (!switches().swipe || direction == 0) return
