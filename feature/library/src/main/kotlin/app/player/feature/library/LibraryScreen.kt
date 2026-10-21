@@ -738,8 +738,8 @@ internal fun ResumeButton(onClick: () -> Unit) {
         onClick = onClick,
         icon = { Icon(LanthornIcons.Play, contentDescription = null) },
         text = { Text(label) },
-        // Above the floating view toolbar. The label is set on the button itself: the extended
-X
+        // Above the floating view toolbar. The label is also set on the button itself: on API 36 the
+        // accessibility tree showed the button with an empty text node (P1.21 evidence).
         modifier = Modifier.padding(bottom = 72.dp).testTag("resume-last").semantics { contentDescription = label },
     )
 }
