@@ -7,12 +7,14 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import app.player.core.testing.Ears
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class PreferencesJsonTest {
+    @Ears("US-66.1", "US-66.2")
     @Test fun `us_66 every value type survives export and import`() {
         val prefs = mutablePreferencesOf(
             booleanPreferencesKey("b") to true,

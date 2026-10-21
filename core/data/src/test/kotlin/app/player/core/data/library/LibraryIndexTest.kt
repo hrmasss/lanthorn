@@ -1,5 +1,6 @@
 package app.player.core.data.library
 
+import app.player.core.testing.Ears
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -37,6 +38,7 @@ class FakeDao(initial: List<LibraryVideo> = emptyList()) : LibraryDao {
 }
 
 class LibraryIndexTest {
+    @Ears("US-01.3")
     @Test fun `us_01_3 scan adds new videos and drops removed ones`() = runTest {
         val dao = FakeDao(listOf(video(1), video(2)))
         val index = LibraryIndex(dao, source { listOf(video(2), video(3)) }, StandardTestDispatcher(testScheduler), { 0 })
@@ -75,6 +77,7 @@ class LibraryIndexTest {
         assertFalse(index.scanning.first())
     }
 
+    @Ears("US-80.3")
     @Test fun `us_80_3 videos on a removed volume stay as unavailable`() = runTest {
         val sd = video(2, folder = "1234-ABCD/Movies/")
         val dao = FakeDao(listOf(video(1), sd))
@@ -87,6 +90,7 @@ class LibraryIndexTest {
         assertEquals(true, dao.rows.value.getValue(2).available)
     }
 
+    @Ears("US-80.1")
     @Test fun `us_80_1 videos from every volume are indexed`() = runTest {
         val dao = FakeDao()
         LibraryIndex(dao, source(mounted = setOf("external_primary", "1234-ABCD")) {
@@ -105,6 +109,7 @@ class LibraryIndexTest {
 }
 
 class FoldersTest {
+    @Ears("US-01.1")
     @Test fun `us_01_1 folders hold their direct videos, count and newest cover`() {
         val videos = listOf(
             video(1, "external_primary/Movies/"),
@@ -125,6 +130,7 @@ class FoldersTest {
         assertEquals("1234-ABCD", folders.getValue("1234-ABCD/DCIM/Camera/").volume)
     }
 
+    @Ears("US-01.2")
     @Test fun `us_01_2 a folder shows its nearest video-holding subfolders`() {
         val folders = listOf(
             video(1, "external_primary/Movies/"),

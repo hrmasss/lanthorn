@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.player.core.data.library.LibraryVideo
 import app.player.core.playerapi.PlayerIntents
+import app.player.core.testing.Ears
 import kotlinx.coroutines.MainScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -30,6 +31,7 @@ class FileActionsTest {
         null, "Clip $id.mp4", 1000, 60_000, 1920, 1080, id, mime,
     )
 
+    @Ears("US-10.4")
     @Test fun us_10_4_properties_open_the_info_screen_for_that_file() {
         actions.properties(video(7))
         val intent = started.single()
@@ -39,6 +41,7 @@ class FileActionsTest {
         assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
     }
 
+    @Ears("US-74.1", "US-74.2")
     @Test fun us_74_share_sends_content_uris_with_their_type_and_a_read_grant() {
         actions.share(listOf(video(1), video(2)))
         val chooser = started.single()
@@ -56,6 +59,7 @@ class FileActionsTest {
         assertEquals(2, send.clipData!!.itemCount)
     }
 
+    @Ears("US-74.1")
     @Test fun us_74_one_video_shares_as_a_single_stream() {
         actions.share(listOf(video(3, "video/x-matroska")))
         @Suppress("DEPRECATION")

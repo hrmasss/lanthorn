@@ -1,5 +1,6 @@
 package app.player.feature.library.network
 
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StreamUrlTest {
+    @Ears("US-61.1")
     @Test fun `us_61_1 every stream scheme is accepted`() {
         listOf(
             "http://10.0.2.2:8000/clip.mp4",
@@ -36,6 +38,7 @@ class StreamUrlTest {
         assertFalse(isNetworkUrl("/sdcard/a.mp4"))
     }
 
+    @Ears("US-61.4")
     @Test fun `us_61_4 failure reasons from mpv lines`() {
         assertEquals(StreamFailure.NotFound, classifyFailure(listOf("[ffmpeg] http: HTTP error 404 Not Found", "[file] Failed to recognize file format.")))
         assertEquals(StreamFailure.Timeout, classifyFailure(listOf("[ffmpeg] tcp: Connection timed out")))
