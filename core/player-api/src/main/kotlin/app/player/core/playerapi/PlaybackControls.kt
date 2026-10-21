@@ -1,10 +1,12 @@
 package app.player.core.playerapi
 
+import android.content.Context
 import android.content.Intent
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import android.net.Uri
 import android.os.Build
+import app.player.core.engine.DecoderMode
 import app.player.core.engine.PlayerEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,4 +96,25 @@ object PlayerIntents {
         val index = intent.getIntExtra(EXTRA_INDEX, -1)
         return if (index in uris.indices) uris to index else null
     }
+
+    private const val EXTRA_DECODER = "app.player.extra.DECODER"
+
+    /**
+     * A decoder for this launch only (US-09.3 "play with HW, HW+ or SW"): used for every file the
+     * intent opens, ahead of the per-file choice, and never remembered.
+     */
+    fun withDecoder(intent: Intent, mode: DecoderMode): Intent = intent.putExtra(EXTRA_DECODER, mode.name)
+
+    /** The launch's one-time decoder, or null. */
+    fun decoderOf(intent: Intent): DecoderMode? =
+        intent.getStringExtra(EXTRA_DECODER)?.let { runCatching { DecoderMode.valueOf(it) }.getOrNull() }
+
+    /**
+     * Shows the US-37 info screen for [uri] (feature/info), from anywhere, without a feature
+     * dependency. Scoped to this app: Android 14+ delivers no implicit intent to an unexported activity.
+     */
+    fun showInfo(context: Context, uri: Uri): Intent = Intent(ACTION_SHOW_INFO).setData(uri)
+        .setPackage(context.packageName).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+    const val ACTION_SHOW_INFO = "app.player.action.SHOW_INFO"
 }

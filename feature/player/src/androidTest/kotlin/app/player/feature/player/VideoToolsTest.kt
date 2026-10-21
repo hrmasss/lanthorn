@@ -44,10 +44,19 @@ class VideoToolsTest {
 
     @Test fun fitModes_US53_1() = runBlocking<Unit> {
         open("clip.mp4")
-        val margins = FitMode.entries.associateWith { mode ->
+        // Each mode is read once the picture has its expected shape (or after 3 s, and the asserts
+        // below fail): a fixed 300 ms wait read the previous mode on the slower hosted emulator.
+        val margins = mutableMapOf<FitMode, List<Int>>()
+        val settled: Map<FitMode, (List<Int>) -> Boolean> = mapOf(
+            FitMode.Fit to { m -> m.sum() > 0 },
+            FitMode.Stretch to { m -> m.sum() == 0 },
+            FitMode.Crop to { m -> m.all { it <= 0 } && m.sum() < 0 },
+            FitMode.Original to { m -> m.sum() > margins.getValue(FitMode.Fit).sum() },
+        )
+        FitMode.entries.forEach { mode ->
             tools.setFit(mode)
-            SystemClock.sleep(300)
-            margins()
+            runCatching { waitUntil(3_000) { settled.getValue(mode)(runBlocking { margins() }) } }
+            margins[mode] = margins()
         }
         log("fit margins (top, bottom, left, right): $margins")
         assertTrue("fit leaves bars", margins.getValue(FitMode.Fit).sum() > 0)

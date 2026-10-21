@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.player.core.engine.PlayerEngine
 import app.player.core.playerapi.MenuGroup
 import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
@@ -40,30 +41,36 @@ object InfoExtension : PlayerExtension {
         override val id = "info"
 
         @Composable
-        override fun Content(host: PanelHost) {
-            val context = LocalContext.current
-            var info by remember { mutableStateOf<StreamInfo?>(null) }
-            // US-37.2 and .3: refresh every second, so a decoder change shows within 1 s.
-            LaunchedEffect(host.engine) {
-                while (true) {
-                    info = StreamInfoReader.read(context, host.engine)
-                    delay(1000)
-                }
-            }
-            val i = info ?: return
-            Column(
-                Modifier.padding(horizontal = 24.dp, vertical = 8.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Live values first, so they are on screen without scrolling (US-37.3).
-                Section("Decoder", i.decoder)
-                Section("Playback", i.live)
-                Section("File", i.file)
-                if (i.video.isNotEmpty()) Section("Video", i.video)
-                i.audio.forEachIndexed { n, rows -> Section(if (i.audio.size > 1) "Audio ${n + 1}" else "Audio", rows) }
-                i.subtitles.forEachIndexed { n, rows -> Section(if (i.subtitles.size > 1) "Subtitle ${n + 1}" else "Subtitle", rows) }
-            }
+        override fun Content(host: PanelHost) = InfoContent(host.engine, live = true)
+    }
+}
+
+/**
+ * The US-37 content for [engine], refreshed every second (US-37.2) so a decoder change shows
+ * within 1 s. [live] adds position, dropped frames and bit rate (US-37.3, only from the player).
+ */
+@Composable
+internal fun InfoContent(engine: PlayerEngine, live: Boolean, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var info by remember { mutableStateOf<StreamInfo?>(null) }
+    LaunchedEffect(engine) {
+        while (true) {
+            info = StreamInfoReader.read(context, engine)
+            delay(1000)
         }
+    }
+    val i = info ?: return
+    Column(
+        modifier.padding(horizontal = 24.dp, vertical = 8.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // Live values first, so they are on screen without scrolling (US-37.3).
+        if (live) Section("Decoder", i.decoder)
+        if (live) Section("Playback", i.live)
+        Section("File", i.file)
+        if (i.video.isNotEmpty()) Section("Video", i.video)
+        i.audio.forEachIndexed { n, rows -> Section(if (i.audio.size > 1) "Audio ${n + 1}" else "Audio", rows) }
+        i.subtitles.forEachIndexed { n, rows -> Section(if (i.subtitles.size > 1) "Subtitle ${n + 1}" else "Subtitle", rows) }
     }
 }
 

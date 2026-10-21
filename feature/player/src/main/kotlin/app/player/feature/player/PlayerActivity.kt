@@ -17,6 +17,7 @@ import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.PlayerEngine
 import app.player.core.engine.PlaybackService
 import app.player.core.engine.PlayerSessions
+import app.player.core.playerapi.PlayerIntents
 import app.player.core.playerapi.playerExtensions
 import app.player.feature.player.settings.PlayerSettings
 import app.player.feature.player.tools.PlaybackTools
@@ -75,6 +76,7 @@ class PlayerActivity : ComponentActivity() {
         // Back from background play with the same file: keep going, do not reload (US-59.3).
         val now = engine.state.value
         if (now.loaded && intent.data != null && now.uri == intent.data.toString()) return
+        engine.launchDecoder = PlayerIntents.decoderOf(intent)
         if (playerExtensions.firstNotNullOfOrNull { it.playback }?.open(engine, intent, ::finish) == true) return
         val uri = intent.data ?: return
         lifecycleScope.launch { engine.open(uri, decoder = decoders.choose(uri.toString())) }

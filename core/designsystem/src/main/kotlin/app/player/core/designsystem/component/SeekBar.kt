@@ -29,7 +29,7 @@ import app.player.core.designsystem.theme.PlayerColors
 
 /**
  * Player seek bar. Track white 30%, buffered white 50%, progress and thumb in primary.
- * The track grows from 4 dp to 12 dp while dragging.
+ * The track grows from 4 dp to 12 dp and the thumb from 14 dp to 20 dp while dragging.
  *
  * [onScrub] fires on every move while the finger is down (drive the preview frame from it);
  * [onSeek] fires once on release with the final position. Positions are fractions 0..1.
@@ -48,7 +48,8 @@ fun SeekBar(
     val scrub by rememberUpdatedState(onScrub)
     val seek by rememberUpdatedState(onSeek)
     val track by animateDpAsState(if (dragging) 12.dp else 4.dp, label = "seek-track")
-    val thumb by animateDpAsState(if (dragging) 0.dp else 14.dp, label = "seek-thumb")
+    // The thumb stays while dragging, a little larger, so the finger's spot and the preview above it line up.
+    val thumb by animateDpAsState(if (dragging) 20.dp else 14.dp, label = "seek-thumb")
     val accent = MaterialTheme.colorScheme.primary
     val shown = if (dragging) dragPos else position.coerceIn(0f, 1f)
 
