@@ -194,14 +194,14 @@ class GestureTest {
         assertNull(c.readout)
     }
 
-    // ---- subtitle text (US-45): the line sits at y 300 to 380 ----
+    // ---- subtitle text (US-45): the line sits at y 330 to 380 ----
 
     @Ears("US-45.1")
     @Test fun `US-45_1 sideways swipe on subtitle text steps one line, right is next`() {
         show()
-        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(300f, 340f), Offset(600f, 340f), 300) }
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(300f, 350f), Offset(600f, 350f), 300) }
         rule.waitForIdle()
-        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(500f, 340f), Offset(200f, 340f), 300) }
+        rule.onNodeWithTag("v").performTouchInput { swipe(Offset(500f, 350f), Offset(200f, 350f), 300) }
         rule.waitForIdle()
         assertEquals(listOf(1, -1), subs.steps)
         assertTrue("no seek", fx.seeks.isEmpty())
@@ -223,7 +223,7 @@ class GestureTest {
         show()
         val zoom = fx.zoomed
         rule.onNodeWithTag("v").performTouchInput {
-            pinch(Offset(350f, 340f), Offset(150f, 340f), Offset(450f, 340f), Offset(650f, 340f), 300)
+            pinch(Offset(350f, 350f), Offset(150f, 350f), Offset(450f, 350f), Offset(650f, 350f), 300)
         }
         rule.waitForIdle()
         assertEquals(5f, subs.scaled, 0.6f)
@@ -416,7 +416,7 @@ private class FakeSubtitles : SubtitleGestures {
     var dragged = 0f
     var dragEnded = false
     var scaled = 1f
-    override fun hit(x: Float, y: Float, width: Int, height: Int) = y in 300f..380f
+    override fun hit(x: Float, y: Float, width: Int, height: Int) = y in 330f..380f
     override fun step(direction: Int) { steps += direction }
     override fun drag(dy: Float, height: Int, end: Boolean) { dragged += dy; if (end) dragEnded = true }
     override fun scale(factor: Float) { scaled *= factor }
