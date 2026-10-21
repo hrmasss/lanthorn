@@ -69,8 +69,13 @@ internal data class Note(val engine: PlayerEngine, val text: String, val id: Lon
 object Playback : PlaybackControls {
     private const val TAG = "Playback"
 
-    /** How long after load a decoder failure is still this file's (US-75.1). */
-    private const val DECODER_CHECK_MS = 2_000L
+    /**
+     * How long after load the video may take to show before a decoder failure counts (US-75.1).
+     * A hardware decoder that refuses the file logs errors first; the software fallback can take
+     * over 2 s on a slow emulator.
+     */
+    private const val DECODER_CHECK_MS = 4_000L
+    private const val DECODER_POLL_MS = 200L
 
     private val NETWORK_SCHEMES = setOf("http", "https", "rtsp", "rtmp", "smb")
 
@@ -338,6 +343,8 @@ object Playback : PlaybackControls {
             val pause = engine.observe("pause", PropertyType.Flag)
             val seekableFlow = engine.observe("seekable", PropertyType.Flag)
             combine(engine.state, pause, seekableFlow) { st, p, sk -> (if (p == null) st else st.copy(paused = p)) to sk }.collect { (s, sk) ->
+                // Released: mpv reports end of file while it shuts down. Not a real end, not a save.
+                if (PlayerSessions.current.value !== engine) return@collect
                 seekable = sk
                 // A network stream that shows its first frame without a duration is live, whatever it reports later.
                 if (s.firstFrameMs != null && s.uri != null && s.uri != liveUri && s.durationMs <= 0 && s.uri!!.substringBefore("://") in NETWORK_SCHEMES) {
@@ -376,8 +383,15 @@ object Playback : PlaybackControls {
 
     /** A file that loads but has no decoder for its streams fails too (US-75.1, unsupported codec). */
     private suspend fun checkDecoders(engine: PlayerEngine, uri: String?) {
-        delay(DECODER_CHECK_MS)
-        val s = engine.state.value
+        // Video showing at any point means a decoder took it, whatever errors came before.
+        var s = engine.state.value
+        var waited = 0L
+        while (waited < DECODER_CHECK_MS) {
+            if (s.uri != uri || s.error != null || s.video != null || s.ended) return
+            delay(DECODER_POLL_MS)
+            waited += DECODER_POLL_MS
+            s = engine.state.value
+        }
         if (s.uri != uri || s.error != null || s.video != null || s.ended) return
         // Loaded, yet no video and not even an audio frame: nothing here can decode it.
         if (lines.any(Failures::isDecoderFailure) || s.firstFrameMs == null) failed(engine, s)

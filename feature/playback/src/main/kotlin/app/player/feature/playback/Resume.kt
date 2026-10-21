@@ -25,6 +25,9 @@ object Resume {
     /** The last 5% counts as the end (US-22.1, US-07.3). */
     const val FINISHED_SHARE = 0.95
 
+    /** An ended file whose last position update is this close to the end counts as finished. */
+    const val ENDED_SLACK_MS = 5_000L
+
     /** How often a playing file's position is written, so a killed process loses at most this (US-22.5: 10 s). */
     const val SAVE_EVERY_MS = 5_000L
 
@@ -42,7 +45,9 @@ object Resume {
         val uri = state.uri ?: return null
         if (!state.loaded || state.error != null || state.durationMs <= 0) return null
         if (seekable == false || live || isLiveScheme(uri)) return null
-        val finished = state.ended || state.positionMs >= state.durationMs * FINISHED_SHARE
+        // Ended counts only near the end: mpv also reports end of file while it shuts down.
+        val finished = state.positionMs >= state.durationMs * FINISHED_SHARE ||
+            (state.ended && state.durationMs - state.positionMs <= ENDED_SLACK_MS)
         val position = if (finished) state.durationMs else state.positionMs / 1000 * 1000
         return PlaybackPosition(uri, position.coerceAtLeast(0), state.durationMs, now)
     }
