@@ -121,6 +121,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
             lib.setOptionString("hwdec", DecoderMode.SW.hwdec)
             lib.setOptionString("demuxer-max-bytes", "${8 * 1024 * 1024}")
             lib.setOptionString("demuxer-max-back-bytes", "0")
+            // Paused, mpv draws each seek's frame once. With a deeper swapchain the TextureView
+            // showed the frame of the seek before (gate shots: 7.8 s shown after 19.8 s landed).
+            lib.setOptionString("swapchain-depth", "1")
         }
         lib.init()
         lib.addObserver(observer)
