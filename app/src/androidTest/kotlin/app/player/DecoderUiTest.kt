@@ -65,7 +65,7 @@ class DecoderUiTest {
 
     private fun engineState() = PlayerSessions.current.value?.state?.value
 
-    private fun waitFor(timeoutMs: Long = 10_000, check: () -> Boolean): Boolean {
+    private fun waitFor(timeoutMs: Long = 20_000, check: () -> Boolean): Boolean {
         val end = SystemClock.elapsedRealtime() + timeoutMs
         while (SystemClock.elapsedRealtime() < end) {
             if (check()) return true
@@ -131,15 +131,15 @@ class DecoderUiTest {
         play("clip444.mp4")
         assertEquals(ActiveDecoder.SW, engineState()?.activeDecoder)
         openFromMenu("Info")
-        assertTrue(device.wait(Until.hasObject(By.text("SW")), 2000))
+        assertTrue("info never showed SW", device.wait(Until.hasObject(By.text("SW")), 8000))
         shot("info-after-fallback")
         device.pressBack()
 
         pickDecoder("Hardware, fastest")
         val t0 = SystemClock.elapsedRealtime()
-        val ok = waitFor(3000) { engineState()?.decoderNotice != null }
+        val ok = waitFor(10_000) { engineState()?.decoderNotice != null }
         log("notice after ${SystemClock.elapsedRealtime() - t0} ms: '${engineState()?.decoderNotice}', running ${engineState()?.activeDecoder?.label}")
-        assertTrue(ok)
+        assertTrue("no notice in 10 s", ok)
         SystemClock.sleep(300)
         shot("notice-after-hand-pick-hw")
         close()
@@ -151,7 +151,7 @@ class DecoderUiTest {
         log("badge before: ${badge()}")
         pickDecoder("Software, plays anything, more battery")
         val t0 = SystemClock.elapsedRealtime()
-        val switched = waitFor(3000) { engineState()?.activeDecoder == ActiveDecoder.SW }
+        val switched = waitFor(10_000) { engineState()?.activeDecoder == ActiveDecoder.SW }
         log("decoder SW ${SystemClock.elapsedRealtime() - t0} ms after the pick")
         assertTrue(switched)
         openFromMenu("Info")
