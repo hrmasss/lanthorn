@@ -5,8 +5,9 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # Main runs always finish (agents land several merges an hour); branch runs cancel older ones.
+  # Every main commit gets its own run (hosted runners run in parallel, and a waiting main run must
+  # not be replaced by the next push); branch pushes cancel their older runs.
+  group: ci-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || 'branch' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:

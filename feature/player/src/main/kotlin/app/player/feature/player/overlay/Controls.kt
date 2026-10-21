@@ -1,5 +1,6 @@
 package app.player.feature.player.overlay
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -66,6 +69,11 @@ data class ControlsUi(
     val hasPrevious: Boolean,
     val hasNext: Boolean,
     val canLock: Boolean,
+    /** Chapter starts as fractions of the duration, drawn as ticks (US-27.1). */
+    val marks: List<Float> = emptyList(),
+    /** A-B points as fractions, drawn while set (US-25.2). */
+    val abA: Float? = null,
+    val abB: Float? = null,
     /** False hides previous and next (US-29.3, playback's setting). */
     val showPreviousNext: Boolean = true,
     /** Back and forward step buttons beside play/pause (US-29.2, playback's setting). */
@@ -199,13 +207,16 @@ private fun SeekRow(ui: ControlsUi, actions: ControlsActions) {
             style = MaterialTheme.typography.labelLarge.tabular(),
             modifier = Modifier.semantics { contentDescription = elapsedDesc }.testTag("elapsed"),
         )
-        SeekBar(
-            position = ui.positionMs.toFloat() / duration,
-            onScrub = actions.scrub,
-            onSeek = actions.seek,
-            contentDescription = stringResource(R.string.player_seek_bar),
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp).testTag("seek-bar"),
-        )
+        Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            SeekBar(
+                position = ui.positionMs.toFloat() / duration,
+                onScrub = actions.scrub,
+                onSeek = actions.seek,
+                contentDescription = stringResource(R.string.player_seek_bar),
+                modifier = Modifier.testTag("seek-bar"),
+            )
+            if (ui.marks.isNotEmpty() || ui.abA != null) SeekMarks(ui.marks, ui.abA, ui.abB, Modifier.matchParentSize())
+        }
         val endDesc = stringResource(
             if (ui.showRemaining) R.string.player_remaining else R.string.player_total,
             ui.endTime,
@@ -274,5 +285,30 @@ private fun BottomBar(ui: ControlsUi, actions: ControlsActions) {
         Spacer(Modifier.weight(1f))
         OverlayIconButton(PlayerIcons.Rotate, stringResource(R.string.player_rotate), actions.rotate, Modifier.testTag("rotate"))
         OverlayIconButton(PlayerIcons.Fit, stringResource(R.string.player_fit), actions.fit, Modifier.testTag("fit"))
+    }
+}
+
+/**
+ * Chapter ticks and the A-B range over the seek bar. Draws only; touches go through to the bar.
+ * Ticks are black 60% so they read on both the track and the progress.
+ */
+@Composable
+private fun SeekMarks(marks: List<Float>, a: Float?, b: Float?, modifier: Modifier) {
+    val accent = MaterialTheme.colorScheme.tertiary
+    Canvas(modifier.testTag("seek-marks")) {
+        val cy = size.height / 2
+        val tick = 2.dp.toPx()
+        val tall = 12.dp.toPx()
+        marks.forEach { f ->
+            val x = size.width * f.coerceIn(0f, 1f)
+            drawRect(PlayerColors.Scrim, Offset(x - tick / 2, cy - tall / 2), Size(tick, tall))
+        }
+        if (a != null) {
+            val xa = size.width * a.coerceIn(0f, 1f)
+            val xb = b?.let { size.width * it.coerceIn(0f, 1f) }
+            if (xb != null) drawRect(accent.copy(alpha = 0.5f), Offset(xa, cy - tall / 2), Size(xb - xa, tall))
+            drawRect(accent, Offset(xa - tick, cy - tall), Size(tick * 2, tall * 2))
+            if (xb != null) drawRect(accent, Offset(xb - tick, cy - tall), Size(tick * 2, tall * 2))
+        }
     }
 }
