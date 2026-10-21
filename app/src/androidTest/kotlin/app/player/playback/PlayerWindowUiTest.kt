@@ -85,6 +85,8 @@ class PlayerWindowUiTest {
         play("clip420.mp4")
         assertTrue("wide video not in landscape, rotation ${device.displayRotation}", waitFor(6_000) { landscape() })
         shot("01-wide-landscape")
+        // A second view intent over a running player only brings it back, so close it first.
+        closePlayer()
         play("tall.mp4")
         assertTrue("tall video not in portrait, rotation ${device.displayRotation}", waitFor(6_000) { !landscape() })
         shot("02-tall-portrait")
@@ -251,13 +253,14 @@ class PlayerWindowUiTest {
         SystemClock.sleep(4_000)
         device.pressHome()
         assertTrue(waitFor(5_000) { player()?.isInPictureInPictureMode == true })
-        val at = state()!!.positionMs
         val b = device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds
         device.click(b.centerX(), b.centerY())
         SystemClock.sleep(1_500)
         val close = device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)
             ?: device.wait(Until.findObject(By.descStartsWith("Dismiss")), 1_000)
         assertNotNull("no close button on the PiP window", close)
+        // PiP keeps playing, so the position that counts is the one at the close.
+        val at = state()!!.positionMs
         close!!.click()
         assertTrue("player still there after closing PiP", waitFor(5_000) { player() == null })
         val row = runBlocking { ResumePoints(context).get(uri.toString()) }
