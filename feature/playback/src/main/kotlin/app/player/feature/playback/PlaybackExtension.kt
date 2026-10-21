@@ -87,6 +87,12 @@ object PlaybackExtension : PlayerExtension {
                 modifier = Modifier.testTag("resume-ask"),
             )
         }
+        val state by host.engine.state.collectAsState()
+        val title by Playback.title.collectAsState()
+        // Audio only: no picture, so show what is playing (gate note on P1.11).
+        if (state.loaded && state.video == null && state.error == null && state.firstFrameMs != null) {
+            title?.let { AudioTitle(it) }
+        }
         val failure by Playback.failure.collectAsState()
         failure?.takeIf { it.engine === host.engine }?.let { FailureCard(it) }
         val note by Playback.note.collectAsState()
@@ -127,16 +133,33 @@ private fun Pill(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** The name of an audio-only file in the middle of the screen, so it is not a black page. */
+@Composable
+private fun AudioTitle(title: String) {
+    Box(Modifier.fillMaxSize().padding(horizontal = 32.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("\u266A", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.displayMedium)
+            Text(title, color = Color.White, style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("audio-title"))
+        }
+    }
+}
+
 /** US-75.1 and US-75.3: the reason, with skip and info. */
 @Composable
 private fun FailureCard(f: Failure) {
     var info by remember(f) { mutableStateOf(false) }
-    val reason = stringResource(
+    val reason = when (f.reason) {
+        FailureReason.MissingFile -> stringResource(R.string.failure_missing)
+        FailureReason.UnsupportedCodec -> f.codec?.let { stringResource(R.string.failure_codec_named, it) } ?: stringResource(R.string.failure_codec)
+        FailureReason.Damaged -> stringResource(R.string.failure_damaged)
+        FailureReason.NoPermission -> stringResource(R.string.failure_permission)
+    }
+    val why = stringResource(
         when (f.reason) {
-            FailureReason.MissingFile -> R.string.failure_missing
-            FailureReason.UnsupportedCodec -> R.string.failure_codec
-            FailureReason.Damaged -> R.string.failure_damaged
-            FailureReason.NoPermission -> R.string.failure_permission
+            FailureReason.MissingFile -> R.string.failure_missing_why
+            FailureReason.UnsupportedCodec -> R.string.failure_codec_why
+            FailureReason.Damaged -> R.string.failure_damaged_why
+            FailureReason.NoPermission -> R.string.failure_permission_why
         },
     )
     AlertDialog(
@@ -147,7 +170,13 @@ private fun FailureCard(f: Failure) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(f.name, style = MaterialTheme.typography.titleSmall)
                 Text(reason, Modifier.testTag("failure-reason"))
-                if (info) f.details.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                if (info) {
+                    Text(why, Modifier.testTag("failure-why"))
+                    if (f.details.isNotEmpty()) {
+                        Text(stringResource(R.string.failure_technical), style = MaterialTheme.typography.labelLarge)
+                        f.details.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
             }
         },
         confirmButton = {
