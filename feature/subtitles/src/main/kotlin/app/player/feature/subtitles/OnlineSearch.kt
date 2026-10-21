@@ -40,9 +40,15 @@ internal class OnlineSearch(context: Context, private val baseUrl: String = Open
         val base = displayName(video).substringBeforeLast('.')
         val ext = file.fileName.substringAfterLast('.', "srt").lowercase()
         val name = "$base.${result.language.ifBlank { "online" }}.$ext"
-        val beside = video.takeIf { it.scheme == "file" }?.path?.let { File(it).parentFile }?.takeIf { it.canWrite() }
-        val dir = beside ?: File(appContext.filesDir, "subtitles-online").apply { mkdirs() }
+        val dir = saveDir(video.scheme, video.path, File(appContext.filesDir, "subtitles-online"))
         File(dir, name).apply { writeBytes(file.bytes) }
+    }
+
+    companion object {
+        /** US-46.2: beside the video when its folder is a writable local folder, else [appDir]. */
+        internal fun saveDir(scheme: String?, path: String?, appDir: File): File =
+            path?.takeIf { scheme == "file" }?.let { File(it).parentFile }?.takeIf { it.canWrite() }
+                ?: appDir.apply { mkdirs() }
     }
 
     private fun displayName(uri: Uri): String {
