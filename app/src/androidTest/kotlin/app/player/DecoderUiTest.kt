@@ -12,6 +12,7 @@ import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import app.player.core.data.history.ResumePoints
 import app.player.core.engine.ActiveDecoder
 import app.player.core.engine.DecoderMode
 import app.player.core.playerapi.PlayerIntents
@@ -29,6 +30,7 @@ import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import app.player.core.testing.Ears
 import app.player.core.testing.evidenceShot
 
@@ -56,6 +58,12 @@ class DecoderUiTest {
     @Before fun setUp() {
         // The player is opened with file:// uris of the app's own files.
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
+        // Each test starts its file from 0: a row left by an earlier test resumes near the end.
+        // The earlier test's last save lands when its engine goes, so wait for that first.
+        val end = SystemClock.uptimeMillis() + 5_000
+        while (PlayerSessions.current.value != null && SystemClock.uptimeMillis() < end) SystemClock.sleep(100)
+        SystemClock.sleep(500)
+        runBlocking { ResumePoints(context).clear() }
     }
 
     private fun file(name: String): File = File(context.filesDir, name).also { f ->
@@ -201,6 +209,9 @@ class DecoderUiTest {
         play("clip420.mp4")
         openFromMenu("Info")
         assertTrue(device.wait(Until.hasObject(By.text("Dropped frames")), 3000))
+        // A slow emulator can reach the end of the 30 s clip by now: capture from near the start.
+        PlayerSessions.current.value!!.seekTo(2000)
+        waitFor(5000) { engineState()?.let { it.positionMs in 2000..4000 && !it.paused } == true }
         val s1 = engineState(); shot("info-live-1")
         SystemClock.sleep(1000)
         val s2 = engineState(); shot("info-live-2")

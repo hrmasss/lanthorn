@@ -77,9 +77,13 @@ object SubtitleSettings : SettingsGroup {
     private const val ONLINE_KEY = "online_api_key"
     private const val ONLINE_USER = "online_username"
     private const val ONLINE_PASSWORD = "online_password"
+    private const val GESTURE_SWIPE = "gesture_swipe"
+    private const val GESTURE_DRAG = "gesture_drag"
+    private const val GESTURE_PINCH = "gesture_pinch"
 
     /** Loading rows sit first; their LazyColumn positions, header at 0. */
     private val LOADING = listOf(AUTO, LANGUAGE, FOLDER, ALLOWED)
+    private val GESTURES = listOf(GESTURE_SWIPE, GESTURE_DRAG, GESTURE_PINCH)
 
     override val entries = listOf(
         SettingsEntry(AUTO, R.string.subs_setting_auto, R.string.subs_setting_auto_summary),
@@ -91,6 +95,9 @@ object SubtitleSettings : SettingsGroup {
         SettingsEntry(ONLINE_KEY, R.string.subs_setting_online_key, R.string.subs_setting_online_key_summary),
         SettingsEntry(ONLINE_USER, R.string.subs_setting_online_user),
         SettingsEntry(ONLINE_PASSWORD, R.string.subs_setting_online_password),
+        SettingsEntry(GESTURE_SWIPE, R.string.subs_setting_gesture_swipe, R.string.subs_setting_gesture_swipe_summary),
+        SettingsEntry(GESTURE_DRAG, R.string.subs_setting_gesture_drag, R.string.subs_setting_gesture_drag_summary),
+        SettingsEntry(GESTURE_PINCH, R.string.subs_setting_gesture_pinch, R.string.subs_setting_gesture_pinch_summary),
     ) + KEYS.zip(TITLES) { k, t -> SettingsEntry(k, t) }
 
     @Composable
@@ -137,6 +144,8 @@ object SubtitleSettings : SettingsGroup {
             when {
                 loading >= 0 -> state.scrollToItem(loading + 1)
                 highlight == DEFAULT_DELAY -> state.scrollToItem(LOADING.size + 2)
+                // The gesture rows are the last three items.
+                highlight in GESTURES -> state.scrollToItem(maxOf(0, state.layoutInfo.totalItemsCount - 3 + GESTURES.indexOf(highlight)))
                 i >= 0 -> state.scrollToItem(LOADING.size + 5 + i)
             }
         }
@@ -212,6 +221,32 @@ object SubtitleSettings : SettingsGroup {
             item("header") { SettingsHeader(stringResource(R.string.subs_style_title)) }
             item("preview") { SubtitlePreview(style, Modifier.padding(horizontal = 16.dp)) }
             styleEditor(style, styles::update, families, onPickFontFolder = { folder.launch(null) }, highlight = highlight)
+            item("gestures") { SettingsHeader(stringResource(R.string.subs_setting_gestures)) }
+            val g = prefs.gestures
+            listOf(
+                Triple(GESTURE_SWIPE, R.string.subs_setting_gesture_swipe, R.string.subs_setting_gesture_swipe_summary) to g.swipe,
+                Triple(GESTURE_DRAG, R.string.subs_setting_gesture_drag, R.string.subs_setting_gesture_drag_summary) to g.drag,
+                Triple(GESTURE_PINCH, R.string.subs_setting_gesture_pinch, R.string.subs_setting_gesture_pinch_summary) to g.pinch,
+            ).forEach { (row, on) ->
+                val (key, title, summary) = row
+                item(key) {
+                    SettingsSwitch(
+                        stringResource(title),
+                        on,
+                        { value ->
+                            val next = when (key) {
+                                GESTURE_SWIPE -> g.copy(swipe = value)
+                                GESTURE_DRAG -> g.copy(drag = value)
+                                else -> g.copy(pinch = value)
+                            }
+                            scope.launch { prefsStore.setGestures(next) }
+                        },
+                        summary = stringResource(summary),
+                        highlighted = highlight == key,
+                        modifier = Modifier.testTag("sub-setting-$key"),
+                    )
+                }
+            }
         }
     }
 
@@ -229,6 +264,7 @@ object SubtitleSettings : SettingsGroup {
             .put("showAutomatically", p.showAutomatically)
             .put("preferredLanguage", p.preferredLanguage)
             .put("defaultDelayMs", SubtitleStyleStore(context).defaultDelayMs.first())
+            .put("gestures", JSONObject().put("swipe", p.gestures.swipe).put("drag", p.gestures.drag).put("pinch", p.gestures.pinch))
     }
 
     override suspend fun import(context: Context, data: JSONObject) {
@@ -236,6 +272,9 @@ object SubtitleSettings : SettingsGroup {
         if (data.has("showAutomatically")) prefs.setShowAutomatically(data.optBoolean("showAutomatically", true))
         if (data.has("preferredLanguage")) prefs.setLanguage(data.optString("preferredLanguage"))
         if (data.has("defaultDelayMs")) SubtitleStyleStore(context).setDefaultDelay(data.optLong("defaultDelayMs"))
+        data.optJSONObject("gestures")?.let { g ->
+            prefs.setGestures(SubtitleGestureSwitches(g.optBoolean("swipe", true), g.optBoolean("drag", true), g.optBoolean("pinch", true)))
+        }
         val style = data.optJSONObject("style")?.let { decodeStyle(it.toString()) } ?: return
         withContext(Dispatchers.Main) { SubtitlesExtension.styles(context).update { style } }
     }

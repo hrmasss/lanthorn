@@ -83,7 +83,8 @@ jobs:
           script: echo "snapshot saved"
 
       - name: Build the APKs first (keeps emulator time short)
-        run: ./gradlew ${{ matrix.build }} --console=plain
+        # One more try after 30 s: a lost plugin or dependency download should not cost the device results.
+        run: ./gradlew ${{ matrix.build }} --console=plain || { sleep 30; ./gradlew ${{ matrix.build }} --console=plain; }
 
       - name: Run ${{ matrix.module }} on an API 36 emulator
         uses: reactivecircus/android-emulator-runner@v2.38.0
@@ -115,6 +116,10 @@ jobs:
             ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
+            # A test class JUnit cannot run (a @Before that returns a value, a bad constructor) is
+            # dropped without a failure in the XML. Make that fail the job.
+            # (One line: the emulator action runs each line on its own.)
+            if grep -E "discarding as bogus|initializationError" logcat.txt > dropped.txt; then { echo "Test classes dropped by JUnit:"; head -20 dropped.txt; } | tee -a "$GITHUB_STEP_SUMMARY"; touch failed.marker; fi
             echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"
             test ! -f failed.marker
 

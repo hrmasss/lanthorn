@@ -10,6 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import app.player.core.designsystem.theme.LanthornPlayerTheme
 import app.player.core.engine.DecoderMode
+import app.player.core.testing.Ears
 import app.player.feature.player.settings.PlayerPrefs
 import app.player.feature.player.settings.PlayerSettingsContent
 import org.junit.Assert.assertTrue
@@ -39,8 +40,10 @@ class TouchTargetsTest {
         }
     }
 
+    @Ears("US-69.1")
     @Test fun `US-69_1 decoder picker`() = check({ DecoderContent(DecoderMode.AUTO, "HW") {} }, minimum = 4)
 
+    @Ears("US-69.1")
     @Test fun `US-69_1 player settings sheet`() = check({ PlayerSettingsContent(PlayerPrefs(), {}) }, minimum = 7)
 
     private fun SemanticsNode.label(): String {

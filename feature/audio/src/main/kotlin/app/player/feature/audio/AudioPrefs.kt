@@ -1,7 +1,9 @@
 package app.player.feature.audio
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -11,12 +13,14 @@ import java.util.Locale
 
 private val Context.audioStore by preferencesDataStore("audio")
 
-/** The Audio settings group's values (US-47.2, US-48.2, US-48.3). */
+/** The Audio settings group's values (US-47.2, US-48.2, US-48.3, US-49.1), and the equalizer (US-50.3). */
 data class AudioPrefs(
     /** ISO 639-1 code, or empty for none. */
     val preferredLanguage: String = "",
     val defaultDelayMs: Long = 0,
     val bluetoothDelayMs: Long = 0,
+    val volumeBoost: Boolean = true,
+    val eq: EqSaved = EqSaved(),
 )
 
 internal class AudioPrefsStore(context: Context) {
@@ -27,18 +31,38 @@ internal class AudioPrefsStore(context: Context) {
             preferredLanguage = it[LANGUAGE].orEmpty(),
             defaultDelayMs = it[DEFAULT_DELAY] ?: 0,
             bluetoothDelayMs = it[BLUETOOTH_DELAY] ?: 0,
+            volumeBoost = it[VOLUME_BOOST] ?: true,
+            eq = EqSaved(
+                on = it[EQ_ON] ?: false,
+                preampDb = it[EQ_PREAMP] ?: 0f,
+                preset = it[EQ_PRESET]?.let { name -> EqPreset.entries.firstOrNull { p -> p.name == name } } ?: EqPreset.Flat,
+                customDb = it[EQ_CUSTOM]?.split(',')?.mapNotNull(String::toFloatOrNull)?.takeIf { c -> c.size == Eq.BANDS }
+                    ?: List(Eq.BANDS) { 0f },
+            ),
         )
     }
 
     suspend fun setLanguage(code: String) = store.edit { it[LANGUAGE] = code }
     suspend fun setDefaultDelay(ms: Long) = store.edit { it[DEFAULT_DELAY] = AudioController.snapDelay(ms) }
     suspend fun setBluetoothDelay(ms: Long) = store.edit { it[BLUETOOTH_DELAY] = AudioController.snapDelay(ms) }
+    suspend fun setVolumeBoost(on: Boolean) = store.edit { it[VOLUME_BOOST] = on }
+    suspend fun setEq(eq: EqSaved) = store.edit {
+        it[EQ_ON] = eq.on
+        it[EQ_PREAMP] = eq.preampDb
+        it[EQ_PRESET] = eq.preset.name
+        it[EQ_CUSTOM] = eq.customDb.joinToString(",")
+    }
     suspend fun reset() = store.edit { it.clear() }
 
     companion object {
         val LANGUAGE = stringPreferencesKey("preferred_language")
         val DEFAULT_DELAY = longPreferencesKey("default_delay_ms")
         val BLUETOOTH_DELAY = longPreferencesKey("bluetooth_delay_ms")
+        val VOLUME_BOOST = booleanPreferencesKey("volume_boost")
+        val EQ_ON = booleanPreferencesKey("eq_on")
+        val EQ_PREAMP = floatPreferencesKey("eq_preamp_db")
+        val EQ_PRESET = stringPreferencesKey("eq_preset")
+        val EQ_CUSTOM = stringPreferencesKey("eq_custom_db")
     }
 }
 

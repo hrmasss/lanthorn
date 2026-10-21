@@ -44,6 +44,7 @@ import app.player.core.playerapi.PanelHost
 import app.player.core.playerapi.PlayerExtension
 import app.player.core.playerapi.PlayerMenuEntry
 import app.player.core.playerapi.PlayerPanel
+import app.player.core.playerapi.SubtitleGestures
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -123,12 +124,28 @@ object SubtitlesExtension : PlayerExtension {
                 if (uri != null) runCatching { loader.onFileLoaded(engine, uri) }
             }
         }
+        // US-45: gestures on subtitle text, with the viewer's switches.
+        var switches = SubtitleGestureSwitches()
+        val switchJob = scope.launch { SubtitlePrefsStore(context).prefs.collect { switches = it.gestures } }
+        touch = SubtitleTouch(engine.asMpv(), styles::current, styles::update, { switches }, styles.navigationInsetPercent)
         scope.launch {
             PlayerSessions.current.first { it !== engine }
             job.cancel()
             loadJob.cancel()
             clearJob.cancel()
+            switchJob.cancel()
         }
+    }
+
+    /** The live player's subtitle gestures; player-ui reaches them through [subtitleGestures]. */
+    internal var touch: SubtitleTouch? = null
+        private set
+
+    override val subtitleGestures: SubtitleGestures = object : SubtitleGestures {
+        override fun hit(x: Float, y: Float, width: Int, height: Int) = touch?.hit(x, y, width, height) ?: false
+        override fun step(direction: Int) { touch?.step(direction) }
+        override fun drag(dy: Float, height: Int, end: Boolean) { touch?.drag(dy, height, end) }
+        override fun scale(factor: Float) { touch?.scale(factor) }
     }
 
     private val scope = MainScope()
