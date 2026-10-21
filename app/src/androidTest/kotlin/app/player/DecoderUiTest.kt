@@ -19,8 +19,11 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
+import org.junit.Rule
 import org.junit.FixMethodOrder
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
@@ -37,6 +40,14 @@ class DecoderUiTest {
     private val context = instr.targetContext
     private val device = UiDevice.getInstance(instr)
     private val shots = File(context.getExternalFilesDir(null), "gate").apply { mkdirs() }
+
+    /** A failed step leaves the screen and the view tree behind, so a CI failure can be read later. */
+    @get:Rule val onFailure = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description) {
+            device.takeScreenshot(File(shots, "FAILED-${description.methodName}.png"))
+            device.dumpWindowHierarchy(File(shots, "FAILED-${description.methodName}.xml"))
+        }
+    }
 
     @Before fun setUp() {
         // The player is opened with file:// uris of the app's own files.

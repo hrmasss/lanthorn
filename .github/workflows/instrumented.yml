@@ -87,7 +87,7 @@ jobs:
           disable-animations: true
           script: |
             adb logcat -c || true
-            ./gradlew ${{ matrix.task }} --console=plain || touch failed.marker
+            ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
             test ! -f failed.marker
