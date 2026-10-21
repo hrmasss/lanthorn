@@ -111,7 +111,8 @@ jobs:
             adb shell settings put secure user_setup_complete 1 || true
             adb shell settings put global device_provisioned 1 || true
             adb shell input keyevent KEYCODE_HOME || true
-            ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
+            # This emulator makes no timing claims: tests that read `timing` log spec limits instead of failing.
+            ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
             echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"

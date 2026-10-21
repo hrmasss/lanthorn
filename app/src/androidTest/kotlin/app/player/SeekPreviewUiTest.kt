@@ -25,7 +25,7 @@ import kotlin.math.abs
  * P1.6 on the real seek bar: a finger drags with injected touch events (so the controls' auto-hide
  * cannot race it), the preview shows above the bar mid-drag (US-30.1), and on release the video
  * lands on the target (US-17.2). The engine logs every preview seek and frame ("preview frame at");
- * the run script reads the rate and distances from logcat.
+ * the finger's time on every move; `perf/preview-timeline.py` pairs them from logcat.
  */
 @RunWith(AndroidJUnit4::class)
 class SeekPreviewUiTest {
@@ -71,13 +71,17 @@ class SeekPreviewUiTest {
         // About 3 s of dragging at 60 moves a second, a screenshot halfway, then a 1 s rest.
         val steps = 180
         for (i in 1..steps) {
-            touch(MotionEvent.ACTION_MOVE, x0 + (x1 - x0) * i / steps, y, down)
+            val x = x0 + (x1 - x0) * i / steps
+            touch(MotionEvent.ACTION_MOVE, x, y, down)
+            // The finger's time on the bar, so each preview frame can be paired with it.
+            Log.i("P1.6", "finger at ${((x - r.left) / r.width() * duration).toLong()} ms")
             SystemClock.sleep(16)
             if (i == steps / 2) {
                 device.takeScreenshot(File(shots, "preview-mid-drag.png"))
                 Log.i("P1.6", "shot mid-drag")
             }
         }
+        Log.i("P1.6", "drag end")
         SystemClock.sleep(1000)
         device.takeScreenshot(File(shots, "preview-finger-resting.png"))
         Log.i("P1.6", "shot finger resting")

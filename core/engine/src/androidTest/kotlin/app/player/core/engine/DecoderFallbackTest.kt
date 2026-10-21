@@ -17,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import app.player.core.testing.Ears
 
 /**
  * P1.1 against the real libmpv: the one-line notice when the chosen decoder cannot play the file
@@ -38,6 +39,8 @@ class DecoderFallbackTest {
         return Uri.fromFile(f)
     }
 
+    @Ears("US-35.3")
+
     @Test fun chosenHwThatCannotPlaySaysSoInOneLine_US35_3(): Unit = runBlocking {
         engine.open(asset("h444.mp4"), decoder = DecoderMode.HW)
         val s = withTimeout(10_000) { engine.state.first { it.decoderNotice != null } }
@@ -47,6 +50,8 @@ class DecoderFallbackTest {
         assertEquals(null, s.error)
     }
 
+    @Ears("US-35.3")
+
     @Test fun autoNeedsNoNotice_US35_3(): Unit = runBlocking {
         engine.open(asset("h444.mp4"), decoder = DecoderMode.AUTO)
         withTimeout(10_000) { engine.state.first { it.video != null } }
@@ -55,6 +60,7 @@ class DecoderFallbackTest {
     }
 
     /** A live switch to HW+: if it comes up, no notice at any point while mpv tries it; if not, notice and badge agree (P1.9 finding). */
+    @Ears("US-35.3")
     @Test fun switchToHwPlusNoticeMatchesBadge_US35_3(): Unit = runBlocking {
         engine.open(asset("clip.mp4"), decoder = DecoderMode.SW)
         withTimeout(10_000) { engine.state.first { it.video != null } }

@@ -1,0 +1,77 @@
+name: EARS
+
+# One EARS report per commit (P1.35): which tagged tests (@Ears) prove which criteria, pass or
+# fail, with their evidenceShot() screenshots. Runs whenever CI or Instrumented finishes and reads
+# both workflows' results for that commit, so the last of the two to finish gives the full report.
+# Artifacts: `ears-report` (json and md) and `ears-shots` (screenshots). workspace tools/ears-report.py
+# reads them.
+
+on:
+  workflow_run:
+    workflows: [CI, Instrumented]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to report on
+        required: true
+
+concurrency:
+  group: ears-${{ github.event.workflow_run.head_sha || inputs.sha }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha || inputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SHA }}
+
+      - name: Download both workflows' results for the commit
+        run: |
+          mkdir -p results
+          args=""
+          for wf in CI Instrumented; do
+            # The newest run of that workflow for this commit, finished or not.
+            line=$(gh run list -R "$GITHUB_REPOSITORY" --workflow "$wf" --commit "$SHA" -L 1 --json databaseId,status,conclusion --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"')
+            read -r id status conclusion <<< "$line"
+            [ -n "$id" ] || { echo "$wf: no run for $SHA"; continue; }
+            echo "$wf: run $id $status $conclusion"
+            args="$args --run $wf=$id:${conclusion}"
+            [ "$status" = completed ] || continue
+            if [ "$wf" = CI ]; then
+              gh run download "$id" -R "$GITHUB_REPOSITORY" -n unit-test-results -D results/unit || true
+            else
+              gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'androidTest-*' -D results/device || true
+            fi
+          done
+          echo "RUN_ARGS=$args" >> "$GITHUB_ENV"
+
+      - name: Report
+        run: |
+          python3 .github/scripts/ears-report.py --src . --results results --out ears --commit "$SHA" $RUN_ARGS
+          cat ears/ears-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ears-report
+          path: |
+            ears/ears-report.json
+            ears/ears-report.md
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ears-shots
+          path: ears/shots/
+          if-no-files-found: ignore
+          retention-days: 30

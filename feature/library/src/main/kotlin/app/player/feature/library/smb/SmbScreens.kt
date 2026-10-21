@@ -1,6 +1,9 @@
 package app.player.feature.library.smb
 
 import android.content.Context
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.net.Uri
@@ -61,6 +64,8 @@ import app.player.feature.library.formatSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.Inet4Address
+import java.net.InetAddress
 
 /** A server found on the local network by mDNS (`_smb._tcp`). */
 data class FoundServer(val name: String, val host: String, val port: Int)
@@ -271,23 +276,48 @@ private fun Hint(text: Int) {
     )
 }
 
-/** Servers advertised by mDNS, live while the screen shows. Phones see Samba, macOS and NAS boxes. */
+/**
+ * Servers advertised by mDNS, live while the screen shows. Phones see Samba, macOS and NAS boxes.
+ * Android 14+ gets addresses through a service info callback, which answers as soon as the record
+ * arrives; older versions resolve one service at a time. IPv4 is preferred, as people read it.
+ */
 @Composable
 private fun rememberDiscovery(context: Context): List<FoundServer> {
     val found = remember { mutableStateListOf<FoundServer>() }
     DisposableEffect(Unit) {
         val nsd = context.getSystemService(NsdManager::class.java)
+        val start = SystemClock.elapsedRealtime()
+        val main = Handler(Looper.getMainLooper())
+        val callbacks = mutableListOf<NsdManager.ServiceInfoCallback>()
+        fun add(info: NsdServiceInfo, addresses: List<InetAddress>) {
+            val host = preferredAddress(addresses)?.hostAddress ?: return
+            main.post {
+                val merged = withFound(found.toList(), FoundServer(info.serviceName, host, info.port))
+                if (merged.size != found.size) {
+                    found += merged.last()
+                    Log.i("LibrarySmb", "discovered ${info.serviceName} at $host in ${SystemClock.elapsedRealtime() - start} ms")
+                }
+            }
+        }
         val listener = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(info: NsdServiceInfo) {
-                @Suppress("DEPRECATION")
-                nsd.resolveService(info, object : NsdManager.ResolveListener {
-                    override fun onServiceResolved(r: NsdServiceInfo) {
-                        val host = r.host?.hostAddress ?: return
-                        val merged = withFound(found.toList(), FoundServer(r.serviceName, host, r.port))
-                        if (merged.size != found.size) found += merged.last()
+                Log.i("LibrarySmb", "found ${info.serviceName} in ${SystemClock.elapsedRealtime() - start} ms")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val callback = object : NsdManager.ServiceInfoCallback {
+                        override fun onServiceUpdated(r: NsdServiceInfo) = add(r, r.hostAddresses)
+                        override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) = Unit
+                        override fun onServiceLost() = Unit
+                        override fun onServiceInfoCallbackUnregistered() = Unit
                     }
-                    override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = Unit
-                })
+                    synchronized(callbacks) { callbacks += callback }
+                    runCatching { nsd.registerServiceInfoCallback(info, Runnable::run, callback) }
+                } else {
+                    @Suppress("DEPRECATION")
+                    nsd.resolveService(info, object : NsdManager.ResolveListener {
+                        override fun onServiceResolved(r: NsdServiceInfo) = add(r, listOfNotNull(r.host))
+                        override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = Unit
+                    })
+                }
             }
             override fun onServiceLost(info: NsdServiceInfo) = Unit
             override fun onDiscoveryStarted(type: String) = Unit
@@ -296,10 +326,21 @@ private fun rememberDiscovery(context: Context): List<FoundServer> {
             override fun onStopDiscoveryFailed(type: String, errorCode: Int) = Unit
         }
         runCatching { nsd.discoverServices("_smb._tcp", NsdManager.PROTOCOL_DNS_SD, listener) }
-        onDispose { runCatching { nsd.stopServiceDiscovery(listener) } }
+        onDispose {
+            runCatching { nsd.stopServiceDiscovery(listener) }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                synchronized(callbacks) { callbacks.forEach { runCatching { nsd.unregisterServiceInfoCallback(it) } } }
+            }
+        }
     }
     return found
 }
+
+/** The address to show and connect to: IPv4 first, then any global IPv6, then link-local. */
+fun preferredAddress(addresses: List<InetAddress>): InetAddress? =
+    addresses.firstOrNull { it is Inet4Address }
+        ?: addresses.firstOrNull { !it.isLinkLocalAddress }
+        ?: addresses.firstOrNull()
 
 /** Adds [found] unless a server with the same address and port is listed already. */
 fun withFound(list: List<FoundServer>, found: FoundServer): List<FoundServer> =
