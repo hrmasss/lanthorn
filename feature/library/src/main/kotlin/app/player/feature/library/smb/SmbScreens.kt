@@ -1,6 +1,8 @@
 package app.player.feature.library.smb
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -181,7 +183,7 @@ private fun AddServerDialog(prefill: FoundServer?, onDismiss: () -> Unit, onSave
                         } else {
                             SmbClient.forget(server.id)
                             store.remove(server.id)
-                            error = resources.getString(R.string.smb_connect_failed, result.exceptionOrNull()?.reason().orEmpty())
+                            error = resources.getString(smbFailure(result.exceptionOrNull()).message)
                         }
                     }
                 },
@@ -212,7 +214,10 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
     val server by produceState<SmbServer?>(null, serverId) { value = SmbServers(context).get(serverId) }
     val listing by produceState<Result<List<SmbEntry>>?>(null, server, path, attempt) {
         val s = server ?: return@produceState
+        val start = SystemClock.elapsedRealtime()
         value = withContext(Dispatchers.IO) { runCatching { SmbClient.list(s, path) } }
+        // US-62.2 regression number: time from asking to having the folder's rows.
+        Log.i("LibrarySmb", "listed ${value?.getOrNull()?.size} entries in ${SystemClock.elapsedRealtime() - start} ms")
     }
     val dialect = remember(listing) { server?.let { SmbClient.dialect(it) } }
     Scaffold(
@@ -221,7 +226,7 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
                 title = {
                     Column {
                         Text(path.substringAfterLast('\\').ifEmpty { server?.label.orEmpty() }, maxLines = 1)
-                        dialect?.let { Text(it, style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("smb-dialect")) }
+                        dialect?.let { Text(dialectLabel(it), style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("smb-dialect")) }
                     }
                 },
                 navigationIcon = { BackButton(onBack) },
@@ -233,7 +238,7 @@ internal fun SmbBrowseScreen(serverId: String, path: String, onFolder: (String) 
             when {
                 l == null -> LoadingIndicator(Modifier.align(Alignment.Center))
                 l.isFailure -> Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.smb_connect_failed, l.exceptionOrNull()?.reason().orEmpty()), modifier = Modifier.testTag("smb-error"))
+                    Text(stringResource(smbFailure(l.exceptionOrNull()).message), modifier = Modifier.testTag("smb-error"))
                     TextButton(onClick = { server?.let { SmbClient.forget(it.id) }; attempt++ }) { Text(stringResource(R.string.stream_retry)) }
                 }
                 else -> LazyColumn(Modifier.fillMaxSize().testTag("smb-list")) {
@@ -266,13 +271,6 @@ private fun Hint(text: Int) {
     )
 }
 
-/** The viewer-facing part of a connection error, without stack or class names. */
-private fun Throwable.reason(): String {
-    var t: Throwable? = this
-    while (t?.cause != null && t.cause !== t) t = t.cause
-    return (t?.message ?: this.message ?: javaClass.simpleName).take(160)
-}
-
 /** Servers advertised by mDNS, live while the screen shows. Phones see Samba, macOS and NAS boxes. */
 @Composable
 private fun rememberDiscovery(context: Context): List<FoundServer> {
@@ -285,8 +283,8 @@ private fun rememberDiscovery(context: Context): List<FoundServer> {
                 nsd.resolveService(info, object : NsdManager.ResolveListener {
                     override fun onServiceResolved(r: NsdServiceInfo) {
                         val host = r.host?.hostAddress ?: return
-                        val f = FoundServer(r.serviceName, host, r.port)
-                        if (found.none { it.host == f.host && it.port == f.port }) found += f
+                        val merged = withFound(found.toList(), FoundServer(r.serviceName, host, r.port))
+                        if (merged.size != found.size) found += merged.last()
                     }
                     override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = Unit
                 })
@@ -302,3 +300,11 @@ private fun rememberDiscovery(context: Context): List<FoundServer> {
     }
     return found
 }
+
+/** Adds [found] unless a server with the same address and port is listed already. */
+fun withFound(list: List<FoundServer>, found: FoundServer): List<FoundServer> =
+    if (list.any { it.host == found.host && it.port == found.port }) list else list + found
+
+/** "SMB_3_1_1" as the viewer reads it: "SMB 3.1.1". */
+fun dialectLabel(dialect: String): String =
+    dialect.removePrefix("SMB_").replace('_', '.').let { "SMB $it" }

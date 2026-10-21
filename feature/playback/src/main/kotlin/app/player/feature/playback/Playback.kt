@@ -17,6 +17,7 @@ import app.player.core.engine.PlayerSessions
 import app.player.core.engine.PropertyType
 import app.player.core.playerapi.PlaybackControls
 import app.player.core.playerapi.PlayerIntents
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
@@ -59,11 +61,11 @@ object Playback : PlaybackControls {
     private const val TAG = "Playback"
 
     /** How long after load a decoder failure is still this file's (US-75.1). */
-    private const val DECODER_CHECK_MS = 1_500L
+    private const val DECODER_CHECK_MS = 2_000L
 
     private val NETWORK_SCHEMES = setOf("http", "https", "rtsp", "rtmp", "smb")
 
-    private val scope = MainScope()
+    private val scope = MainScope() + CoroutineExceptionHandler { _, e -> Log.e(TAG, "playback coroutine failed", e) }
     private lateinit var context: Context
     private val prefs by lazy { PlaybackPrefs(context) }
     private val resumePoints by lazy { ResumePoints(context) }
@@ -243,13 +245,13 @@ object Playback : PlaybackControls {
             }
             var last: PlaybackState? = null
             var savedAt = 0L
-            fun save(s: PlaybackState) {
+            fun save(s: PlaybackState, why: String) {
                 savedAt = SystemClock.elapsedRealtime()
-                launch(NonCancellable) { write(s) }
+                scope.launch(NonCancellable) { write(s, why) }
             }
             launch {
                 PlayerSessions.current.first { it !== engine }
-                last?.let { withContext(NonCancellable) { write(it) } }
+                last?.let { withContext(NonCancellable) { write(it, "engine released") } }
                 if (this@Playback.engine === engine) this@Playback.engine = null
                 watcher?.cancel()
             }
@@ -259,29 +261,41 @@ object Playback : PlaybackControls {
             combine(engine.state, pause) { st, p -> if (p == null) st else st.copy(paused = p) }.collect { s ->
                 val prev = last
                 val now = SystemClock.elapsedRealtime()
+                if (prev != null && (prev.paused != s.paused || prev.loaded != s.loaded || prev.error != s.error)) {
+                    Log.d(TAG, "state: paused ${s.paused}, loaded ${s.loaded}, error ${s.error}, ended ${s.ended}, at ${s.positionMs}")
+                }
                 when {
-                    prev != null && prev.uri != s.uri -> save(prev)
-                    s.loaded && s.paused && prev?.paused == false -> save(s)
-                    s.ended && prev?.ended == false -> save(s)
-                    s.loaded && !s.paused && now - savedAt >= Resume.SAVE_EVERY_MS -> save(s)
+                    prev != null && prev.uri != s.uri -> save(prev, "next file")
+                    s.loaded && s.paused && prev?.paused == false -> save(s, "paused")
+                    s.ended && prev?.ended == false -> save(s, "ended")
+                    s.loaded && !s.paused && now - savedAt >= Resume.SAVE_EVERY_MS -> save(s, "every 5 s")
                 }
                 if (s.uri == queue.currentOrNull()?.toString()) {
-                    if (s.error != null && prev?.error == null) failed(engine, s)
-                    if (s.loaded && prev?.loaded != true) launch { checkDecoders(engine, s.uri) }
-                    if (s.firstFrameMs != null && prev?.firstFrameMs == null) queue.markPlayed()
-                    if (s.ended && prev?.ended == false) ended()
+                    // State updates are conflated: two files in a row can arrive without the reset
+                    // between them, so a new file counts as a change on every field.
+                    val newFile = prev == null || prev.uri != s.uri
+                    if (s.error != null && (newFile || prev?.error == null)) failed(engine, s)
+                    if (s.loaded && (newFile || prev?.loaded != true)) launch { checkDecoders(engine, s.uri) }
+                    if (s.firstFrameMs != null && (newFile || prev?.firstFrameMs == null)) queue.markPlayed()
+                    if (s.ended && (newFile || prev?.ended == false)) {
+                        // No decoder for any stream: mpv "plays" nothing and ends at once (US-75.1).
+                        val nothingPlayed = s.video == null && (lines.any(Failures::isDecoderFailure) || s.positionMs < 1000)
+                        if (nothingPlayed) failed(engine, s) else ended()
+                    }
                 }
                 last = s
             }
         }
+        watcher?.invokeOnCompletion { Log.i(TAG, "stopped following the engine", it) }
     }
 
     /** A file that loads but has no decoder for its streams fails too (US-75.1, unsupported codec). */
     private suspend fun checkDecoders(engine: PlayerEngine, uri: String?) {
         delay(DECODER_CHECK_MS)
         val s = engine.state.value
-        if (s.uri != uri || s.error != null || s.video != null || s.firstFrameMs != null && s.positionMs > 0) return
-        if (lines.any(Failures::isDecoderFailure)) failed(engine, s)
+        if (s.uri != uri || s.error != null || s.video != null || s.ended) return
+        // Loaded, yet no video and not even an audio frame: nothing here can decode it.
+        if (lines.any(Failures::isDecoderFailure) || s.firstFrameMs == null) failed(engine, s)
     }
 
     /** End of a file: next, back to the first with loop all, or stop (US-24.1, US-24.3, US-24.5). */
@@ -308,13 +322,14 @@ object Playback : PlaybackControls {
         scope.launch {
             val name = displayName(uri)
             val settings = _settings.value
-            val allFailed = queue.allFailed
+            val allFailed = queue.size > 1 && queue.allFailed
             val canSkip = !allFailed && queue.hasNext(settings.loop)
             if (settings.skipFailed && canSkip) {
                 _note.value = Note(engine, context.getString(R.string.playback_skipped, name))
                 next()
             } else {
                 _failure.value = Failure(engine, name, reason, details, canSkip, allFailed)
+                Log.i(TAG, "failure card: $reason${if (allFailed) ", whole queue" else ""}")
             }
         }
     }
@@ -333,9 +348,13 @@ object Playback : PlaybackControls {
 
     private fun <T> PlayQueue<T>.currentOrNull(): T? = if (size == 0) null else current
 
-    private suspend fun write(s: PlaybackState) {
-        val row = Resume.toSave(s, System.currentTimeMillis()) ?: return
+    private suspend fun write(s: PlaybackState, why: String) {
+        val row = Resume.toSave(s, System.currentTimeMillis()) ?: run {
+            Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, uri ${s.uri}")
+            return
+        }
         if (history.isPaused()) return
         resumePoints.put(row)
+        Log.i(TAG, "saved ${row.uri} at ${row.positionMs} of ${row.durationMs} ($why)")
     }
 }

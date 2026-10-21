@@ -92,7 +92,7 @@ internal fun StreamDialog(onPlay: (String) -> Unit, onDismiss: () -> Unit) {
                     LazyColumn(Modifier.heightIn(max = 240.dp).testTag("stream-history")) {
                         items(history, key = { it }) { u ->
                             ListItem(
-                                headlineContent = { Text(u, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                                headlineContent = { Text(u, maxLines = 1, overflow = TextOverflow.MiddleEllipsis) },
                                 trailingContent = {
                                     IconButton(onClick = { scope.launch { prefs.removeFromHistory(u) } }) {
                                         Icon(LibraryIcons.Close, contentDescription = stringResource(R.string.stream_history_remove, u))

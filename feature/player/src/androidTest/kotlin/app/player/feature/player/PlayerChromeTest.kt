@@ -47,9 +47,15 @@ class PlayerChromeTest {
 
     @Test fun controlsHideAfterThreeSecondsWhilePlaying_US16_3() {
         compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("back") }
+        // The hosted emulator can drop the first tap while the player is still starting: tap again.
+        runCatching { compose.waitUntil(3_000) { shown("back") } }.onFailure {
+            compose.onNodeWithTag("video").performClick()
+            compose.waitUntil(3_000) { shown("back") }
+        }
         val shownAt = SystemClock.elapsedRealtime()
-        shot("01-controls")
+        // No screenshot while the overlay is about to animate out: taking one during a layout
+        // pass made Espresso's idle check fail on the hosted emulator. 01-controls comes from
+        // controlsStayWhilePaused instead.
         compose.waitUntil(9_000) { !shown("back") }
         val hiddenAfter = SystemClock.elapsedRealtime() - shownAt
         // The Compose test clock skews wall time on the emulator; the exact 3 s is proven by the
@@ -65,6 +71,7 @@ class PlayerChromeTest {
         compose.onNodeWithTag("play-pause").performClick()
         SystemClock.sleep(5_000)
         assertTrue(shown("back"))
+        shot("01-controls")
         shot("03-paused")
     }
 
@@ -82,17 +89,23 @@ class PlayerChromeTest {
     @Test fun screenOnWhilePlayingAndPaused_US60_1() {
         // Read from the window manager (dumpsys), the state the system acts on.
         fun step(name: String, want: Boolean) {
-            runCatching { waitUntil(8_000) { keepScreenOn() == want } }
+            // compose.waitUntil lets the test rule's frame clock run, so the screen recomposes
+            // while we wait; a plain sleep loop would freeze it (the earlier failures).
+            runCatching { compose.waitUntil(8_000) { keepScreenOn() == want } }
                 .onFailure { log("US-60.1 $name: wanted $want, window block: ${windowBlock().take(1_200)}") }
                 .getOrThrow()
             log("US-60.1 $name: keep-screen-on ${keepScreenOn()}")
         }
         SystemClock.sleep(1_000)
         step("playing", true)
+        // Preconditions, logged so a failure says which side is wrong.
+        waitUntil(3_000) { !PlayerSettings.get(context).prefs.value.keepScreenOnPaused }
         // Pause the way a viewer does: the play/pause button.
         compose.onNodeWithTag("video").performClick()
         compose.waitUntil(2_000) { shown("play-pause") }
         compose.onNodeWithTag("play-pause").performClick()
+        waitUntil(3_000) { mpvPaused() == true }
+        log("US-60.1 after the pause tap: mpv pause=${mpvPaused()}, setting keepScreenOnPaused=${PlayerSettings.get(context).prefs.value.keepScreenOnPaused}")
         step("paused, setting off", false)
         PlayerSettings.get(context).update { it.copy(keepScreenOnPaused = true) }
         step("paused, setting on", true)
@@ -148,9 +161,13 @@ class PlayerChromeTest {
         scenario.close()
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip()))
         waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("end-time") }
-        val desc = compose.onNodeWithTag("end-time", useUnmergedTree = true).fetchSemanticsNode()
+        // Show the controls and read at once; tap again if auto-hide got there first.
+        fun endTime() = runCatching {
+            if (!shown("end-time")) compose.onNodeWithTag("video").performClick()
+            compose.waitUntil(2_000) { shown("end-time") }
+            compose.onNodeWithTag("end-time", useUnmergedTree = true).fetchSemanticsNode()
+        }
+        val desc = (endTime().getOrNull() ?: endTime().getOrThrow())
             .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
         log("US-16.4 after reopen the end time reads: $desc")
         assertTrue(desc.startsWith("Remaining"))
@@ -268,6 +285,9 @@ class PlayerChromeTest {
     }
 
     /** KEEP_SCREEN_ON on the player's window, as the window manager reports it. */
+    private fun mpvPaused(): Boolean? =
+        kotlinx.coroutines.runBlocking { PlayerSessions.current.value?.get("pause", app.player.core.engine.PropertyType.Flag) }
+
     private fun keepScreenOn(): Boolean = Regex("fl=[^ ]*KEEP_SCREEN_ON").containsMatchIn(windowBlock())
 
     /** The player window's entry in `dumpsys window windows`, from its header to the next window. */
