@@ -86,18 +86,22 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect ${{ matrix.audio && ' ' || '-noaudio' }} -no-boot-anim -camera-back none
           disable-animations: true
           script: |
+            adb logcat -G 16M || true
             adb logcat -c || true
             # A fresh AVD shows a one-time "Viewing full screen" prompt over the player that takes the taps.
             adb shell settings put secure immersive_mode_confirmations confirmed || true
-            # First boot also opens Google's welcome and Tips screens over whatever runs, about 30 s in.
-            adb shell pm disable-user --user 0 com.google.android.apps.tips || true
-            adb shell am force-stop com.google.android.gms || true
+            # First boot also has Google Play services open its welcome screen over whatever runs,
+            # about 30 s in. Disable that one activity (needs root, which google_apis images allow).
+            adb root || true
+            adb wait-for-device
+            adb shell pm disable com.google.android.gms/.setupservices.CoverSheetWelcomeActivity || true
             adb shell settings put secure user_setup_complete 1 || true
             adb shell settings put global device_provisioned 1 || true
             adb shell input keyevent KEYCODE_HOME || true
             ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
+            echo "First-boot welcome screen opened during the tests: $(grep -c 'START.*CoverSheetWelcomeActivity' logcat.txt) times" | tee -a "$GITHUB_STEP_SUMMARY"
             test ! -f failed.marker
 
       - name: Summary
