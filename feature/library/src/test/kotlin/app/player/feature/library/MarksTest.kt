@@ -2,6 +2,7 @@ package app.player.feature.library
 
 import app.player.core.data.PlaybackPosition
 import app.player.core.data.library.LibraryVideo
+import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -19,6 +20,7 @@ private fun pos(video: LibraryVideo, at: Long, duration: Long = 100_000, updated
     video.uri to PlaybackPosition(video.uri, at, duration, updated)
 
 class MarksTest {
+    @Ears("US-07.1")
     @Test fun `us_07_1 new means modified within the period and never played`() {
         val fresh = v(1, modified = NOW - 2 * DAY)
         val old = v(2, modified = NOW - 10 * DAY)
@@ -30,12 +32,14 @@ class MarksTest {
         assertTrue(marks(listOf(old), emptyMap(), NOW, 14, true).getValue(2).isNew)
     }
 
+    @Ears("US-07.2")
     @Test fun `us_07_2 progress is the played share`() {
         val a = v(1)
         assertEquals(0.4f, marks(listOf(a), mapOf(pos(a, 40_000)), NOW, 7, true).getValue(1).progress!!, 0.001f)
         assertNull("under a second is no progress", marks(listOf(a), mapOf(pos(a, 500)), NOW, 7, true).getValue(1).progress)
     }
 
+    @Ears("US-07.3")
     @Test fun `us_07_3 the last 5 percent or the end is finished, with no bar`() {
         val a = v(1)
         val atEnd = marks(listOf(a), mapOf(pos(a, 100_000)), NOW, 7, true).getValue(1)
@@ -45,6 +49,7 @@ class MarksTest {
         assertFalse(marks(listOf(a), mapOf(pos(a, 94_000)), NOW, 7, true).getValue(1).finished)
     }
 
+    @Ears("US-07.4")
     @Test fun `us_07_4 last played per folder, and only with the switch on`() {
         val a1 = v(1, "external_primary/A/"); val a2 = v(2, "external_primary/A/"); val b1 = v(3, "external_primary/B/")
         val ps = mapOf(pos(a1, 5_000, updated = 10), pos(a2, 5_000, updated = 20), pos(b1, 5_000, updated = 5))
@@ -53,6 +58,7 @@ class MarksTest {
         assertTrue(marks(listOf(a1, a2, b1), ps, NOW, 7, false).values.none { it.lastPlayed })
     }
 
+    @Ears("US-08.1")
     @Test fun `us_08 resume button video is the latest played local video`() {
         val a = v(1); val b = v(3)
         val stream = "https://example.com/live.m3u8"
@@ -61,6 +67,7 @@ class MarksTest {
         assertNull("no resume points", lastPlayed(listOf(a, b), emptyMap()))
     }
 
+    @Ears("US-08.3")
     @Test fun `us_08_3 button hides when the last played file is gone or unavailable`() {
         val a = v(1); val off = v(2, available = false)
         val deleted = "content://media/external_primary/video/media/99"
