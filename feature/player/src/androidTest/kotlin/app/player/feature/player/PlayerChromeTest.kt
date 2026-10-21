@@ -82,7 +82,9 @@ class PlayerChromeTest {
     @Test fun screenOnWhilePlayingAndPaused_US60_1() {
         // Read from the window manager (dumpsys), the state the system acts on.
         fun step(name: String, want: Boolean) {
-            runCatching { waitUntil(8_000) { keepScreenOn() == want } }
+            // compose.waitUntil lets the test rule's frame clock run, so the screen recomposes
+            // while we wait; a plain sleep loop would freeze it (the earlier failures).
+            runCatching { compose.waitUntil(8_000) { keepScreenOn() == want } }
                 .onFailure { log("US-60.1 $name: wanted $want, window block: ${windowBlock().take(1_200)}") }
                 .getOrThrow()
             log("US-60.1 $name: keep-screen-on ${keepScreenOn()}")
