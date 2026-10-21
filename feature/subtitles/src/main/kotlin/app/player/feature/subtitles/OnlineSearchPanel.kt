@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +47,8 @@ internal object OnlineSearchPanel : PlayerPanel {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         val search = remember { OnlineSearch(context, baseUrl) }
-        val video = host.engine.state.value.uri?.let(Uri::parse)
+        val state by host.engine.state.collectAsState()
+        val video = state.uri?.let(Uri::parse)
         var query by remember { mutableStateOf("") }
         var hash by remember { mutableStateOf<String?>(null) }
         var language by remember { mutableStateOf("") }
