@@ -129,8 +129,11 @@ class LibraryHomeTest {
         rule.onNodeWithTag("open-sort").performClick()
         rule.onNodeWithTag("sort-Length").performClick()
         rule.waitUntil(5_000) { runBlocking { store.prefs.first().sort.key } == SortKey.Length }
-        val text = storedFile().readBytes().decodeToString()
-        assertTrue("sort not on disk", text.contains("sort_key") && text.contains("Length"))
+        // The file is replaced on each write; read it until this write is the one there.
+        val onDisk = runCatching {
+            rule.waitUntil(5_000) { storedFile().readBytes().decodeToString().let { it.contains("sort_key") && it.contains("Length") } }
+        }.isSuccess
+        assertTrue("sort not on disk: ${storedFile().readBytes().decodeToString().filter { it.isLetterOrDigit() || it == '_' }}", onDisk)
     }
 
     /** The player is another activity; coming back, or the library being recreated meanwhile, keeps the position. */
