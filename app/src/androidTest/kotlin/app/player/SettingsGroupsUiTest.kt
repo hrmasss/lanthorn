@@ -57,7 +57,8 @@ class SettingsGroupsUiTest {
         device.wait(Until.hasObject(By.text("Subtitle")), 5_000)
         shot("settings-home-with-subtitle")
         tap(By.text("Subtitle"))
-        if (!device.wait(Until.hasObject(By.text("Subtitles look like this")), 5_000)) throw AssertionError("no Subtitle group")
+        // The first section's header: lower rows are not composed until scrolled to.
+        if (!device.wait(Until.hasObject(By.text("Show subtitles automatically")), 5_000)) throw AssertionError("no Subtitle group")
         Thread.sleep(1500)
         shot("settings-subtitle-group")
         device.swipe(540, 1800, 540, 600, 30)

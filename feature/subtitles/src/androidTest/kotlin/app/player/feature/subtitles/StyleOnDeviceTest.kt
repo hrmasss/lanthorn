@@ -1,5 +1,7 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.evidenceShot
+import app.player.core.testing.Ears
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
@@ -44,6 +46,8 @@ class StyleOnDeviceTest {
             delay(500)
             if ((engine.get("time-pos", PropertyType.Real) ?: 0.0) >= 0.9) {
                 engine.set("sid", "1")
+                // Paused, mpv may have read past the track's packets: seek again so it reads them.
+                engine.seekTo(1000)
                 engine.await("sub-text", PropertyType.Text) { it == "Inside or outside the picture" }
                 delay(1500) // font cache on first load
                 return@runBlocking
@@ -61,6 +65,7 @@ class StyleOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-42.1", "US-42.2", "US-42.3")
     @Test fun defaultsAndLiveEdit_US42_1_US42_2_US42_3() = runBlocking {
         assertEquals("#FFFFFFFF", engine.get("sub-color", PropertyType.Text))
         assertEquals(true, engine.get("sub-bold", PropertyType.Flag))
@@ -90,6 +95,7 @@ class StyleOnDeviceTest {
         assertWithin("StyleOnDeviceTest", took, 100)
     }
 
+    @Ears("US-43.1", "US-43.2")
     @Test fun alignmentMarginAndFit_US43_1_US43_2() = runBlocking {
         OnDevice.main { styles.update { it.copy(align = SubAlign.Left, bottomMarginPercent = 25f) } }
         engine.await("sub-margin-y", PropertyType.Int64) { it == 180L }
@@ -130,6 +136,7 @@ class StyleOnDeviceTest {
         evidence("Subtitle settings page shows a live preview that follows edits; screenshots")
     }
 
+    @Ears("US-42.1")
     @Test fun fontNamesAndFamilies_US42_1() = runBlocking {
         assertEquals("Roboto", FontNames.family(File("/system/fonts/Roboto-Regular.ttf")))
         val families = styles.families()
@@ -140,8 +147,6 @@ class StyleOnDeviceTest {
 
     /** Why text on the wide clip drew tiny: dump what mpv thinks, compare with the 16:9 clip. */
     private fun shot(name: String) {
-        val bitmap = OnDevice.instrumentation.uiAutomation.takeScreenshot() ?: return
-        val dir = File(OnDevice.context.getExternalFilesDir(null), "evidence").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        evidenceShot(name)
     }
 }

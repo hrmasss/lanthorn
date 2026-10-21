@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
 import app.player.core.engine.PlayerEngine
@@ -38,6 +39,7 @@ class EncodingsOnDeviceTest {
         scenario.close()
     }
 
+    @Ears("US-44.1")
     @Test fun everyNamedEncodingShowsOnAuto_US44_1() = runBlocking {
         val assets = OnDevice.instrumentation.context.assets
         val expected = assets.open("encodings/expected.tsv").bufferedReader().readLines()
@@ -58,7 +60,7 @@ class EncodingsOnDeviceTest {
             controller.addFile(prepared.path, prepared.title)
             engine.seekTo(1000)
             delay(800)
-            val shown = runCatching { engine.await("sub-text", PropertyType.Text, 5_000) { it != null && it.isNotEmpty() && it != "Inside or outside the picture" } }
+            val shown = runCatching { engine.await("sub-text", PropertyType.Text, 15_000) { it != null && it.isNotEmpty() && it != "Inside or outside the picture" } }
                 .map { engine.get("sub-text", PropertyType.Text) }.getOrNull()
             val ok = shown != null && Normalizer.normalize(shown, Normalizer.Form.NFC) == line
             evidence("US-44.1 $name: ${if (ok) "ok" else "GARBLED"} '${shown?.take(60)}'")

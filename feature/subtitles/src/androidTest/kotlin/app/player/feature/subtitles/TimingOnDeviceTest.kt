@@ -1,5 +1,6 @@
 package app.player.feature.subtitles
 
+import app.player.core.testing.Ears
 import android.net.Uri
 import androidx.test.core.app.ActivityScenario
 import app.player.core.engine.PlayerEngine
@@ -41,6 +42,7 @@ class TimingOnDeviceTest {
     private suspend fun near(seconds: Double) =
         engine.await("sub-delay", PropertyType.Real, 10_000) { it != null && abs(it - seconds) < 1e-6 }
 
+    @Ears("US-41.3")
     @Test fun defaultDelayOnEveryNewFile_US41_3() = runBlocking {
         store.setDefaultDelay(320) // snaps to 300
         engine.open(Uri.fromFile(OnDevice.asset("tracks.mkv")))
@@ -52,6 +54,7 @@ class TimingOnDeviceTest {
         evidence("US-41.3 default 320 ms snapped to 300 ms, applied on open; changed to -1 s; the next file started at 300 ms again")
     }
 
+    @Ears("US-41.4")
     @Test fun perFileDelayRemembered_US41_4() = runBlocking {
         store.setDefaultDelay(300)
         val tracks = Uri.fromFile(OnDevice.asset("tracks.mkv"))

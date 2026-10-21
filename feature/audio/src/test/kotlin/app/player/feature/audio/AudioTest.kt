@@ -1,5 +1,6 @@
 package app.player.feature.audio
 
+import app.player.core.testing.Ears
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -23,6 +24,7 @@ class AudioTest {
     private val sink = FakeSink()
     private val effects = AudioEffects(sink, StereoFilter(mpv))
 
+    @Ears("US-47.1")
     @Test fun `audio tracks list with channels and switch by aid (US-47_1)`() = runTest {
         val c = AudioController(mpv)
         mpv.emit("track-list", """[{"id":1,"type":"audio","lang":"eng","codec":"ac3","demux-channel-count":6},{"id":2,"type":"audio","lang":"ita","codec":"aac","demux-channel-count":2},{"id":1,"type":"sub"}]""")
@@ -35,11 +37,13 @@ class AudioTest {
         assertEquals("set aid=1", mpv.calls.last())
     }
 
+    @Ears("US-47.3")
     @Test fun `external audio is added and selected (US-47_3)`() {
         AudioController(mpv).addFile("fdclose://42", "dub.m4a")
         assertEquals("audio-add fdclose://42 select dub.m4a", mpv.calls.last())
     }
 
+    @Ears("US-48.1")
     @Test fun `audio delay snaps to 10 ms and clamps to 10 s (US-48_1)`() {
         val c = AudioController(mpv)
         c.setDelayMs(123)
@@ -47,6 +51,7 @@ class AudioTest {
         assertEquals(listOf("set audio-delay=0.12", "set audio-delay=-10.0"), mpv.calls)
     }
 
+    @Ears("US-49.2")
     @Test fun `boost is 100 to 200 percent and feeds the input gain (US-49_2)`() {
         effects.setBoost(3f)
         assertEquals(2f, sink.applied.last().boost)
@@ -56,18 +61,21 @@ class AudioTest {
         assertFalse(sink.applied.last().processing)
     }
 
+    @Ears("US-49.2")
     @Test fun `worst-case gain stays under 0 dBFS after the limiter (US-49_2)`() {
         // Full-scale input, preamp +12, boost +6, a band +12: output peak is threshold + over/ratio.
         val peak = Eq.LIMITER_THRESHOLD_DB + Eq.WORST_CASE_OVER_DB / Eq.LIMITER_RATIO
         assertTrue("peak $peak dBFS", peak < 0f)
     }
 
+    @Ears("US-49.3")
     @Test fun `reset puts boost back to 100 percent (US-49_3)`() {
         effects.setBoost(1.8f)
         effects.resetBoost()
         assertEquals(1f, effects.state.value.boost)
     }
 
+    @Ears("US-50.2")
     @Test fun `ten bands, moving one sends only that band (US-50_2)`() {
         effects.setEq(true)
         val before = sink.applied.size
@@ -91,6 +99,7 @@ class AudioTest {
         }
     }
 
+    @Ears("US-51.1")
     @Test fun `mono uses a labelled filter, stereo removes it (US-51_1)`() {
         effects.setStereo(StereoMode.Mono)
         effects.setStereo(StereoMode.Stereo)
@@ -110,6 +119,7 @@ class AudioTest {
         assertEquals(StereoMode.Stereo, effects.state.value.stereo)
     }
 
+    @Ears("US-51.2")
     @Test fun `surround goes to stereo unless a multichannel output is attached (US-51_2)`() {
         assertEquals("stereo", OutputChannels.mpvChannels(emptyList()))
         assertEquals("stereo", OutputChannels.mpvChannels(listOf(1, 2)))

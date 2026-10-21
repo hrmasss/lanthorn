@@ -48,9 +48,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import app.player.core.data.choice.PerFileChoices
 import app.player.core.engine.PlayerSessions
 import java.nio.charset.Charset
@@ -62,8 +62,9 @@ object SubtitlesExtension : PlayerExtension {
     const val TRACKS_PANEL = "subtitle-tracks"
     const val SYNC_PANEL = "subtitle-sync"
     const val STYLE_PANEL = "subtitle-style"
+    const val ONLINE_PANEL = "subtitle-online"
 
-    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel, StylePanel)
+    override val panels: List<PlayerPanel> = listOf(TracksPanel, SyncPanel, StylePanel, OnlineSearchPanel)
 
     override val menuEntries = listOf(
         PlayerMenuEntry(id = TRACKS_PANEL, group = MenuGroup.Subtitle, order = 0, opensPanel = TRACKS_PANEL) {
@@ -100,12 +101,13 @@ object SubtitlesExtension : PlayerExtension {
         engine.set("sub-ass-override", "scale")
         engine.set("embeddedfonts", "yes")
         styles.attach(engine)
-        // A new file starts at its remembered delay (US-41.4), else the default (US-41.3).
+        // A new file starts at its remembered delay (US-41.4), else the default (US-41.3). Applied once
+        // the file has loaded, also when the same file opens again: set earlier, a slow load could lose it.
         val controller = SubtitleController(engine.asMpv())
         val store = SubtitleStyleStore(context)
         val perFile = choices(context)
         val job = scope.launch {
-            engine.state.map { it.uri }.distinctUntilChanged().filterNotNull().collect { uri ->
+            engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.mapNotNull { it.second }.collect { uri ->
                 val remembered = perFile.get(uri, DELAY_KEY)?.toLongOrNull()
                 controller.setDelayMs(remembered ?: store.defaultDelayMs.first())
             }
@@ -188,6 +190,7 @@ private object TracksPanel : PlayerPanel {
                 scope.launch { host.engine.state.value.uri?.let { loader.onFileLoaded(host.engine, it) } }
             }
         }
+        val online by remember { OnlineAccountStore(context).account }.collectAsState(OnlineAccount())
         val offerFolder = loader.lastResult?.takeIf { !it.folderGranted }?.place?.let(loader::folderUri)
 
         Column(Modifier.padding(bottom = 16.dp)) {
@@ -229,6 +232,13 @@ private object TracksPanel : PlayerPanel {
                         }
                     }
                 }
+            }
+            // US-46.4: hidden unless the viewer turned online search on in settings.
+            if (online.ready) {
+                OutlinedButton(
+                    onClick = { host.open(SubtitlesExtension.ONLINE_PANEL) },
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp).testTag("sub-search-online"),
+                ) { Text(stringResource(R.string.subs_online_search_action)) }
             }
             if (offerFolder != null) {
                 OutlinedButton(

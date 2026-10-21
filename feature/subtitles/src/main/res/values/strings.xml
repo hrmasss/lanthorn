@@ -60,4 +60,25 @@
         <item quantity="one">%1$d folder. Videos in it and below find their subtitles by themselves.</item>
         <item quantity="other">%1$d folders. Videos in them and below find their subtitles by themselves.</item>
     </plurals>
+    <string name="subs_online_search_action">Search online</string>
+    <string name="subs_online_title">Search online</string>
+    <string name="subs_online_query">Title or file name</string>
+    <string name="subs_online_language">Languages (en, fr)</string>
+    <string name="subs_online_search">Search</string>
+    <string name="subs_online_searching">Searching opensubtitles.com…</string>
+    <string name="subs_online_nothing">Nothing found.</string>
+    <string name="subs_online_downloading">Downloading…</string>
+    <string name="subs_online_failed">Could not reach the service: %1$s</string>
+    <string name="subs_online_result">%1$s · rated %2$.1f · %3$d downloads</string>
+    <string name="subs_online_exact">matches this file</string>
+    <string name="subs_setting_online">Online search</string>
+    <string name="subs_setting_online_on">Search subtitles online</string>
+    <string name="subs_setting_online_summary">Off by default. Uses opensubtitles.com, only when you tap Search, with your own account.</string>
+    <string name="subs_setting_online_key">API key</string>
+    <string name="subs_setting_online_key_summary">Create one under your opensubtitles.com profile, API consumers</string>
+    <string name="subs_setting_online_user">Username</string>
+    <string name="subs_setting_online_password">Password</string>
+    <string name="subs_setting_set">Set</string>
+    <string name="subs_setting_not_set">Not set</string>
+    <string name="subs_setting_save">Save</string>
 </resources>
