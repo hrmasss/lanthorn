@@ -87,6 +87,8 @@ jobs:
           disable-animations: true
           script: |
             adb logcat -c || true
+            # A fresh AVD shows a one-time "Viewing full screen" prompt over the player that takes the taps.
+            adb shell settings put secure immersive_mode_confirmations confirmed || true
             ./gradlew ${{ matrix.task }} -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker
             mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
