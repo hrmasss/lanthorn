@@ -125,6 +125,44 @@ class PlaybackToolsTest {
         context.contentResolver.delete(uri, null, null)
     }
 
+    /**
+     * US-33.1 "without subtitles": with a subtitle on screen, the saved PNG has no subtitle text,
+     * while mpv's own subtitle-including capture of the same paused frame does.
+     */
+    @Test fun screenshotLeavesSubtitlesOut_US33_1() = runBlocking<Unit> {
+        open("clip.mp4")
+        engine.command("sub-add", copy("sub.srt").path!!, "select")
+        SystemClock.sleep(1_000)
+        engine.pause()
+        SystemClock.sleep(500)
+        val uri = tools.screenshot(context)!!
+        val saved = context.contentResolver.openInputStream(uri)!!.use { android.graphics.BitmapFactory.decodeStream(it) }
+        val withSubs = File(context.cacheDir, "with-subs.png")
+        engine.command("screenshot-to-file", withSubs.path, "subtitles")
+        engine.get("pause", PropertyType.Flag)
+        val reference = android.graphics.BitmapFactory.decodeFile(withSubs.path)
+        val textSaved = whiteRows(saved)
+        val textReference = whiteRows(reference)
+        log("US-33.1 subtitle text pixels: saved frame $textSaved, mpv capture with subtitles $textReference (same frame, ${saved.width}x${saved.height})")
+        File(context.getExternalFilesDir(null), "evidence").apply { mkdirs() }.let { dir ->
+            context.contentResolver.openInputStream(uri)!!.use { input -> File(dir, "p113-screenshot-saved.png").outputStream().use { input.copyTo(it) } }
+            withSubs.copyTo(File(dir, "p113-screenshot-with-subs-reference.png"), overwrite = true)
+        }
+        context.contentResolver.delete(uri, null, null)
+        assertTrue("reference shows the subtitle", textReference > 50)
+        assertTrue("saved frame has no subtitle text", textSaved * 10 < textReference)
+    }
+
+    /** Near-white pixels in the bottom third, where the subtitle sits. */
+    private fun whiteRows(b: android.graphics.Bitmap): Int {
+        var n = 0
+        for (y in b.height * 2 / 3 until b.height) for (x in 0 until b.width) {
+            val c = b.getPixel(x, y)
+            if (android.graphics.Color.red(c) > 235 && android.graphics.Color.green(c) > 235 && android.graphics.Color.blue(c) > 235) n++
+        }
+        return n
+    }
+
     private fun waitUntil(ms: Long, check: () -> Boolean) {
         val end = SystemClock.elapsedRealtime() + ms
         while (!check()) {
@@ -134,11 +172,10 @@ class PlaybackToolsTest {
     }
 
     private fun copy(asset: String): Uri {
+        // Always fresh: a crashed run once left a truncated copy here.
         val file = File(context.cacheDir, asset)
-        if (!file.exists()) {
-            InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
-                file.outputStream().use { input.copyTo(it) }
-            }
+        InstrumentationRegistry.getInstrumentation().context.assets.open(asset).use { input ->
+            file.outputStream().use { input.copyTo(it) }
         }
         return Uri.fromFile(file)
     }
