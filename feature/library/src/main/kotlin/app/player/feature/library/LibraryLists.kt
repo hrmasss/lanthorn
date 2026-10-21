@@ -74,6 +74,8 @@ internal class RowContext(
     val onVideo: (LibraryVideo) -> Unit,
     val folderActions: List<RowAction<LibraryFolder>> = emptyList(),
     val videoActions: List<RowAction<LibraryVideo>> = emptyList(),
+    /** Watch state per video id (US-07). */
+    val marks: Map<Long, VideoMark> = emptyMap(),
     /** Selected row keys ([SelectionKey]); non-empty means selection mode (US-09.1). */
     val selection: Set<String> = emptySet(),
     /** Toggles a row. Null where the screen has no selection mode. */
@@ -237,6 +239,7 @@ private fun VideoRow(video: LibraryVideo, ctx: RowContext) {
             Text(
                 displayName(video.name),
                 style = MaterialTheme.typography.titleMedium,
+                color = nameColor(ctx.marks[video.id]),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -262,6 +265,7 @@ private fun VideoCell(video: LibraryVideo, ctx: RowContext) {
                 Text(
                     displayName(video.name),
                     style = MaterialTheme.typography.titleSmall,
+                    color = nameColor(ctx.marks[video.id]),
                     maxLines = 2,
                     minLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -284,6 +288,11 @@ private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
     }
     val parts = buildList {
         if (!video.available) add(stringResource(R.string.library_unavailable))
+        ctx.marks[video.id]?.let { m ->
+            if (m.lastPlayed) add(stringResource(R.string.mark_last_played))
+            if (m.finished) add(stringResource(R.string.mark_finished))
+            if (m.isNew) add(stringResource(R.string.mark_new))
+        }
         ctx.volumeLabel(video.volume)?.let(::add)
         for (field in Field.entries) {
             if (field !in ctx.fields) continue
@@ -308,7 +317,13 @@ private fun VideoDetails(video: LibraryVideo, ctx: RowContext) {
 
 @Composable
 private fun VideoThumb(video: LibraryVideo, ctx: RowContext, modifier: Modifier) {
-    VideoThumbnail(duration = formatDuration(video.durationMs), modifier = modifier) {
+    val mark = ctx.marks[video.id]
+    VideoThumbnail(
+        duration = formatDuration(video.durationMs),
+        modifier = modifier,
+        resume = mark?.progress,
+        unplayed = mark?.isNew == true,
+    ) {
         ThumbImage(video, ctx.loader)
     }
 }
@@ -356,4 +371,12 @@ private fun ThumbImage(video: LibraryVideo, loader: ThumbnailLoader) {
             modifier = Modifier.fillMaxSize(),
         )
     }
+}
+
+/** Last played in the accent colour, finished dimmed, everything else as usual. */
+@Composable
+private fun nameColor(mark: VideoMark?) = when {
+    mark?.lastPlayed == true -> MaterialTheme.colorScheme.primary
+    mark?.finished == true -> MaterialTheme.colorScheme.onSurfaceVariant
+    else -> MaterialTheme.colorScheme.onSurface
 }

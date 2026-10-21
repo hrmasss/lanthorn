@@ -16,6 +16,9 @@ class ResumePoints(context: Context) {
 
     suspend fun all(): List<PlaybackPosition> = withContext(Dispatchers.IO) { dao.all() }
 
+    /** Live, for marks in lists. Room runs the query off the main thread. */
+    val flow: kotlinx.coroutines.flow.Flow<List<PlaybackPosition>> = dao.observeAll()
+
     suspend fun putAll(positions: List<PlaybackPosition>) = withContext(Dispatchers.IO) { dao.putAll(positions) }
 
     suspend fun clear() = withContext(Dispatchers.IO) { dao.clear() }
