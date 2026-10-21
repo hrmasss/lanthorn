@@ -381,7 +381,7 @@ object Playback : PlaybackControls {
 
     private suspend fun write(s: PlaybackState, why: String) {
         val row = Resume.toSave(s, System.currentTimeMillis(), seekable, live = s.uri == liveUri) ?: run {
-            Log.d(TAG, "not saved ($why): loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, seekable $seekable, uri ${s.uri}")
+            Log.d(TAG, "not saved ($why): at ${s.positionMs}, loaded ${s.loaded}, error ${s.error}, duration ${s.durationMs}, seekable $seekable, uri ${s.uri}")
             return
         }
         if (history.isPaused()) return
