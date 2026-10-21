@@ -76,7 +76,7 @@ class LibraryHomeTest {
         }
         vm.onAccess(MediaAccess.Full, false)
         show(vm, index)
-        rule.onNodeWithTag("library-list").assertExists()
+        rule.waitUntil(5_000) { rule.onAllNodesWithTag("library-list").fetchSemanticsNodes().isNotEmpty() }
         rule.onAllNodesWithTag("library-scanning").assertCountEquals(0)
 
         rule.onNodeWithTag("library-list").performTouchInput { swipeDown(startY = top + 20f, endY = bottom - 20f, durationMillis = 600) }

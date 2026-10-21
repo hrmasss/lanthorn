@@ -156,7 +156,12 @@ class GeneralSettingsTest {
         assertNotNull(runBlocking { ResumePoints(context).get(uri) })
 
         rule.onNodeWithText(string(R.string.action_clear)).performClick()
-        rule.waitUntil(5_000) { runBlocking { ResumePoints(context).get(uri) } == null }
+        rule.waitUntil(5_000) {
+            runBlocking {
+                ResumePoints(context).get(uri) == null && LibraryPrefsStore(context).prefs.first().recentSearches.isEmpty() &&
+                    NetworkPrefs(context).history.first().isEmpty()
+            }
+        }
         runBlocking {
             // Last-played marks come from resume points (US-07.4): none left to mark.
             assertTrue(ResumePoints(context).all().isEmpty())

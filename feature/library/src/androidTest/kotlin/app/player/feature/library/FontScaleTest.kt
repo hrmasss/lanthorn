@@ -72,12 +72,13 @@ class FontScaleTest {
             val r = results.firstOrNull() ?: return@mapNotNull null
             val text = node.config.getOrNull(SemanticsProperties.Text)?.joinToString() ?: r.layoutInput.text.text
             if (r.layoutInput.overflow == TextOverflow.Ellipsis) return@mapNotNull null
-            // Cut off: wider or taller than the room it was given, by more than rounding.
-            val wide = r.multiParagraph.width - r.size.width
+            // Cut off: a line wider than the text's box, text taller than it, or lines dropped.
+            val widest = (0 until r.lineCount).maxOf { r.getLineRight(it) - r.getLineLeft(it) }
+            val wide = widest - r.size.width
             val tall = r.multiParagraph.height - r.size.height
             val lines = r.multiParagraph.didExceedMaxLines
             "$text (over by ${"%.1f".format(wide)} x ${"%.1f".format(tall)} px, lines cut $lines)"
-                .takeIf { tall > 2f || lines || (r.didOverflowWidth && wide > 2f) }
+                .takeIf { tall > 2f || lines || wide > 2f }
         }
         android.util.Log.i("US-69.3", "$screen: ${nodes.size} texts checked")
         assertTrue("$screen at 200% font: clipped text $clipped", clipped.isEmpty())
