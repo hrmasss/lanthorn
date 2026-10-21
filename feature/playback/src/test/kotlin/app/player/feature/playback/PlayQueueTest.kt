@@ -1,15 +1,17 @@
 package app.player.feature.playback
 
 import app.player.core.engine.EngineMessage
+import app.player.core.testing.Ears
+import kotlin.random.Random
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.random.Random
 
 class PlayQueueTest {
     private val five = listOf("a", "b", "c", "d", "e")
 
+    @Ears("US-24.1")
     @Test fun `loop off plays in list order and stops after the last (US-24_1)`() {
         val q = PlayQueue(five, 2)
         val seen = mutableListOf(q.current)
@@ -18,6 +20,7 @@ class PlayQueueTest {
         assertFalse(q.hasNext(LoopMode.Off))
     }
 
+    @Ears("US-24.3")
     @Test fun `loop all goes from the last back to the first (US-24_3)`() {
         val q = PlayQueue(five, 4)
         assertTrue(q.hasNext(LoopMode.All))
@@ -27,6 +30,7 @@ class PlayQueueTest {
         assertEquals("e", q.current)
     }
 
+    @Ears("US-24.4")
     @Test fun `shuffle plays every item once before any repeats (US-24_4)`() {
         repeat(50) { seed ->
             val q = PlayQueue(five, 1, Random(seed))
@@ -60,6 +64,7 @@ class PlayQueueTest {
         assertEquals(5, n)
     }
 
+    @Ears("US-75.3")
     @Test fun `every item failed means the whole queue failed (US-75_3)`() {
         val q = PlayQueue(listOf("a", "b"), 0)
         q.markFailed()
@@ -71,6 +76,7 @@ class PlayQueueTest {
         assertFalse(q.allFailed)
     }
 
+    @Ears("US-75.1")
     @Test fun `failure reasons are named from the error and mpv's lines (US-75_1)`() {
         fun line(t: String) = EngineMessage("x", EngineMessage.Level.Error, t)
         assertEquals(FailureReason.MissingFile, Failures.classify("/sdcard/a.mp4: open failed: ENOENT (No such file or directory)", emptyList()))
@@ -79,6 +85,7 @@ class PlayQueueTest {
         assertEquals(FailureReason.Damaged, Failures.classify("cannot play this file", listOf(line("Failed to recognize file format."))))
     }
 
+    @Ears("US-29.1")
     @Test fun `smart previous restarts after 5 s, otherwise goes back (US-29_1)`() {
         assertTrue(previousRestarts(smartPrevious = true, positionMs = 5_001))
         assertFalse(previousRestarts(smartPrevious = true, positionMs = 5_000))

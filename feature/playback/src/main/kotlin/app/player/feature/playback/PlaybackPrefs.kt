@@ -25,7 +25,17 @@ data class PlaybackSettings(
     val stepButtons: Boolean = false,
     val showPreviousNext: Boolean = true,
     val skipFailed: Boolean = false,
+    val lockMode: LockMode = LockMode.Lock,
+    val orientation: OrientationMode = OrientationMode.FollowVideo,
+    /** "On leaving the app" (US-58.1, US-59.1, US-59.4). */
+    val onLeave: OnLeave = OnLeave.Pip,
 )
+
+/** Lock (US-28.1) or kids lock (US-28.2). */
+enum class LockMode { Lock, Kids }
+
+/** What happens when the viewer leaves the player while it plays. */
+enum class OnLeave { Pip, Background, Stop }
 
 class PlaybackPrefs(context: Context) {
     val store = context.applicationContext.playbackStore
@@ -42,6 +52,9 @@ class PlaybackPrefs(context: Context) {
             stepButtons = p[STEP_BUTTONS] ?: false,
             showPreviousNext = p[SHOW_PREVIOUS_NEXT] ?: true,
             skipFailed = p[SKIP_FAILED] ?: false,
+            lockMode = p[LOCK_MODE].enumOr(LockMode.Lock),
+            orientation = p[ORIENTATION].enumOr(OrientationMode.FollowVideo),
+            onLeave = p[ON_LEAVE].enumOr(OnLeave.Pip),
         )
     }
 
@@ -55,6 +68,9 @@ class PlaybackPrefs(context: Context) {
     suspend fun setStepButtons(on: Boolean) = store.edit { it[STEP_BUTTONS] = on }
     suspend fun setShowPreviousNext(on: Boolean) = store.edit { it[SHOW_PREVIOUS_NEXT] = on }
     suspend fun setSkipFailed(on: Boolean) = store.edit { it[SKIP_FAILED] = on }
+    suspend fun setLockMode(mode: LockMode) = store.edit { it[LOCK_MODE] = mode.name }
+    suspend fun setOrientation(mode: OrientationMode) = store.edit { it[ORIENTATION] = mode.name }
+    suspend fun setOnLeave(mode: OnLeave) = store.edit { it[ON_LEAVE] = mode.name }
     suspend fun reset() = store.edit { it.clear() }
 
     companion object {
@@ -68,5 +84,11 @@ class PlaybackPrefs(context: Context) {
         val STEP_BUTTONS = booleanPreferencesKey("step_buttons")
         val SHOW_PREVIOUS_NEXT = booleanPreferencesKey("show_previous_next")
         val SKIP_FAILED = booleanPreferencesKey("skip_failed")
+        val LOCK_MODE = stringPreferencesKey("lock_mode")
+        val ORIENTATION = stringPreferencesKey("orientation")
+        val ON_LEAVE = stringPreferencesKey("on_leave")
+
+        private inline fun <reified E : Enum<E>> String?.enumOr(default: E): E =
+            this?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default
     }
 }
