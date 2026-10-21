@@ -119,7 +119,10 @@ object AudioExtension : PlayerExtension {
                 val store = choices ?: PerFileChoices(context).also { choices = it }
                 // Every finished load, also of the same file again: mpv picks tracks afresh each time.
                 engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.collect { (_, uri) ->
-                    uri?.let { store.get(it, TRACK_KEY) }?.toLongOrNull()?.let { engine.set("aid", it.toString()) }
+                    // mpv's aid is global: without a remembered pick, give the choice back to its own rule
+                    // (preferred language, else the default-flagged track), not the last file's pick.
+                    val remembered = uri?.let { store.get(it, TRACK_KEY) }?.toLongOrNull()
+                    engine.set("aid", remembered?.toString() ?: "auto")
                 }
             },
             // US-48.3: every new file starts at the default delay.
