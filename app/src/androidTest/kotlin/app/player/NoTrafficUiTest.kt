@@ -29,6 +29,7 @@ import kotlin.concurrent.thread
  * The test runs in the app's process, so the counters are the app's.
  */
 // Local use first: the stream control opens a connection, which must not be live during the zero check.
+// CI runs this class last, alone, in a fresh process (instrumented.yml).
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @RunWith(AndroidJUnit4::class)
 class NoTrafficUiTest {
@@ -53,9 +54,22 @@ class NoTrafficUiTest {
     @Test fun localUseSendsAndReceivesNothing() {
         StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().build())
         val uid = Process.myUid()
-        val tx0 = TrafficStats.getUidTxBytes(uid)
-        val rx0 = TrafficStats.getUidRxBytes(uid)
-        assertTrue("traffic counters unsupported here", tx0 != TrafficStats.UNSUPPORTED.toLong())
+        assertTrue("traffic counters unsupported here", TrafficStats.getUidTxBytes(uid) != TrafficStats.UNSUPPORTED.toLong())
+        // Baseline only once the uid's counters have been still for 10 s (90 s at most). No app
+        // screen runs yet, so anything moving here is not the app's code: say what it was.
+        var last = TrafficStats.getUidTxBytes(uid) to TrafficStats.getUidRxBytes(uid)
+        var stillSince = SystemClock.elapsedRealtime()
+        val quietEnd = stillSince + 90_000
+        while (SystemClock.elapsedRealtime() - stillSince < 10_000 && SystemClock.elapsedRealtime() < quietEnd) {
+            SystemClock.sleep(1_000)
+            val now = TrafficStats.getUidTxBytes(uid) to TrafficStats.getUidRxBytes(uid)
+            if (now != last) {
+                Log.i("P2.1", "before the app starts: sent ${now.first - last.first}, received ${now.second - last.second} bytes")
+                last = now
+                stillSince = SystemClock.elapsedRealtime()
+            }
+        }
+        val (tx0, rx0) = last
 
         context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
