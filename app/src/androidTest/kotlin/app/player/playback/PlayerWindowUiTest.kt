@@ -67,6 +67,8 @@ class PlayerWindowUiTest {
         device.wakeUp()
         device.unfreezeRotation()
         // Each test starts its files from 0: a row left by an earlier test resumes near the end.
+        // The last test's engine writes its row as it goes, so wait for it to be gone first.
+        waitFor(5_000) { PlayerSessions.current.value == null }
         runBlocking { ResumePoints(context).clear() }
     }
 
@@ -225,12 +227,12 @@ class PlayerWindowUiTest {
             assertNotNull("PiP action missing: $a", device.wait(Until.findObject(By.desc(a)), 2_000))
         }
         val p0 = state()!!.positionMs
-        device.findObject(By.desc("Pause")).click()
+        pipAction("Pause", b)
         assertTrue("PiP pause did not pause", waitFor(2_000) { state()!!.paused })
-        device.wait(Until.findObject(By.desc("Forward 10 seconds")), 1_500)?.click()
+        pipAction("Forward 10 seconds", b)
         assertTrue("PiP forward did not seek", waitFor(2_000) { state()!!.positionMs >= p0 + 8_000 })
         shot("22-pip-paused")
-        device.wait(Until.findObject(By.desc("Play")), 1_500)?.click()
+        pipAction("Play", b)
         // US-58.3: expand returns to the full player, same file, same position (no reopen).
         val uri = state()!!.uri
         val before = state()!!.positionMs
@@ -276,6 +278,16 @@ class PlayerWindowUiTest {
     }
 
     // --- helpers
+
+    /** Taps a PiP menu action. The system hides the menu after a few seconds: tap the window to bring it back first. */
+    private fun pipAction(desc: String, window: android.graphics.Rect) {
+        if (!device.hasObject(By.desc(desc))) {
+            device.click(window.centerX(), window.centerY())
+            device.wait(Until.hasObject(By.desc(desc)), 2_000)
+        }
+        // Found and tapped at once, so the menu cannot change between the two.
+        retrying { device.findObject(By.desc(desc))!!.click() }
+    }
 
     private fun file(name: String): File = File(context.filesDir, name).also { f ->
         if (!f.exists()) instr.context.assets.open(name).use { i -> f.outputStream().use { i.copyTo(it) } }

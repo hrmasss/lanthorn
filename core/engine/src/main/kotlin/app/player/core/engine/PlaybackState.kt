@@ -49,3 +49,6 @@ data class VideoInfo(
 data class EngineMessage(val prefix: String, val level: Level, val text: String) {
     enum class Level { Warn, Error }
 }
+
+/** Where an engine was when its decoder stopped answering ([PlayerEngine.stalled]). */
+data class Stall(val uri: String, val positionMs: Long, val paused: Boolean, val decoder: ActiveDecoder)

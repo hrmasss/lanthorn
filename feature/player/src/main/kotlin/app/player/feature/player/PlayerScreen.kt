@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -496,11 +497,14 @@ fun PlayerScreen(
                 }
             },
     ) {
-        AndroidView(
-            factory = { VideoSurfaceView(it).apply { this.engine = engine } },
-            update = { it.engine = engine },
-            modifier = Modifier.fillMaxSize(),
-        )
+        // A new surface for a new engine: a stalled one may never let go of the old surface.
+        key(engine) {
+            AndroidView(
+                factory = { VideoSurfaceView(it).apply { this.engine = engine } },
+                update = { it.engine = engine },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         // Touch layer over the video. Single tap toggles the controls (US-16.2); the gesture model
         // replaces this with P1.10.
         Box(

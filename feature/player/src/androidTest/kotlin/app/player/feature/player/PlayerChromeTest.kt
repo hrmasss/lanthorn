@@ -257,7 +257,8 @@ class PlayerChromeTest {
         SystemClock.sleep(500)
         log("decoder switch to $target: playback restarted after $switchMs ms, position $before -> $after (difference ${after - before} ms), now running ${engine.state.value.activeDecoder}")
         assertWithin("decoder switch", switchMs, 1_000)
-        assertTrue("position moved by ${after - before} ms", kotlin.math.abs(after - before) <= 500)
+        // Playback may run on while the switch happens, never more than the switch took.
+        assertTrue("position moved by ${after - before} ms in a $switchMs ms switch", after - before in -500..switchMs + 500)
     }
 
     @Ears("US-78.1")

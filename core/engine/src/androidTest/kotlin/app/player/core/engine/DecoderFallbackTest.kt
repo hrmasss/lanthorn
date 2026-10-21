@@ -13,6 +13,8 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -63,6 +65,30 @@ class DecoderFallbackTest {
         if (!lenient) org.junit.Assert.assertTrue("SW took $ms ms", ms <= 1000)
     }
 
+    /** P2.6: a call into mpv that does not return on a hardware decoder is reported within the bound (NF-5). */
+    @Ears("NF-5")
+    @Test fun watchdogReportsAStuckEngineOnHardware_NF5(): Unit = runBlocking {
+        engine.open(asset("clip.mp4"))
+        withTimeout(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.HW || it.activeDecoder == ActiveDecoder.HW_PLUS } }
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        engine.blockEngineThreadForTest(10_000)
+        val stall = withTimeout(PlayerEngine.STALL_MS + 2_000) { engine.stalled.first { it != null } }!!
+        val ms = android.os.SystemClock.elapsedRealtime() - t0
+        Log.i("P1.1", "watchdog: stall reported after $ms ms: $stall")
+        assertTrue("reported after $ms ms", ms >= PlayerEngine.STALL_MS)
+        assertEquals(engine.state.value.uri, stall.uri)
+    }
+
+    /** Software decoding has nothing to fall to: a busy engine there is logged, not replaced. */
+    @Ears("NF-5")
+    @Test fun watchdogLeavesSoftwareAlone_NF5(): Unit = runBlocking {
+        engine.open(asset("clip.mp4"), decoder = DecoderMode.SW)
+        withTimeout(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.SW } }
+        engine.blockEngineThreadForTest(PlayerEngine.STALL_MS + 1_500)
+        delay(PlayerEngine.STALL_MS + 1_000)
+        assertEquals(null, engine.stalled.value)
+    }
+
     @Ears("US-35.3")
     @Test fun autoNeedsNoNotice_US35_3(): Unit = runBlocking {
         engine.open(asset("h444.mp4"), decoder = DecoderMode.AUTO)
@@ -89,6 +115,15 @@ class DecoderFallbackTest {
         val notice = engine.state.value.decoderNotice
         if (cameUp) {
             assertEquals("a notice showed though HW+ came up: $seen", emptyList<String>(), seen.filterNot { it.endsWith("/null") })
+        } else if (notice == null && engine.get("pause", PropertyType.Flag) == null) {
+            // The hosted emulator's MediaCodec can stop answering after the switch, and mpv then
+            // holds the engine thread: neither outcome can show here. The watchdog must have caught
+            // it (in the app, PlayerSessions then replaces the engine on SW: EngineStallUiTest).
+            // The notice judgement itself is not tested on this run, so the test is skipped, with a
+            // warning, not passed.
+            withTimeout(PlayerEngine.STALL_MS + 2_000) { engine.stalled.first { it != null } }
+            Log.w("P1.1", "WARNING skipped: HW+ decoder stalled after the switch, watchdog reported ${engine.stalled.value}; states $seen")
+            assumeTrue("WARNING: HW+ decoder stalled after the switch; the watchdog caught it: $seen", false)
         } else {
             // HW+ cannot play this file here: then the notice must say so and the badge must agree.
             assertEquals("states $seen", "HW+ cannot play this video. Playing with SW.", notice)

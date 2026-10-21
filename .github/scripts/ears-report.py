@@ -153,8 +153,11 @@ def read_results(results):
                         status = "fail"
                         lines = (el.get("message") or el.text or "").strip().splitlines()
                         message = lines[0][:300] if lines else ""
-                if case.find("skipped") is not None and status == "pass":
+                skipped = case.find("skipped")
+                if skipped is not None and status == "pass":
                     status = "skipped"
+                    lines = (skipped.get("message") or skipped.text or "").strip().splitlines()
+                    message = lines[0][:300] if lines else ""
                 # A test that ran twice (retries, two devices) counts as failed if any run failed.
                 if out.get(key, {}).get("status") == "fail":
                     continue
@@ -222,6 +225,13 @@ def main():
             f.write(f"- {name}: run {r['id']} ({r['conclusion'] or 'not finished'})\n")
         s = report["summary"]
         f.write(f"\n{len(rows)} tagged results: {s['pass']} pass, {s['fail']} fail, {s['skipped']} skipped, {s['not run']} not run.\n\n")
+        # A skipped test proved nothing on this run: say so above the table, with its reason.
+        skips = [r for r in rows if r["status"] == "skipped"]
+        if skips:
+            f.write("**Warning: skipped tests** (they prove nothing on this run)\n\n")
+            for r in skips:
+                f.write(f"- {r['id']} `{r['test'].rpartition('.')[2]}`: {r['message'] or 'no reason given'}\n")
+            f.write("\n")
         f.write("| Id | Status | Test | Module | Shots | Message |\n|---|---|---|---|---|---|\n")
         for r in rows:
             cls, _, fun = r["test"].rpartition("#")

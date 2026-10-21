@@ -160,9 +160,14 @@ class VideoToolsTest {
         tools.setPicture(PictureAdjust(brightness = 40, contrast = -20, saturation = 60, gamma = 10))
         val adjusted = grab("adjust-on")
         tools.setPicture(PictureAdjust())
-        val reset = grab("adjust-reset")
+        // Four properties, each its own redraw: the slow hosted emulator can show the frame before
+        // the last one lands. Capture until it matches or 5 s pass; the assert reads the last one.
+        val t0 = SystemClock.elapsedRealtime()
+        var back: Int
+        do {
+            back = maxDiff(plain, grab("adjust-reset"))
+        } while (back > baseline && SystemClock.elapsedRealtime() - t0 < 5_000)
         val changed = maxDiff(plain, adjusted)
-        val back = maxDiff(plain, reset)
         log("picture adjust: capture baseline $baseline, max channel difference with adjust $changed, after reset to zeros $back")
         assertTrue("adjust changed the frame", changed > 10)
         assertEquals("zeros give back the frame", 0, back)
