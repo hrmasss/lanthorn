@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.player.core.engine.ActiveDecoder
@@ -82,8 +83,11 @@ class DecoderUiTest {
         repeat(3) {
             showControls()
             device.findObject(By.desc("More options"))?.click()
-            if (device.wait(Until.hasObject(By.text(label)), 2000)) {
-                device.findObject(By.text(label)).click()
+            // On smaller screens the entry can sit below the fold of the menu.
+            val entry = device.wait(Until.findObject(By.text(label)), 1500)
+                ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text(label)))
+            if (entry != null) {
+                entry.click()
                 SystemClock.sleep(1200)
                 return
             }
