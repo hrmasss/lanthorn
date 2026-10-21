@@ -302,7 +302,7 @@ object Playback : PlaybackControls {
                     if (s.ended && (newFile || prev?.ended == false)) {
                         // No decoder for any stream: mpv "plays" nothing and ends at once (US-75.1).
                         val nothingPlayed = s.video == null && (lines.any(Failures::isDecoderFailure) || s.positionMs < 1000)
-                        if (nothingPlayed) failed(engine, s) else ended()
+                        if (nothingPlayed || Failures.endedEarly(s.positionMs, s.durationMs, lines.toList())) failed(engine, s) else ended()
                     }
                 }
                 last = s

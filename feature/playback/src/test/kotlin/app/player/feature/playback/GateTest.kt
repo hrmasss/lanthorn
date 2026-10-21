@@ -41,4 +41,12 @@ class GateTest {
         assertEquals(listOf("Cannot play this file.", "Failed to initialize a decoder for codec 'zq9x'."), Failures.technical("cannot play this file", lines))
         assertEquals("zq9x", Failures.codecOf(lines))
     }
+
+    @Test fun `a file that ends early after an mpv error failed, a normal end did not (US-75_1)`() {
+        val error = listOf(EngineMessage("ffmpeg/demuxer", EngineMessage.Level.Error, "error reading packet"))
+        assert(Failures.endedEarly(positionMs = 0, durationMs = 4_000, lines = error))
+        assert(!Failures.endedEarly(positionMs = 3_990, durationMs = 4_000, lines = error))
+        assert(!Failures.endedEarly(positionMs = 0, durationMs = 4_000, lines = emptyList()))
+        assert(!Failures.endedEarly(positionMs = 200, durationMs = 900, lines = error))
+    }
 }

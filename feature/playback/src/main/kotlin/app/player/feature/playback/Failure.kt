@@ -14,6 +14,14 @@ object Failures {
         "no decoder found", "Requested decoder", "No video or audio streams",
     )
 
+    /**
+     * A file that "ends" well before its duration right after mpv logged an error did not play: mpv
+     * hit a fatal read error and stopped (US-75.1). A normal end, or a short file, is not this.
+     */
+    fun endedEarly(positionMs: Long, durationMs: Long, lines: List<EngineMessage>): Boolean =
+        durationMs > 0 && positionMs < durationMs * 0.95 && durationMs - positionMs > 1_000 &&
+            lines.any { it.level == EngineMessage.Level.Error }
+
     /** True for a log line that says a decoder could not start. */
     fun isDecoderFailure(m: EngineMessage) = codec.any { m.text.contains(it, ignoreCase = true) }
 
