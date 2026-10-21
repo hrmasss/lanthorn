@@ -103,7 +103,7 @@ internal fun SearchScreen(
                     modifier = Modifier.padding(24.dp).testTag("search-none"),
                 )
                 else -> {
-                    val base = rowContext(content, vm, loaders, onFolder, onPlay)
+                    val base = rowContext(content, vm, loaders, onFolder, result.videos, { uris, i -> onPlay(uris[i]) })
                     val ctx = remember(base, query) {
                         RowContext(
                             base.loader, base.fps, base.fields, base.volumeLabel,
