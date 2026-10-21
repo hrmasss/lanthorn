@@ -1,0 +1,11 @@
+# Every permission the release app may ask for (P2.1, NF-8). A new one fails CI until it is added
+# here with its reason, so a library cannot add one unseen.
+android.permission.READ_MEDIA_VIDEO                 # library: read videos (US-71)
+android.permission.READ_EXTERNAL_STORAGE            # library: the same before Android 13 (maxSdkVersion 32)
+android.permission.READ_MEDIA_VISUAL_USER_SELECTED  # library: "select videos" partial access on Android 14+
+android.permission.INTERNET                         # network streams and SMB the viewer opens (US-61, US-62)
+android.permission.MODIFY_AUDIO_SETTINGS            # audio: equalizer and volume boost effects
+android.permission.FOREGROUND_SERVICE               # engine: background play (US-59)
+android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK # engine: background play service type
+android.permission.POST_NOTIFICATIONS               # engine: the playback notification (US-59)
+app.player.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION # androidx core: guards the app's own receivers
