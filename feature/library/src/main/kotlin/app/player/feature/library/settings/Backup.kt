@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import app.player.core.data.PlaybackPosition
 import app.player.core.data.history.ResumePoints
+import app.player.core.data.playlist.Playlist
+import app.player.core.data.playlist.Playlists
 import app.player.core.settingsapi.BackupPart
 import app.player.core.settingsapi.backupParts
 import app.player.core.settingsapi.settingsGroups
@@ -101,5 +103,40 @@ object ResumePointsBackup : BackupPart {
         }
         ResumePoints(context).putAll(positions)
         return positions.size
+    }
+}
+
+/** Playlists in backups (US-12, US-66.1), entries in their order. Restored playlists keep their ids. */
+object PlaylistsBackup : BackupPart {
+    override val id = "playlists"
+    override val label = R.string.backup_playlists
+
+    override suspend fun export(context: Context): JSONObject {
+        val items = JSONArray()
+        for ((p, entries) in Playlists(context).all()) {
+            val list = JSONArray()
+            for (e in entries) {
+                list.put(JSONObject().put("uri", e.uri).put("name", e.name))
+            }
+            items.put(JSONObject().put("id", p.id).put("name", p.name).put("createdAt", p.createdAt).put("entries", list))
+        }
+        return JSONObject().put("items", items)
+    }
+
+    override suspend fun import(context: Context, data: JSONObject): Int {
+        val items = data.optJSONArray("items") ?: return 0
+        val store = Playlists(context)
+        var restored = 0
+        for (i in 0 until items.length()) {
+            val o = items.optJSONObject(i) ?: continue
+            val playlist = runCatching { Playlist(o.getLong("id"), o.getString("name"), o.getLong("createdAt")) }.getOrNull() ?: continue
+            val list = o.optJSONArray("entries") ?: JSONArray()
+            val videos = (0 until list.length()).mapNotNull { j ->
+                list.optJSONObject(j)?.let { e -> runCatching { e.getString("uri") to e.getString("name") }.getOrNull() }
+            }
+            store.restore(playlist, videos)
+            restored++
+        }
+        return restored
     }
 }

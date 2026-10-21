@@ -109,6 +109,25 @@ internal object LibraryIcons {
         }
     }
 
+    /** Three lines and a plus: a new playlist, or add to one. */
+    val PlaylistAdd: ImageVector by lazy {
+        shapes("PlaylistAdd") {
+            roundRect(3f, 5f, 15f, 7f, 1f)
+            roundRect(3f, 10f, 15f, 12f, 1f)
+            roundRect(3f, 15f, 10f, 17f, 1f)
+            roundRect(16f, 12f, 18f, 22f, 1f)
+            roundRect(12f, 16f, 22f, 18f, 1f)
+        }
+    }
+
+    /** Two bars: grab here to drag a row. */
+    val DragHandle: ImageVector by lazy {
+        shapes("DragHandle") {
+            roundRect(4f, 8f, 20f, 10f, 1f)
+            roundRect(4f, 14f, 20f, 16f, 1f)
+        }
+    }
+
     /** Three sliders: choose the fields shown. */
     val Fields: ImageVector by lazy {
         shapes("Fields") {
