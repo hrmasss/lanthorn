@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -82,7 +83,7 @@ class PlaylistTest {
         rule.onNodeWithTag("playlist-pick-new").performClick()
         rule.onNodeWithTag("playlist-name-field").performTextInput("PL test dialog")
         rule.onNodeWithTag("playlist-name-save").performClick()
-        rule.waitUntil(5_000) { said.size == 1 }
+        rule.waitUntil(5_000) { said.size == 1 && !open }
         assertEquals("Added 2 videos to PL test dialog.", said[0])
 
         // Again, from selection with one new and one already there: the existing playlist is listed.
@@ -137,7 +138,7 @@ class PlaylistTest {
 
         rule.onNodeWithTag("playlist-more").performClick()
         rule.onNodeWithTag("playlist-rename").performClick()
-        rule.onNodeWithTag("playlist-name-field").performTextInput(" renamed")
+        rule.onNodeWithTag("playlist-name-field").performTextReplacement("PL test edit renamed")
         rule.onNodeWithTag("playlist-name-save").performClick()
         rule.waitUntil(5_000) { rule.onAllNodesWithText("PL test edit renamed").fetchSemanticsNodes().isNotEmpty() }
 
@@ -156,7 +157,7 @@ class PlaylistTest {
         val said = mutableListOf<String>()
         showPlaylist(id, onPlayQueue = { uris, i -> played = uris to i }, notify = { said += it })
         rule.waitUntil(5_000) { rule.onAllNodesWithTag("playlist-item").fetchSemanticsNodes().size == 5 }
-        rule.onAllNodesWithTag("playlist-missing").assertCountEquals(2)
+        rule.onAllNodesWithTag("playlist-missing", useUnmergedTree = true).assertCountEquals(2)
         evidenceShot("playlist-missing-greyed")
 
         rule.onNodeWithTag("playlist-play").performClick()

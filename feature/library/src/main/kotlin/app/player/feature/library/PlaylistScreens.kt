@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -268,11 +270,19 @@ internal fun PlaylistScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            VideoThumbnail(
-                                duration = item.durationMs?.let(::formatDuration).orEmpty(),
-                                modifier = Modifier.width(112.dp),
-                            ) {
-                                if (video != null && item.present) ThumbImage(video, loader)
+                            if (item.durationMs != null) {
+                                VideoThumbnail(duration = formatDuration(item.durationMs), modifier = Modifier.width(112.dp)) {
+                                    if (video != null && item.present) ThumbImage(video, loader)
+                                }
+                            } else {
+                                // Not in the library (a stream, a share, a deleted file): a plain frame, no length.
+                                Box(
+                                    Modifier
+                                        .width(112.dp)
+                                        .aspectRatio(16f / 9f)
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                )
                             }
                             Column(Modifier.weight(1f).heightIn(min = 40.dp), verticalArrangement = Arrangement.Center) {
                                 Text(
