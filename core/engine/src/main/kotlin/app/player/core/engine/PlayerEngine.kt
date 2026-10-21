@@ -84,6 +84,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private var pendingLoad: (() -> Unit)? = null
     private var videoBeforeDetach: String? = null
     private var reattachedAt = 0L
+    // Engine thread only. The video chain came back after the surface returned; mpv's next
+    // "first video frame" line is then its first frame on screen (US-59.3).
+    private var reconfiguredSinceReattach = false
     @Volatile private var released = false
 
     // Engine thread only. Latest-wins scrubbing: one keyframe seek in flight, the newest target waits.
@@ -420,6 +423,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // decoder and shows the frame at the current audio position.
         videoBeforeDetach?.let {
             reattachedAt = SystemClock.elapsedRealtime()
+            reconfiguredSinceReattach = false
             _state.update { s -> s.copy(videoBackMs = null) }
             setProperty("vid", it)
             videoBeforeDetach = null
@@ -578,14 +582,23 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     private fun mpvCommand(vararg args: String) = mpv?.command(arrayOf(*args))
     private fun setProperty(name: String, value: String) = mpv?.setPropertyString(name, value)
 
+    /**
+     * US-59.3: back from background, the time from the surface's return to the first frame drawn
+     * on it. VIDEO_RECONFIG alone comes about 0.9 s before that frame on the emulator (player-ui,
+     * run 39637149909), so the stamp waits for mpv's "first video frame after restart shown".
+     */
+    private fun videoShownAgain() {
+        if (reattachedAt == 0L || !reconfiguredSinceReattach) return
+        val back = SystemClock.elapsedRealtime() - reattachedAt
+        Log.i(TAG, "video shown again $back ms after the surface came back, at ${_state.value.positionMs} ms")
+        _state.update { it.copy(videoBackMs = back) }
+        reattachedAt = 0
+        reconfiguredSinceReattach = false
+    }
+
     private fun refreshVideo(triesLeft: Int = DECODER_SETTLE_TRIES) {
         val lib = mpv ?: return
-        if (reattachedAt > 0 && triesLeft == DECODER_SETTLE_TRIES) {
-            val back = SystemClock.elapsedRealtime() - reattachedAt
-            Log.i(TAG, "video shown again $back ms after the surface came back, at ${_state.value.positionMs} ms")
-            _state.update { it.copy(videoBackMs = back) }
-            reattachedAt = 0
-        }
+        if (reattachedAt > 0 && triesLeft == DECODER_SETTLE_TRIES) reconfiguredSinceReattach = true
         // VIDEO_RECONFIG can come before mpv knows the format, and no second one may follow: read
         // again until it does (or give up: no video track, or video turned off).
         val codec = lib.getPropertyString("video-format") ?: run {
@@ -704,6 +717,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
     private val logObserver = object : MPVLib.LogObserver {
         override fun logMessage(prefix: String, level: Int, text: String) {
+            // mpv's only signal that a new video chain drew its first frame: a track switched back on
+            // sends no PLAYBACK_RESTART (US-59.3). Posted, so it lands behind VIDEO_RECONFIG's post.
+            if (prefix == "cplayer" && text.startsWith("first video frame after restart shown")) post { videoShownAgain() }
             Log.println(if (level <= 20) Log.ERROR else Log.WARN, "mpv", "[$prefix] ${text.trimEnd()}")
             _messages.tryEmit(EngineMessage(prefix, if (level <= 20) EngineMessage.Level.Error else EngineMessage.Level.Warn, text.trimEnd()))
         }
