@@ -133,10 +133,19 @@ class AutoLoadOnDeviceTest {
             assertEquals("${c.label}: external tracks ${external.map { it.title to it.codec }}", 1, external.size)
             assertEquals(c.label, c.codec, external[0].codec)
             assertEquals(c.label, external[0].id, selected()?.id)
-            engine.pause()
-            engine.seekTo(1000)
-            delay(1500)
-            if (c.text != null) engine.await("sub-text", PropertyType.Text, 5_000) { it == c.text }
+            if (c.text != null) {
+                engine.pause()
+                engine.seekTo(1000)
+                delay(1500)
+                engine.await("sub-text", PropertyType.Text, 5_000) { it == c.text }
+            } else {
+                // Bitmap subtitles: play from the start into the line, as a viewer does, then hold the frame.
+                engine.seekTo(0)
+                engine.play()
+                engine.await("time-pos", PropertyType.Real, 10_000) { (it ?: 0.0) >= 1.2 }
+                engine.pause()
+                delay(1500)
+            }
             shotTo("us39-format-${c.label}")
             evidence("US-39.1 ${c.label}: ${external[0].title} loaded as ${external[0].codec} and on${c.text?.let { ", shows '$it'" } ?: " (bitmap, screenshot)"}")
             engine.play()
