@@ -31,7 +31,7 @@ enum class EqPreset(internal val bandsDb: List<Float>?) {
 }
 
 /** What the equalizer keeps across files and restarts (US-50.3). */
-internal data class EqSaved(
+data class EqSaved(
     val on: Boolean = false,
     val preampDb: Float = 0f,
     val preset: EqPreset = EqPreset.Flat,

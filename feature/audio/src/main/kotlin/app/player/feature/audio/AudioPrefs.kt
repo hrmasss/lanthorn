@@ -20,7 +20,7 @@ data class AudioPrefs(
     val defaultDelayMs: Long = 0,
     val bluetoothDelayMs: Long = 0,
     val volumeBoost: Boolean = true,
-    internal val eq: EqSaved = EqSaved(),
+    val eq: EqSaved = EqSaved(),
 )
 
 internal class AudioPrefsStore(context: Context) {
