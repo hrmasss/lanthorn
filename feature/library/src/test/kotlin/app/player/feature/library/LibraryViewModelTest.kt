@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -41,9 +43,9 @@ private class MemoryDao : LibraryDao {
     override suspend fun putExtra(extra: VideoExtra) = Unit
 }
 
-private fun source(list: () -> List<LibraryVideo>) = object : VideoSource {
+private fun source(mounted: () -> Set<String> = { setOf("external_primary") }, list: () -> List<LibraryVideo>) = object : VideoSource {
     override fun scan() = list()
-    override fun mountedVolumes() = setOf("external_primary")
+    override fun mountedVolumes() = mounted()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -124,6 +126,74 @@ class LibraryViewModelTest {
         assertEquals(listOf("Internal shared storage", "SD card"), s.volumes.map { it.label })
         assertEquals(null, s.volumeLabel("external_primary"))
         assertEquals("SD card", s.volumeLabel("1234-abcd"))
+    }
+
+    @Ears("US-80.2")
+    @Test fun `us_80_2 a volume mounted or removed while open shows or drops its videos within 5 s`() = runTest(main) {
+        val internal = video(1, "external_primary/Movies/")
+        val onCard = video(2, "1234-abcd/Movies/").copy(volume = "1234-abcd")
+        var mounted = setOf("external_primary")
+        onDisk = listOf(internal)
+        val vm = LibraryViewModel(
+            LibraryIndex(dao, source({ mounted }) { onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
+            null,
+            { (listOf(Volume("external_primary", "Internal shared storage")) + listOfNotNull(Volume("1234-abcd", "SD card").takeIf { "1234-abcd" in mounted })) },
+            StandardTestDispatcher(testScheduler),
+        )
+        vm.onAccess(MediaAccess.Full, false)
+        vm.refresh()
+        advanceUntilIdle()
+        fun content() = vm.state.value as LibraryUiState.Content
+
+        // The card goes in: the system's broadcast reaches onVolumesChanged, no restart.
+        mounted = mounted + "1234-abcd"
+        onDisk = listOf(internal, onCard)
+        vm.onVolumesChanged()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(listOf(1L, 2L), content().videos.map { it.id }.sorted())
+        assertEquals("SD card", content().volumeLabel("1234-abcd"))
+
+        // The card comes out: its videos leave the playable list (kept greyed, US-80.3), its label goes.
+        mounted = mounted - "1234-abcd"
+        onDisk = listOf(internal)
+        vm.onVolumesChanged()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(listOf(true), content().videos.filter { it.volume == "1234-abcd" }.map { !it.available })
+        assertEquals(listOf(1L), content().videos.filter { it.available }.map { it.id })
+        assertEquals(null, content().volumes.firstOrNull { it.name == "1234-abcd" })
+    }
+
+    @Ears("US-03.1")
+    @Test fun `us_03_1 all videos lists every scanned video in one flat list`() = runTest(main) {
+        onDisk = listOf(video(1, "external_primary/Movies/"), video(2, "external_primary/Movies/Trips/"), video(3, "external_primary/DCIM/"))
+        val vm = LibraryViewModel(
+            LibraryIndex(dao, source { onDisk }, StandardTestDispatcher(testScheduler), { 0 }),
+            null, { emptyList() }, StandardTestDispatcher(testScheduler),
+            prefs = kotlinx.coroutines.flow.flowOf(LibraryPrefs(viewMode = ViewMode.AllVideos)),
+        )
+        vm.onAccess(MediaAccess.Full, false)
+        vm.refresh()
+        advanceUntilIdle()
+        val s = vm.state.value as LibraryUiState.Content
+        assertEquals(ViewMode.AllVideos, s.prefs.viewMode)
+        assertEquals(listOf("v1.mp4", "v2.mp4", "v3.mp4"), s.videos.map { it.name })
+    }
+
+    @Ears("US-03.1", "US-04.3")
+    @Test fun `us_03_1 and us_04_3 view and sort choices come back from the stored file`() {
+        val stored = androidx.datastore.preferences.core.mutablePreferencesOf(
+            LibraryPrefsStore.VIEW_MODE to ViewMode.AllVideos.name,
+            LibraryPrefsStore.SORT_KEY to SortKey.Size.name,
+            LibraryPrefsStore.SORT_DESCENDING to true,
+        )
+        val prefs = with(LibraryPrefsStore) { stored.toPrefs() }
+        assertEquals(ViewMode.AllVideos, prefs.viewMode)
+        assertEquals(Sort(SortKey.Size, descending = true), prefs.sort)
+        // Defaults when nothing is stored.
+        val none = with(LibraryPrefsStore) { androidx.datastore.preferences.core.emptyPreferences().toPrefs() }
+        assertEquals(LibraryPrefs(), none)
     }
 
     @Test fun `partial access is flagged`() = runTest(main) {

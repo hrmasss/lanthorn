@@ -29,6 +29,12 @@ data class PlaybackSettings(
     val orientation: OrientationMode = OrientationMode.FollowVideo,
     /** "On leaving the app" (US-58.1, US-59.1, US-59.4). */
     val onLeave: OnLeave = OnLeave.Pip,
+    /** Volume keys change volume or brightness (US-77.1). */
+    val volumeKeys: VolumeKeys = VolumeKeys.Volume,
+    /** Next and previous media keys seek by the step instead (US-31.4). */
+    val nextPreviousSeek: Boolean = false,
+    /** Pause when another window covers the player (US-60.2). */
+    val pauseWhenCovered: Boolean = false,
 )
 
 /** Lock (US-28.1) or kids lock (US-28.2). */
@@ -36,6 +42,9 @@ enum class LockMode { Lock, Kids }
 
 /** What happens when the viewer leaves the player while it plays. */
 enum class OnLeave { Pip, Background, Stop }
+
+/** What the volume keys change while the full player shows. */
+enum class VolumeKeys { Volume, Brightness }
 
 class PlaybackPrefs(context: Context) {
     val store = context.applicationContext.playbackStore
@@ -55,6 +64,9 @@ class PlaybackPrefs(context: Context) {
             lockMode = p[LOCK_MODE].enumOr(LockMode.Lock),
             orientation = p[ORIENTATION].enumOr(OrientationMode.FollowVideo),
             onLeave = p[ON_LEAVE].enumOr(OnLeave.Pip),
+            volumeKeys = p[VOLUME_KEYS].enumOr(VolumeKeys.Volume),
+            nextPreviousSeek = p[NEXT_PREVIOUS_SEEK] ?: false,
+            pauseWhenCovered = p[PAUSE_WHEN_COVERED] ?: false,
         )
     }
 
@@ -71,6 +83,9 @@ class PlaybackPrefs(context: Context) {
     suspend fun setLockMode(mode: LockMode) = store.edit { it[LOCK_MODE] = mode.name }
     suspend fun setOrientation(mode: OrientationMode) = store.edit { it[ORIENTATION] = mode.name }
     suspend fun setOnLeave(mode: OnLeave) = store.edit { it[ON_LEAVE] = mode.name }
+    suspend fun setVolumeKeys(mode: VolumeKeys) = store.edit { it[VOLUME_KEYS] = mode.name }
+    suspend fun setNextPreviousSeek(on: Boolean) = store.edit { it[NEXT_PREVIOUS_SEEK] = on }
+    suspend fun setPauseWhenCovered(on: Boolean) = store.edit { it[PAUSE_WHEN_COVERED] = on }
     suspend fun reset() = store.edit { it.clear() }
 
     companion object {
@@ -87,6 +102,9 @@ class PlaybackPrefs(context: Context) {
         val LOCK_MODE = stringPreferencesKey("lock_mode")
         val ORIENTATION = stringPreferencesKey("orientation")
         val ON_LEAVE = stringPreferencesKey("on_leave")
+        val VOLUME_KEYS = stringPreferencesKey("volume_keys")
+        val NEXT_PREVIOUS_SEEK = booleanPreferencesKey("next_previous_seek")
+        val PAUSE_WHEN_COVERED = booleanPreferencesKey("pause_when_covered")
 
         private inline fun <reified E : Enum<E>> String?.enumOr(default: E): E =
             this?.let { v -> enumValues<E>().firstOrNull { it.name == v } } ?: default

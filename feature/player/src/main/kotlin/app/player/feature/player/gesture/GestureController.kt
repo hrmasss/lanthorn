@@ -214,6 +214,15 @@ class GestureController(private val fx: GestureEffects) {
         readout = null
     }
 
+    // ---- keys ----
+
+    /** One 5% brightness step from a volume key (US-77.1), shown on the same level bar as the swipe. */
+    fun stepBrightness(up: Boolean) {
+        val v = ((fx.brightness * 100).roundToInt() + if (up) KEY_STEP else -KEY_STEP).coerceIn(0, 100)
+        fx.brightness = v / 100f
+        readout = Readout.Level(LevelKind.Brightness, v)
+    }
+
     // ---- long press ----
 
     fun fastStart() {
@@ -299,6 +308,9 @@ class GestureController(private val fx: GestureEffects) {
     companion object {
         /** US-19.3. */
         const val SKIP_RUN_MS = 600L
+
+        /** US-77.1: percent per volume key press. */
+        const val KEY_STEP = 5
 
         /** US-17.1: linear, full width = [fullWidthSec]. */
         fun seekDelta(dx: Float, width: Float, fullWidthSec: Int): Long =

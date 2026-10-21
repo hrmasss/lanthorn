@@ -44,6 +44,9 @@ object PlaybackSettingsGroup : SettingsGroup {
     private const val LOCK = "lock_mode"
     private const val ORIENT = "orientation"
     private const val LEAVE = "on_leave"
+    private const val COVERED = "pause_when_covered"
+    private const val VOLUME = "volume_keys"
+    private const val SEEK_KEYS = "next_previous_seek"
 
     override val entries = listOf(
         SettingsEntry(RESUME, R.string.setting_resume),
@@ -55,6 +58,9 @@ object PlaybackSettingsGroup : SettingsGroup {
         SettingsEntry(PREV_NEXT, R.string.setting_show_previous_next),
         SettingsEntry(LINKS, R.string.setting_open_links, R.string.setting_open_links_summary),
         SettingsEntry(LEAVE, R.string.setting_on_leave),
+        SettingsEntry(COVERED, R.string.setting_pause_when_covered, R.string.setting_pause_when_covered_summary),
+        SettingsEntry(VOLUME, R.string.setting_volume_keys),
+        SettingsEntry(SEEK_KEYS, R.string.setting_next_previous_seek, R.string.setting_next_previous_seek_summary),
         SettingsEntry(ORIENT, R.string.setting_orientation),
         SettingsEntry(LOCK, R.string.setting_lock_mode),
     )
@@ -65,7 +71,7 @@ object PlaybackSettingsGroup : SettingsGroup {
         val scope = rememberCoroutineScope()
         val prefs = remember { PlaybackPrefs(context) }
         val s by prefs.settings.collectAsStateWithLifecycle(PlaybackSettings())
-        val order = listOf("h1", RESUME, FIRST_ONLY, "h3", BACK, SKIP, "h4", SMART, STEPS, PREV_NEXT, "h2", LINKS, "h5", LEAVE, ORIENT, LOCK)
+        val order = listOf("h1", RESUME, FIRST_ONLY, "h3", BACK, SKIP, "h4", SMART, STEPS, PREV_NEXT, "h2", LINKS, "h5", LEAVE, COVERED, VOLUME, SEEK_KEYS, ORIENT, LOCK)
         val list = rememberLazyListState()
         LaunchedEffect(highlight) {
             val i = order.indexOf(highlight)
@@ -119,6 +125,15 @@ object PlaybackSettingsGroup : SettingsGroup {
             item("h5") { SettingsHeader(stringResource(R.string.settings_section_screen)) }
             choice(LEAVE, R.string.setting_on_leave, listOf(OnLeave.Pip to R.string.on_leave_pip, OnLeave.Background to R.string.on_leave_background, OnLeave.Stop to R.string.on_leave_stop), s.onLeave, highlight) {
                 scope.launch { prefs.setOnLeave(it) }
+            }
+            switch(COVERED, R.string.setting_pause_when_covered, R.string.setting_pause_when_covered_summary, s.pauseWhenCovered, highlight) {
+                scope.launch { prefs.setPauseWhenCovered(it) }
+            }
+            choice(VOLUME, R.string.setting_volume_keys, listOf(VolumeKeys.Volume to R.string.volume_keys_volume, VolumeKeys.Brightness to R.string.volume_keys_brightness), s.volumeKeys, highlight) {
+                scope.launch { prefs.setVolumeKeys(it) }
+            }
+            switch(SEEK_KEYS, R.string.setting_next_previous_seek, R.string.setting_next_previous_seek_summary, s.nextPreviousSeek, highlight) {
+                scope.launch { prefs.setNextPreviousSeek(it) }
             }
             choice(
                 ORIENT, R.string.setting_orientation,

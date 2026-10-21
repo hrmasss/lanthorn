@@ -7,7 +7,6 @@ import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -71,23 +70,10 @@ class PlaylistUiTest {
         )
         assertTrue("never played", waitFor { PlayerSessions.current.value?.state?.value?.video != null })
 
+        val controls = PlayerControls(device)
         var opened = false
         repeat(3) {
-            if (opened) return@repeat
-            if (!device.hasObject(By.desc("More options"))) {
-                device.click(device.displayWidth / 2, device.displayHeight / 2)
-                device.wait(Until.hasObject(By.desc("More options")), 2000)
-            }
-            retrying { device.findObject(By.desc("More options"))?.click() }
-            val entry = retrying {
-                device.wait(Until.findObject(By.text("Add to playlist")), 1500)
-                    ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(By.text("Add to playlist")))
-            }
-            if (entry != null && retrying { (device.findObject(By.text("Add to playlist")) ?: entry).click() } != null) {
-                opened = device.wait(Until.hasObject(By.text("New playlist")), 3000)
-            } else if (device.hasObject(By.scrollable(true))) {
-                device.pressBack()
-            }
+            if (!opened && controls.menu("Add to playlist")) opened = device.wait(Until.hasObject(By.text("New playlist")), 3000)
         }
         assertTrue("Add to playlist panel did not open", opened)
         evidenceShot("player-add-to-playlist")

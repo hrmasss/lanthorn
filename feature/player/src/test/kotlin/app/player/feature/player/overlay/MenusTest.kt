@@ -15,8 +15,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import app.player.core.designsystem.theme.LanthornPlayerTheme
+import app.player.core.playerapi.MenuGroup
 import app.player.core.testing.Ears
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,5 +72,18 @@ class MenusTest {
         assertEquals(list, Shortcut.parse(Shortcut.format(list)))
         assertEquals(listOf(Shortcut.Speed), Shortcut.parse("Gone,Speed,Speed"))
         assertEquals(Shortcut.entries, Shortcut.parse(Shortcut.DEFAULT))
+    }
+
+    @Ears("US-59.1")
+    @Test fun `US-59_1 background play is a switch in the Tools menu`() {
+        var on by mutableStateOf(false)
+        val items = menuItems(
+            emptyList(),
+            listOf(MenuItem("background-play", MenuGroup.Tools, 150, { "Background play" }, { on }) { on = !on }),
+        ) {}
+        rule.setContent { LanthornPlayerTheme(dynamicColor = false) { MenuContent(items) } }
+        rule.onNodeWithTag("menu-background-play").performScrollTo().assertIsOff().performClick()
+        assertTrue(on)
+        rule.onNodeWithTag("menu-background-play").assertIsOn()
     }
 }
