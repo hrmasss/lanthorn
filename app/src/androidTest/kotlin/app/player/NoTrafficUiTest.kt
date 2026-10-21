@@ -74,20 +74,37 @@ class NoTrafficUiTest {
         settle(uid)
         val tx0 = TrafficStats.getUidTxBytes(uid)
         val rx0 = TrafficStats.getUidRxBytes(uid)
+        // Logs the moment any counter moves, so a failure lines up with the logcat around it.
+        val sampling = java.util.concurrent.atomic.AtomicBoolean(true)
+        val sampler = kotlin.concurrent.thread(isDaemon = true, name = "nf8-sampler") {
+            var last = longArrayOf(tx0, rx0, TrafficStats.getUidTxPackets(uid), TrafficStats.getUidRxPackets(uid))
+            while (sampling.get()) {
+                SystemClock.sleep(200)
+                val now = longArrayOf(TrafficStats.getUidTxBytes(uid), TrafficStats.getUidRxBytes(uid), TrafficStats.getUidTxPackets(uid), TrafficStats.getUidRxPackets(uid))
+                if (!now.contentEquals(last)) {
+                    Log.i("P2.1", "moved: tx +${now[0] - last[0]} B/${now[2] - last[2]} pk, rx +${now[1] - last[1]} B/${now[3] - last[3]} pk")
+                    last = now
+                }
+            }
+        }
 
         context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        Log.i("P2.1", "step: library started")
         SystemClock.sleep(5000)
         evidenceShot("library-after-start")
+        Log.i("P2.1", "step: opening the local file")
 
         context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(Uri.fromFile(file("withsubs.mp4")), "video/mp4")
             .setClassName(context, "app.player.feature.player.PlayerActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         assertTrue("never played", waitFor { PlayerSessions.current.value?.state?.value?.video != null })
         SystemClock.sleep(5000)
         evidenceShot("playing-local-file")
+        Log.i("P2.1", "step: leaving")
         device.pressBack(); device.pressBack(); device.pressHome()
         SystemClock.sleep(2000)
 
+        sampling.set(false); sampler.join(1_000)
         val tx = TrafficStats.getUidTxBytes(uid) - tx0
         val rx = TrafficStats.getUidRxBytes(uid) - rx0
         Log.i("P2.1", "local use: sent $tx bytes, received $rx bytes")
