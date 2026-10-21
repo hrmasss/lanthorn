@@ -152,9 +152,13 @@ class PlayerChromeTest {
         scenario.close()
         scenario = ActivityScenario.launch(PlayerActivity.intent(context, clip()))
         waitUntil(10_000) { (PlayerSessions.current.value?.state?.value?.positionMs ?: 0) > 500 }
-        compose.onNodeWithTag("video").performClick()
-        compose.waitUntil(2_000) { shown("end-time") }
-        val desc = compose.onNodeWithTag("end-time", useUnmergedTree = true).fetchSemanticsNode()
+        // Show the controls and read at once; tap again if auto-hide got there first.
+        fun endTime() = runCatching {
+            if (!shown("end-time")) compose.onNodeWithTag("video").performClick()
+            compose.waitUntil(2_000) { shown("end-time") }
+            compose.onNodeWithTag("end-time", useUnmergedTree = true).fetchSemanticsNode()
+        }
+        val desc = (endTime().getOrNull() ?: endTime().getOrThrow())
             .config[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
         log("US-16.4 after reopen the end time reads: $desc")
         assertTrue(desc.startsWith("Remaining"))
