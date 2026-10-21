@@ -80,6 +80,9 @@ object Playback : PlaybackControls {
      */
     private const val DECODER_CHECK_MS = 4_000L
     private const val DECODER_POLL_MS = 200L
+    private const val PAUSE_SETTLE_MS = 150L
+    private const val PAUSE_SETTLE_TRIES = 10
+    private const val LOG_SETTLE_MS = 300L
 
     /** Next and previous as seeks when the player screen has not given its step (US-31.4). */
     private const val DEFAULT_STEP_MS = 10_000L
@@ -149,6 +152,9 @@ object Playback : PlaybackControls {
 
     /** mpv log lines since the current file started, for the failure reason and "info". */
     private val lines = ArrayDeque<EngineMessage>()
+
+    /** The file whose failure is being named, so one failure gives one card. */
+    private var failing: Uri? = null
 
     fun init(context: Context) {
         this.context = context.applicationContext
@@ -360,6 +366,7 @@ object Playback : PlaybackControls {
             Log.i(TAG, "open $uri item ${queue.index + 1}/${queue.size} start $start")
             launch { _title.value = displayName(uri) }
             lines.clear()
+            failing = null
             when (start) {
                 StartAt.Beginning -> e.open(uri, decoder = decoder)
                 is StartAt.Resume -> {
@@ -397,8 +404,7 @@ object Playback : PlaybackControls {
                 savedAt = SystemClock.elapsedRealtime()
                 lastSaved = s
                 scope.launch(NonCancellable) {
-                    // The state's position can be one update behind the pause: ask mpv where it stopped.
-                    val at = if (fresh) engine.get("time-pos", PropertyType.Real)?.let { (it * 1000).toLong() } else null
+                    val at = if (fresh) settledPosition(engine) else null
                     write(if (at != null) s.copy(positionMs = at) else s, why)
                 }
             }
@@ -459,6 +465,21 @@ object Playback : PlaybackControls {
         watcher?.invokeOnCompletion { Log.i(TAG, "stopped following the engine", it) }
     }
 
+    /**
+     * Where mpv stopped after a pause: frames already decoded can still be shown just after it, so
+     * the position is read until two reads agree. The state's own position can trail it.
+     */
+    private suspend fun settledPosition(engine: PlayerEngine): Long? {
+        var at = engine.get("time-pos", PropertyType.Real) ?: return null
+        repeat(PAUSE_SETTLE_TRIES) {
+            delay(PAUSE_SETTLE_MS)
+            val now = engine.get("time-pos", PropertyType.Real) ?: return (at * 1000).toLong()
+            if (now == at) return (now * 1000).toLong()
+            at = now
+        }
+        return (at * 1000).toLong()
+    }
+
     /** A file that loads but has no decoder for its streams fails too (US-75.1, unsupported codec). */
     private suspend fun checkDecoders(engine: PlayerEngine, uri: String?) {
         // Video showing at any point means a decoder took it, whatever errors came before.
@@ -492,11 +513,15 @@ object Playback : PlaybackControls {
         val uri = queue.current
         // Network streams fail through library's overlay (P1.8), with retry; one card, not two.
         if (uri.scheme in NETWORK_SCHEMES) return
+        if (failing == uri) return
+        failing = uri
         queue.markFailed()
-        val reason = Failures.classify(s.error, lines.toList())
-        val details = Failures.technical(s.error, lines.toList())
-        Log.w(TAG, "failed $uri: $reason")
         scope.launch {
+            // The end of the file can arrive before mpv's lines saying why: let them land first.
+            delay(LOG_SETTLE_MS)
+            val reason = Failures.classify(s.error, lines.toList())
+            val details = Failures.technical(s.error, lines.toList())
+            Log.w(TAG, "failed $uri: $reason")
             val name = displayName(uri)
             val settings = _settings.value
             val allFailed = queue.size > 1 && queue.allFailed

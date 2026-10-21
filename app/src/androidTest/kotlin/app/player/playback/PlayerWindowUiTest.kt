@@ -262,10 +262,17 @@ class PlayerWindowUiTest {
         val close = device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)
             ?: device.wait(Until.findObject(By.descStartsWith("Dismiss")), 1_000)
         assertNotNull("no close button on the PiP window", close)
-        // PiP keeps playing, so the position that counts is the one at the close.
-        val at = state()!!.positionMs
+        // PiP keeps playing until the window is really gone, so the position that counts is the
+        // last one seen before the player went away.
+        var at = state()!!.positionMs
+        val gone = { state()?.positionMs?.let { at = it }; player() == null }
         close!!.click()
-        assertTrue("player still there after closing PiP", waitFor(5_000) { player() == null })
+        // The system can take several seconds to take the window down on the hosted emulator, and
+        // a tap during its menu animation can miss: tap Close again if the window is still up.
+        if (!waitFor(4_000, gone) && player()?.isInPictureInPictureMode == true) {
+            device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)?.let { c -> retrying { c.click() } }
+        }
+        assertTrue("player still there after closing PiP", waitFor(10_000, gone))
         // The save on leaving is written off the main thread; give it a moment after the close.
         var row = runBlocking { ResumePoints(context).get(uri.toString()) }
         waitFor(3_000) {
@@ -275,7 +282,7 @@ class PlayerWindowUiTest {
         log("after closing PiP at $at ms: row $row")
         val saved = row
         assertNotNull("no resume point after closing PiP", saved)
-        assertTrue("resume point ${saved!!.positionMs} not near $at", saved.positionMs in at - 1_000..at + 3_000)
+        assertTrue("resume point ${saved!!.positionMs} not near $at", saved.positionMs in at - 1_000..at + 1_000)
         shot("24-pip-closed")
     }
 
