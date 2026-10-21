@@ -34,7 +34,7 @@ internal class SubtitleStyles(context: Context) {
      * Subtitles keep at least this bottom margin. Read from the system dimension; 24 dp if absent.
      */
     @android.annotation.SuppressLint("DiscouragedApi", "InternalInsetResource")
-    private val navigationInsetPercent: Float = appContext.resources.let { r ->
+    val navigationInsetPercent: Float = appContext.resources.let { r ->
         val id = r.getIdentifier("navigation_bar_height_landscape", "dimen", "android")
             .takeIf { it != 0 } ?: r.getIdentifier("navigation_bar_height", "dimen", "android")
         val px = if (id != 0) r.getDimensionPixelSize(id) else (24 * r.displayMetrics.density).toInt()

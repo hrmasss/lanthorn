@@ -81,4 +81,11 @@
     <string name="subs_setting_set">Set</string>
     <string name="subs_setting_not_set">Not set</string>
     <string name="subs_setting_save">Save</string>
+    <string name="subs_setting_gestures">Gestures on subtitles</string>
+    <string name="subs_setting_gesture_swipe">Swipe for the previous or next line</string>
+    <string name="subs_setting_gesture_swipe_summary">Swipe sideways on a subtitle to jump to the line before or after</string>
+    <string name="subs_setting_gesture_drag">Drag to move subtitles</string>
+    <string name="subs_setting_gesture_drag_summary">Drag a subtitle up or down; the new height is kept</string>
+    <string name="subs_setting_gesture_pinch">Pinch to resize subtitles</string>
+    <string name="subs_setting_gesture_pinch_summary">Pinch on a subtitle to make it smaller or larger</string>
 </resources>

@@ -123,13 +123,22 @@ object SubtitlesExtension : PlayerExtension {
                 if (uri != null) runCatching { loader.onFileLoaded(engine, uri) }
             }
         }
+        // US-45: gestures on subtitle text, with the viewer's switches.
+        var switches = SubtitleGestureSwitches()
+        val switchJob = scope.launch { SubtitlePrefsStore(context).prefs.collect { switches = it.gestures } }
+        touch = SubtitleTouch(engine.asMpv(), styles::current, styles::update, { switches }, styles.navigationInsetPercent)
         scope.launch {
             PlayerSessions.current.first { it !== engine }
             job.cancel()
             loadJob.cancel()
             clearJob.cancel()
+            switchJob.cancel()
         }
     }
+
+    /** The live player's subtitle gestures; player-ui reaches them through the player-api hook. */
+    internal var touch: SubtitleTouch? = null
+        private set
 
     private val scope = MainScope()
     private var choices: PerFileChoices? = null
