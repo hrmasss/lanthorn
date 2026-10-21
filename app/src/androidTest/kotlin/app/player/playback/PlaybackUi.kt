@@ -104,7 +104,7 @@ internal class PlaybackUi(private val tag: String) {
     fun since(mark: String): List<String> {
         val all = shell("logcat -d -v epoch -s Playback:V $LOG_TAG:I").lines()
         val at = all.indexOfLast { it.contains(mark) }
-        return if (at < 0) emptyList() else all.drop(at + 1).filter { it.contains("Playback:") }
+        return if (at < 0) emptyList() else all.drop(at + 1).filter { it.contains("Playback:") && !it.contains("$LOG_TAG:") }
     }
 
     /** Uris playback opened after [mark], in order. */
@@ -210,6 +210,16 @@ internal object TestMedia {
     fun song(): Uri = made.getOrPut("Music/song.m4a") {
         val bytes = InstrumentationRegistry.getInstrumentation().context.assets.open("song.m4a").use { it.readBytes() }
         insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), "Music/$ROOT/", "Song.m4a", "audio/mp4", bytes)
+    }
+
+    /**
+     * A file in the app's own storage, opened as file://, for content MediaStore will not keep as
+     * a video (it drops the row of an mp4 whose codec tag it cannot read).
+     */
+    fun privateFile(name: String): Uri {
+        val f = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, name)
+        f.writeBytes(bytesFor(name))
+        return Uri.fromFile(f)
     }
 
     /** The file on disk behind a MediaStore uri. */

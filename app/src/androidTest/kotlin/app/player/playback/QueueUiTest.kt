@@ -227,9 +227,8 @@ class QueueUiTest {
 
     @Ears("US-75.1")
     @Test fun h_failuresNameTheReasonWithSkipAndInfo() {
-        val (broken, codec, gone, long) = TestMedia.videos(
-            "Odd" to "Broken.mp4", "Odd2" to "Codec unknown.mp4", "Odd4" to "Gone.mp4", "Single" to "Long.mp4",
-        )
+        val (broken, gone, long) = TestMedia.videos("Odd" to "Broken.mp4", "Odd4" to "Gone.mp4", "Single" to "Long.mp4")
+        val codec = TestMedia.privateFile("Codec unknown.mp4")
         // A file opened in a stale library: the row is there, the file is not.
         val path = TestMedia.path(gone)
         assertTrue("could not delete $path", path != null && File(path).delete())

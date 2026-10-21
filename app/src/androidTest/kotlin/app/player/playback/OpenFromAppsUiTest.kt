@@ -1,7 +1,6 @@
 package app.player.playback
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.StrictMode
 import android.os.SystemClock
@@ -60,12 +59,15 @@ class OpenFromAppsUiTest {
         device.unfreezeRotation()
     }
 
+    /** Whether the system offers this app for the view intent, asked as another app (the shell) would. */
     private fun offered(uri: String, type: String? = null, browsable: Boolean = false): Boolean {
-        val i = Intent(Intent.ACTION_VIEW)
-        if (type != null) i.setDataAndType(Uri.parse(uri), type) else i.data = Uri.parse(uri)
-        if (browsable) i.addCategory(Intent.CATEGORY_BROWSABLE)
-        val found = context.packageManager.queryIntentActivities(i, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
-            .any { it.activityInfo.packageName == context.packageName }
+        val cmd = buildString {
+            append("cmd package query-activities --brief -a android.intent.action.VIEW")
+            if (browsable) append(" -c android.intent.category.BROWSABLE")
+            append(" -d ").append(uri)
+            if (type != null) append(" -t ").append(type)
+        }
+        val found = ui.shell(cmd).lines().any { it.trim().startsWith("${context.packageName}/") }
         ui.log("offered for $uri ${type ?: ""}${if (browsable) " (browsable)" else ""}: $found")
         return found
     }
