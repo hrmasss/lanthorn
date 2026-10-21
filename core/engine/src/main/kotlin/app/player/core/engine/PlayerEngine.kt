@@ -25,6 +25,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
@@ -41,7 +43,26 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
     private val appContext = context.applicationContext
     @Volatile private var engineThread: Thread? = null
-    private val thread: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine").also { engineThread = it } }
+    // When the task running on the engine thread started, 0 while idle: the watchdog reads it.
+    @Volatile private var busySince = 0L
+    private val thread: ScheduledExecutorService = object : ScheduledThreadPoolExecutor(1, { r -> Thread(r, "engine").also { engineThread = it } }) {
+        override fun beforeExecute(t: Thread, r: Runnable) { busySince = SystemClock.elapsedRealtime() }
+        override fun afterExecute(r: Runnable, t: Throwable?) { busySince = 0L }
+    }
+
+    /**
+     * Set once when a call into mpv has blocked the engine thread for [STALL_MS] while a hardware
+     * decoder runs: a MediaCodec that stops answering (for example inside a seek) holds mpv, and
+     * this engine cannot recover. [PlayerSessions] replaces it with a new engine on SW at the same
+     * place (NF-5 mid-playback). Plain engines only report it.
+     */
+    val stalled: StateFlow<Stall?> get() = _stalled.asStateFlow()
+    private val _stalled = MutableStateFlow<Stall?>(null)
+    private var swStallLogged = false
+    private val watchdog: ScheduledFuture<*>? =
+        if (preview) null else WATCHDOG.scheduleWithFixedDelay({ checkStall() }, STALL_CHECK_MS, STALL_CHECK_MS, TimeUnit.MILLISECONDS)
+    // A notice that outlives the decoder judgement for this file: why it plays on SW after a stall.
+    @Volatile private var stickyNotice: String? = null
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
@@ -152,19 +173,30 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
      * [decoder] is the mode for this file, normally from [DecoderSettings.choose]; null keeps the
      * current one. [launchDecoder], when set, wins over both.
      */
-    fun open(uri: Uri, startMs: Long = 0, decoder: DecoderMode? = null) {
+    fun open(uri: Uri, startMs: Long = 0, decoder: DecoderMode? = null) = open(uri, startMs, decoder, notice = null, startPaused = false)
+
+    /** After [stall] on another engine: the same file and place on SW, paused if it was, saying why. */
+    internal fun openAfterStall(stall: Stall) {
+        val launch = launchDecoder
+        launchDecoder = null
+        open(Uri.parse(stall.uri), stall.positionMs, DecoderMode.SW, "${stall.decoder.label} stopped responding. Playing with SW.", stall.paused)
+        launchDecoder = launch
+    }
+
+    private fun open(uri: Uri, startMs: Long, decoder: DecoderMode?, notice: String?, startPaused: Boolean) {
         openedAt = SystemClock.elapsedRealtime()
         val mode = launchDecoder ?: decoder ?: _state.value.decoderMode
+        stickyNotice = notice
         // open() starts playback (pause=no below). Say so now: when mpv was already unpaused it
         // sends no change event, and the default `paused = true` would stick for the whole file.
-        _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode, paused = false)
+        _state.value = PlaybackState(uri = uri.toString(), decoderMode = mode, paused = startPaused, decoderNotice = notice)
         post {
             setProperty("hwdec", mode.hwdec)
             val path = resolve(uri)
             val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
             val load: () -> Unit = {
                 mpvCommand("loadfile", path, "replace", "-1", opts)
-                setProperty("pause", if (preview) "yes" else "no")
+                setProperty("pause", if (preview || startPaused) "yes" else "no")
             }
             if (hasSurface) {
                 load()
@@ -294,6 +326,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
 
     /** Switches decoder live at the current position. mpv reinitialises only the video decoder. */
     fun setDecoder(mode: DecoderMode) {
+        stickyNotice = null
         // Judge the pick against the decoder running now. HW and Auto share one hwdec list, so a
         // pick of HW over a file already on SW changes nothing in mpv and sends no event; if mpv
         // does switch, the hwdec-current event corrects this.
@@ -436,6 +469,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     fun release() {
         if (released) return
         released = true
+        watchdog?.cancel(false)
         thread.execute {
             mpv?.removeObserver(observer)
             mpv?.removeLogObserver(logObserver)
@@ -446,7 +480,18 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         thread.shutdown()
     }
 
-    private fun resolve(uri: Uri): String = when (uri.scheme) {
+    private fun resolve(uri: Uri): String {
+        // Opening a content uri (SMB, a slow provider) can take seconds and is not mpv: keep it
+        // out of the watchdog's count.
+        busySince = 0L
+        try {
+            return resolveNow(uri)
+        } finally {
+            busySince = SystemClock.elapsedRealtime()
+        }
+    }
+
+    private fun resolveNow(uri: Uri): String = when (uri.scheme) {
         "content" -> {
             closeFd()
             val pfd = appContext.contentResolver.openFileDescriptor(uri, "r")
@@ -463,6 +508,29 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         openFd?.close()
         openFd = null
     }
+
+    private fun checkStall() {
+        val since = busySince
+        if (released || since == 0L || _stalled.value != null) return
+        val ms = SystemClock.elapsedRealtime() - since
+        if (ms < STALL_MS) return
+        val s = _state.value
+        val stack = engineThread?.stackTrace?.take(12)?.joinToString("\n") { "  at $it" }
+        if (s.uri == null || (s.activeDecoder != ActiveDecoder.HW && s.activeDecoder != ActiveDecoder.HW_PLUS)) {
+            // Software decoding has no other decoder to fall to: say so once.
+            if (!swStallLogged) Log.w(TAG, "engine thread busy $ms ms on ${s.activeDecoder.label}, no fallback; at:\n$stack")
+            swStallLogged = true
+            return
+        }
+        Log.w(TAG, "engine stalled $ms ms on ${s.activeDecoder.label} at ${s.positionMs} ms: recovering on SW; engine thread at:\n$stack")
+        _stalled.value = Stall(s.uri, s.positionMs, s.paused, s.activeDecoder)
+    }
+
+    /**
+     * Holds the engine thread for [ms], as a decoder that stops answering inside mpv would. Tests
+     * only: proves the watchdog and that the UI does not wait on the engine.
+     */
+    fun blockEngineThreadForTest(ms: Long) = post { Thread.sleep(ms) }
 
     private fun post(block: () -> Unit) {
         if (released) return
@@ -485,7 +553,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     }
 
     private fun runAndWait(block: () -> Unit) {
-        if (released) return
+        // A stalled engine never answers: do not hold the caller (the main thread) for it.
+        if (released || _stalled.value != null) return
         val done = CountDownLatch(1)
         execute {
             try {
@@ -545,7 +614,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         val requested = lib.getPropertyString("hwdec")
         val s = _state.updateAndGet {
             val judged = requested == it.decoderMode.hwdec
-            it.copy(activeDecoder = running, decoderNotice = if (judged) fallbackNotice(it.decoderMode, running) else it.decoderNotice)
+            it.copy(activeDecoder = running, decoderNotice = if (judged) stickyNotice ?: fallbackNotice(it.decoderMode, running) else it.decoderNotice)
         }
         Log.i(TAG, "decoder ${running.label} ($hwdec), chosen ${s.decoderMode}, notice ${s.decoderNotice}")
     }
@@ -640,6 +709,10 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // A newer seek cancels the one in flight, so replacing slow seeks early means no frame ever
         // lands on a slow decoder. Wait this long for a seek to finish before giving up on it.
         private const val GET_TIMEOUT_MS = 5000L
+        // An mpv call that has not returned in this long on a hardware decoder is a stall.
+        const val STALL_MS = 3000L
+        private const val STALL_CHECK_MS = 250L
+        private val WATCHDOG: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine-watchdog").apply { isDaemon = true } }
         private const val SCRUB_STALL_MS = 5000L
         // Longest a landed preview frame holds the next seek back when the view never reports it.
         private const val SHOW_WAIT_MS = 500L
