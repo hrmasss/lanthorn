@@ -71,6 +71,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -730,12 +732,14 @@ private fun Context.openAppSettings() {
 
 /** US-08: one tap back into the last played video; the player resumes it at its resume point. */
 @Composable
-private fun ResumeButton(onClick: () -> Unit) {
+internal fun ResumeButton(onClick: () -> Unit) {
+    val label = stringResource(R.string.resume_last)
     ExtendedFloatingActionButton(
         onClick = onClick,
         icon = { Icon(LanthornIcons.Play, contentDescription = null) },
-        text = { Text(stringResource(R.string.resume_last)) },
-        // Above the floating view toolbar.
-        modifier = Modifier.padding(bottom = 72.dp).testTag("resume-last"),
+        text = { Text(label) },
+        // Above the floating view toolbar. The label is set on the button itself: the extended
+X
+        modifier = Modifier.padding(bottom = 72.dp).testTag("resume-last").semantics { contentDescription = label },
     )
 }
