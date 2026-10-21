@@ -206,8 +206,9 @@ fun PlayerScreen(
     fun show(message: String) { note = Note(message, NOTE_MS) }
 
     // US-23.2: every new video starts at the default speed.
-    LaunchedEffect(state.uri, prefs.defaultSpeed) {
-        if (state.uri != null) {
+    // Keyed on each load, not the uri: reopening the same file is a new video too.
+    LaunchedEffect(state.uri, state.loaded, prefs.defaultSpeed) {
+        if (state.uri != null && state.loaded) {
             android.util.Log.i("PlayerChrome", "default speed ${prefs.defaultSpeed} for a new video")
             tools.setSpeed(prefs.defaultSpeed)
         }
