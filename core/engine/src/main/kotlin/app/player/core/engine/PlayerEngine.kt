@@ -196,7 +196,14 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         post {
             setProperty("hwdec", mode.hwdec)
             val path = resolve(uri)
-            val opts = if (startMs > 0) "start=${startMs / 1000.0}" else ""
+            // Track choices are global in mpv: a pick on the last file (a remembered one, applied after
+            // its load) would carry into this one. Each file starts on mpv's own rule; features apply
+            // their per-file picks after it loads.
+            val opts = listOfNotNull(
+                if (startMs > 0) "start=${startMs / 1000.0}" else null,
+                if (preview) null else "aid=auto",
+                if (preview) null else "sid=auto",
+            ).joinToString(",")
             val load: () -> Unit = {
                 mpvCommand("loadfile", path, "replace", "-1", opts)
                 setProperty("pause", if (preview || startPaused) "yes" else "no")

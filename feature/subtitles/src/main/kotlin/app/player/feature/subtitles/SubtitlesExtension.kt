@@ -110,7 +110,9 @@ object SubtitlesExtension : PlayerExtension {
         val job = scope.launch {
             engine.state.map { it.loaded to it.uri }.distinctUntilChanged().filter { it.first }.mapNotNull { it.second }.collect { uri ->
                 val remembered = perFile.get(uri, DELAY_KEY)?.toLongOrNull()
-                controller.setDelayMs(remembered ?: store.defaultDelayMs.first())
+                val delayMs = remembered ?: store.defaultDelayMs.first()
+                // The reads can outlast a quick next file: then this delay is not for the open one.
+                if (engine.state.value.uri == uri) controller.setDelayMs(delayMs)
             }
         }
         // US-39: subtitle files beside the video, and which track turns on, once the file has loaded.

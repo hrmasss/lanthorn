@@ -146,7 +146,9 @@ object AudioExtension : PlayerExtension {
                     // mpv's aid is global: without a remembered pick, give the choice back to its own rule
                     // (preferred language, else the default-flagged track), not the last file's pick.
                     val remembered = uri?.let { store.get(it, TRACK_KEY) }?.toLongOrNull()
-                    engine.set("aid", remembered?.toString() ?: "auto")
+                    // The read can outlast a quick next file: then this pick is not for the open one.
+                    // open() sets the uri on the main thread before it loads, so this check holds.
+                    if (engine.state.value.uri == uri) engine.set("aid", remembered?.toString() ?: "auto")
                 }
             },
             // US-50.3: the equalizer as the viewer left it, saved again as it changes.

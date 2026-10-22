@@ -47,6 +47,8 @@ class AudioSettingsOnDeviceTest {
 
     private suspend fun open(name: String) {
         engine.open(Uri.fromFile(OnDevice.asset(name)))
+        // The last file's tracks answer until mpv has switched: wait for this one first.
+        engine.await("path", PropertyType.Text, 10_000) { it?.endsWith(name) == true }
         engine.await("track-list/count", PropertyType.Int64, 10_000) { (it ?: 0) >= 2 }
         engine.await("current-tracks/audio/id", PropertyType.Int64, 10_000) { it != null }
     }
@@ -101,6 +103,17 @@ class AudioSettingsOnDeviceTest {
         app.player.core.data.choice.PerFileChoices(OnDevice.context).forget(Uri.fromFile(OnDevice.asset("tracks.mkv")).toString())
         assertEquals("eng", whenOff)
         evidence("US-47.4 picked the Italian track, opened another file, reopened: Italian restored; with remember choices off it opened on 'eng'")
+    }
+
+    /** A pick on one file does not carry into the next: mpv's track choice is global (1.0.1). */
+    @Test fun aPickStaysWithItsFile() = runBlocking {
+        open("tracks.mkv")
+        val ita = parseTracks(engine.get("track-list", PropertyType.Text)).first { it.type == "audio" && it.lang == "ita" }.id
+        OnDevice.main { AudioController(engine.asMpv()).select(ita) }
+        engine.await("current-tracks/audio/lang", PropertyType.Text, 10_000) { it == "ita" }
+        // long.mp4 has one audio track, id 1: the Italian pick (id 2) must not leave it silent.
+        open("long.mp4")
+        assertEquals(1L, engine.get("current-tracks/audio/id", PropertyType.Int64))
     }
 
     @Ears("US-47.2")
