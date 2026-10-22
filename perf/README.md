@@ -13,7 +13,7 @@ What Hojayfa does, start to end. About 45 minutes, most of it unattended.
 | Step | Command or action | Done when |
 |---|---|---|
 | 1. Tools | `adb`, `ffmpeg`, `python3`, `gh` (logged in) on apollo | `adb version`, `ffmpeg -version` answer |
-| 2. Code | `git clone https://github.com/hrmasss/player-app && cd player-app` (or `git pull` on main) | on main |
+| 2. Code | `git clone https://github.com/hrmasss/lanthorn && cd lanthorn` (or `git pull` on main) | on main |
 | 3. Media | `perf/gen-media.sh` (once, tens of minutes; files land in `perf/media/`, not committed) | 9 files in `perf/media/` |
 | 4. Bench APK | `gh run download $(gh run list -b main -w CI -s success -L 1 --json databaseId -q '.[0].databaseId') -n app-bench-arm64 -D perf` | `perf/app-arm64-v8a-bench.apk` |
 | 5. Phone | USB debugging on, plugged in, battery 50% or more, airplane mode on, brightness fixed, screen timeout 30 min, Developer options > Show taps on, cool to the touch | `adb devices` lists one device |

@@ -5,7 +5,7 @@ phone, your SD card and your home network, with hardware decoding, gestures and 
 subtitles. It has no ads, no tracking and no account. It runs on Android 10 and later, targets
 Android 16, and is free software under GPL-3.0-or-later.
 
-Download the APK for your phone from [Releases](https://github.com/hrmasss/player-app/releases).
+Download the APK for your phone from [Releases](https://github.com/hrmasss/lanthorn/releases).
 
 ## Features
 

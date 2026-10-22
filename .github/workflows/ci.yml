@@ -86,8 +86,8 @@ jobs:
 
       # Small artifacts for emulator runs: downloads need no lock and run at about 0.3 MB/s on
       # hapl-aux, so each one holds a single x86_64 APK (test APKs carry x86_64 libraries only).
-      #   gh run download <id> -R hrmasss/player-app -n app-debug-x86_64
-      #   gh run download <id> -R hrmasss/player-app -n test-core-engine
+      #   gh run download <id> -R hrmasss/lanthorn -n app-debug-x86_64
+      #   gh run download <id> -R hrmasss/lanthorn -n test-core-engine
       # A new module with instrumented tests adds its own step below.
       - uses: actions/upload-artifact@v7
         with:
@@ -96,7 +96,7 @@ jobs:
           retention-days: 7
 
       # The phone bench (P2.4): the arm64 bench build, kept a month so a phone run can use any recent main.
-      #   gh run download <id> -R hrmasss/player-app -n app-bench-arm64
+      #   gh run download <id> -R hrmasss/lanthorn -n app-bench-arm64
       - uses: actions/upload-artifact@v7
         with:
           name: app-bench-arm64
