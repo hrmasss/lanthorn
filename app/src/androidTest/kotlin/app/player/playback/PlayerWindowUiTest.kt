@@ -243,9 +243,19 @@ class PlayerWindowUiTest {
         // US-58.3: expand returns to the full player, same file, same position (no reopen).
         val uri = state()!!.uri
         val before = state()!!.positionMs
-        val expand = device.wait(Until.findObject(By.descStartsWith("Expand")), 1_500)
-            ?: device.wait(Until.findObject(By.descContains("ull screen")), 1_500)
-        if (expand != null) expand.click() else device.click(b.centerX(), b.centerY())
+        // The menu hides after a few seconds: bring it back and tap Expand itself. A blind tap on
+        // the window can land on another menu button once the menu shows (seen: Close).
+        val expandSel = listOf(By.descStartsWith("Expand"), By.descContains("ull screen"))
+        var expanded = false
+        for (i in 1..3) {
+            if (expandSel.none { device.hasObject(it) }) {
+                device.click(b.centerX(), b.centerY())
+                device.wait(Until.hasObject(expandSel[0]), 2_000)
+            }
+            expanded = retrying { expandSel.firstNotNullOfOrNull { device.findObject(it) }?.click() != null } == true
+            if (expanded) break
+        }
+        assertTrue("no Expand button in the PiP menu", expanded)
         assertTrue("not back to the full player", waitFor(5_000) { player()?.isInPictureInPictureMode == false && player()?.hasWindowFocus() == true })
         val after = state()!!.positionMs
         log("expand: $before -> $after ms, uri ${state()!!.uri}")
