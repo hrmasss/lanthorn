@@ -537,9 +537,10 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         val ms = SystemClock.elapsedRealtime() - since
         if (ms < STALL_MS) return
         val s = _state.value
-        // Before any decoder runs, mpv is still opening the file (scripts, fonts, demuxer) and holds
-        // its lock for seconds on a slow device. A decoder hanging at open is caught at the longer bound.
-        if (s.activeDecoder == ActiveDecoder.NONE && ms < OPEN_STALL_MS) return
+        // Until the first frame shows, mpv is still opening the file (scripts, fonts, demuxer, decoders,
+        // audio output) and holds its lock for seconds on a slow device. A decoder hanging at open is
+        // caught at the longer bound.
+        if (s.firstFrameMs == null && ms < OPEN_STALL_MS) return
         // Right after a surface change (rotation, picture-in-picture) mpv rebuilds its video output and
         // compiles shaders, over 3 s on a software GPU. That is not the decoder.
         if (since - surfaceChangedAt in 0..SURFACE_REBUILD_WINDOW_MS && ms < SURFACE_STALL_MS) return
