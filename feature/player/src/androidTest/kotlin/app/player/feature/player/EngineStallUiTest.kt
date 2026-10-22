@@ -122,7 +122,8 @@ class EngineStallUiTest {
 
     private fun onHardware(): PlayerEngine {
         val engine = PlayerSessions.current.value!!
-        waitUntil(5_000) { engine.state.value.activeDecoder.let { it == ActiveDecoder.HW || it == ActiveDecoder.HW_PLUS } }
+        // Playing, past the first frame: before it the watchdog allows the longer open bound.
+        waitUntil(10_000) { engine.state.value.let { (it.activeDecoder == ActiveDecoder.HW || it.activeDecoder == ActiveDecoder.HW_PLUS) && it.firstFrameMs != null } }
         return engine
     }
 

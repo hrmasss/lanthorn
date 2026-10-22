@@ -70,7 +70,8 @@ class DecoderFallbackTest {
     @Ears("NF-5")
     @Test fun watchdogReportsAStuckEngineOnHardware_NF5(): Unit = runBlocking {
         engine.open(asset("clip.mp4"))
-        withTimeout(10_000) { engine.state.first { it.activeDecoder == ActiveDecoder.HW || it.activeDecoder == ActiveDecoder.HW_PLUS } }
+        // Mid-playback: before the first frame the watchdog allows the longer open bound.
+        withTimeout(10_000) { engine.state.first { (it.activeDecoder == ActiveDecoder.HW || it.activeDecoder == ActiveDecoder.HW_PLUS) && it.firstFrameMs != null } }
         val t0 = android.os.SystemClock.elapsedRealtime()
         engine.blockEngineThreadForTest(10_000)
         val stall = withTimeout(PlayerEngine.STALL_MS + 2_000) { engine.stalled.first { it != null } }!!
