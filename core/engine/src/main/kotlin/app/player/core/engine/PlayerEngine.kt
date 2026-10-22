@@ -45,6 +45,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     @Volatile private var engineThread: Thread? = null
     // When the task running on the engine thread started, 0 while idle: the watchdog reads it.
     @Volatile private var busySince = 0L
+    // When the surface last attached or changed size: mpv rebuilds its video output then (watchdog).
+    @Volatile private var surfaceChangedAt = 0L
     private val thread: ScheduledExecutorService = object : ScheduledThreadPoolExecutor(1, { r -> Thread(r, "engine").also { engineThread = it } }) {
         override fun beforeExecute(t: Thread, r: Runnable) { busySince = SystemClock.elapsedRealtime() }
         override fun afterExecute(r: Runnable, t: Throwable?) { busySince = 0L }
@@ -429,6 +431,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     }
 
     fun attachSurface(surface: Surface) = runAndWait {
+        surfaceChangedAt = SystemClock.elapsedRealtime()
         mpv?.attachSurface(surface)
         mpv?.setOptionString("force-window", "yes")
         setProperty("vo", "gpu-next,gpu")
@@ -447,6 +450,7 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
     }
 
     fun setSurfaceSize(width: Int, height: Int) = post {
+        surfaceChangedAt = SystemClock.elapsedRealtime()
         setProperty("android-surface-size", "${width}x$height")
     }
 
@@ -536,6 +540,9 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // Before any decoder runs, mpv is still opening the file (scripts, fonts, demuxer) and holds
         // its lock for seconds on a slow device. A decoder hanging at open is caught at the longer bound.
         if (s.activeDecoder == ActiveDecoder.NONE && ms < OPEN_STALL_MS) return
+        // Right after a surface change (rotation, picture-in-picture) mpv rebuilds its video output and
+        // compiles shaders, over 3 s on a software GPU. That is not the decoder.
+        if (since - surfaceChangedAt in 0..SURFACE_REBUILD_WINDOW_MS && ms < SURFACE_STALL_MS) return
         val stack = engineThread?.stackTrace?.take(12)?.joinToString("\n") { "  at $it" }
         // Hardware runs, or was just asked for (a live switch can stall while MediaCodec opens).
         val onHardware = s.activeDecoder == ActiveDecoder.HW || s.activeDecoder == ActiveDecoder.HW_PLUS
@@ -756,6 +763,8 @@ class PlayerEngine private constructor(context: Context, private val preview: Bo
         // An mpv call that has not returned in this long on a hardware decoder is a stall.
         const val STALL_MS = 3000L
         const val OPEN_STALL_MS = 10_000L
+        private const val SURFACE_STALL_MS = 5000L
+        private const val SURFACE_REBUILD_WINDOW_MS = 2000L
         private const val STALL_CHECK_MS = 250L
         private val WATCHDOG: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "engine-watchdog").apply { isDaemon = true } }
         private const val SCRUB_STALL_MS = 5000L
