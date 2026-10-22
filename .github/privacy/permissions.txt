@@ -8,4 +8,4 @@ android.permission.MODIFY_AUDIO_SETTINGS            # audio: equalizer and volum
 android.permission.FOREGROUND_SERVICE               # engine: background play (US-59)
 android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK # engine: background play service type
 android.permission.POST_NOTIFICATIONS               # engine: the playback notification (US-59)
-app.player.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION # androidx core: guards the app's own receivers
+io.github.hrmasss.lanthorn.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION # androidx core: guards the app's own receivers

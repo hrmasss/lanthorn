@@ -13,9 +13,9 @@ adb shell svc power stayon true
 adb shell input keyevent KEYCODE_WAKEUP; adb shell wm dismiss-keyguard
 adb install -r -g "$ORCH/orchestrator-1.6.1.apk" >/dev/null
 adb install -r -g "$ORCH/test-services-1.6.0.apk" >/dev/null
-adb uninstall app.player >/dev/null 2>&1
+adb uninstall io.github.hrmasss.lanthorn >/dev/null 2>&1
 adb install "$APK/app-debug-x86_64/app-x86_64-debug.apk" > "$OUT/app-install.txt" 2>&1
-adb shell pm grant app.player android.permission.READ_MEDIA_VIDEO 2>/dev/null
+adb shell pm grant io.github.hrmasss.lanthorn android.permission.READ_MEDIA_VIDEO 2>/dev/null
 for p in $S $A; do adb uninstall $p.test >/dev/null 2>&1; adb shell rm -rf /sdcard/Android/data/$p.test; done
 adb install -r -t "$APK/test-feature-subtitles/subtitles-debug-androidTest.apk" >/dev/null
 adb install -r -t "$APK/test-feature-audio/audio-debug-androidTest.apk" >/dev/null

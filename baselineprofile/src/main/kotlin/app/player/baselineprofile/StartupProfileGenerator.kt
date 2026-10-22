@@ -21,4 +21,4 @@ class StartupProfileGenerator {
     }
 }
 
-const val TARGET = "app.player"
+const val TARGET = "io.github.hrmasss.lanthorn"

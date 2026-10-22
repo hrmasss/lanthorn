@@ -212,7 +212,7 @@ class PlayerWindowUiTest {
         assertTrue("no picture-in-picture after home", waitFor(5_000) { player()?.isInPictureInPictureMode == true })
         // The window settles into its corner after entering, so read its bounds once it has.
         SystemClock.sleep(1_000)
-        val b = retrying { device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds }
+        val b = retrying { device.wait(Until.findObject(By.pkg(context.packageName)), 3_000)!!.visibleBounds }
         assertNotNull("no PiP window", b)
         b!!
         val ratio = b.width().toFloat() / b.height()
@@ -271,7 +271,7 @@ class PlayerWindowUiTest {
         device.pressHome()
         assertTrue(waitFor(5_000) { player()?.isInPictureInPictureMode == true })
         SystemClock.sleep(1_000)
-        val b = retrying { device.wait(Until.findObject(By.pkg("app.player")), 3_000)!!.visibleBounds }!!
+        val b = retrying { device.wait(Until.findObject(By.pkg(context.packageName)), 3_000)!!.visibleBounds }!!
         device.click(b.centerX(), b.centerY())
         SystemClock.sleep(1_500)
         val close = device.wait(Until.findObject(By.descStartsWith("Close")), 2_000)
