@@ -71,6 +71,10 @@ MEDIA=/sdcard/Movies/PlayerBench
 
 echo "device: $model, Android $release, SoC ${soc:-unknown}${emu:+ (emulator)}"
 adb uninstall "$PKG" >/dev/null 2>&1 || true
+# A results folder left from an earlier install can belong to another user id: the bench then
+# cannot write its results (EACCES) and every scenario times out. Start from none.
+adb shell "ls -lnd /sdcard/Android/data/$PKG /sdcard/Android/data/$PKG/files/bench" 2>/dev/null || true
+adb shell rm -rf "/sdcard/Android/data/$PKG" 2>/dev/null || true
 adb install -r -g "$APK" >/dev/null
 adb shell mkdir -p "$MEDIA"
 for f in media/*.mp4 media/*.mkv media/*.webm; do
