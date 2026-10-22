@@ -15,9 +15,9 @@ adb shell svc power stayon true
 adb shell input keyevent KEYCODE_WAKEUP; adb shell wm dismiss-keyguard
 adb install -r -g "$ORCH/orchestrator-1.6.1.apk" >/dev/null
 adb install -r -g "$ORCH/test-services-1.6.0.apk" >/dev/null
-adb uninstall app.player >/dev/null 2>&1
+adb uninstall io.github.hrmasss.lanthorn >/dev/null 2>&1
 adb install "$APK/app-debug-x86_64/app-x86_64-debug.apk" > "$OUT/app-install.txt" 2>&1
-adb shell pm grant app.player android.permission.READ_MEDIA_VIDEO 2>/dev/null
+adb shell pm grant io.github.hrmasss.lanthorn android.permission.READ_MEDIA_VIDEO 2>/dev/null
 for p in $S $A; do adb uninstall $p.test >/dev/null 2>&1; adb shell rm -rf /sdcard/Android/data/$p.test; done
 adb install -r -t "$APK/test-feature-subtitles/subtitles-debug-androidTest.apk" >/dev/null
 adb install -r -t "$APK/test-feature-audio/audio-debug-androidTest.apk" >/dev/null
@@ -29,7 +29,7 @@ orch $S subtitles
 orch $A audio
 # The Subtitle and Audio groups in the real Settings screen (app module).
 adb install -r -t "$(ls "$APK"/test-app/*.apk | head -1)" >/dev/null
-adb shell am instrument -w -e class app.player.SettingsGroupsUiTest app.player.test/$R > "$OUT/app-instrument.txt" 2>&1
-adb pull /sdcard/Android/data/app.player/files/gate "$OUT/app-shots" >/dev/null 2>&1
+adb shell am instrument -w -e class app.player.SettingsGroupsUiTest io.github.hrmasss.lanthorn.test/$R > "$OUT/app-instrument.txt" 2>&1
+adb pull /sdcard/Android/data/io.github.hrmasss.lanthorn/files/gate "$OUT/app-shots" >/dev/null 2>&1
 adb logcat -d -s evidence:I > "$OUT/evidence-lines.txt"
 adb logcat -d | grep -E " mpv |PlayerEngine|AndroidRuntime|TestRunner|evidence" | tail -6000 > "$OUT/logcat-tail.txt"

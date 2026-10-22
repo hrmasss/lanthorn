@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- The real-settings test starts the app (package visibility, Android 11+). -->
     <queries>
-        <package android:name="app.player" />
+        <package android:name="io.github.hrmasss.lanthorn" />
     </queries>
     <!-- Test only: puts a video in shared storage through MediaStore, as the library finds them. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />

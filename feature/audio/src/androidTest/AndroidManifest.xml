@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- The real-settings test starts the app (package visibility, Android 11+). -->
     <queries>
-        <package android:name="app.player" />
+        <package android:name="io.github.hrmasss.lanthorn" />
     </queries>
     <application>
         <activity android:name="app.player.feature.audio.VideoTestActivity" android:exported="false" android:screenOrientation="landscape"

@@ -19,7 +19,7 @@ android {
 
     defaultConfig {
         // Codename id. Changes when brand's name lands.
-        applicationId = "app.player"
+        applicationId = "io.github.hrmasss.lanthorn"
         versionCode = 1
         // The release workflow refuses a tag that is not "v" + this name.
         versionName = "1.0.0"

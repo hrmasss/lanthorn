@@ -50,7 +50,7 @@ if [ -n "$warnings" ]; then
   [ $FORCE = 1 ] || { echo "fix it, or rerun with --force to record anyway"; exit 2; }
 fi
 
-PKG=app.player.bench
+PKG=io.github.hrmasss.lanthorn.bench
 MAIN=$PKG/app.player.MainActivity
 PLAYER=$PKG/app.player.feature.player.PlayerActivity
 BENCH=$PKG/app.player.bench.BenchActivity

@@ -30,7 +30,7 @@ once, so step 7 plays the very same files. Record the phone in `perf/devices.md`
 
 ```
 perf/gen-media.sh                 # once; full set, tens of minutes. --quick for 10 s clips
-./gradlew :app:assembleBench      # release code + bench mode, debug-signed, id app.player.bench
+./gradlew :app:assembleBench      # release code + bench mode, debug-signed, id io.github.hrmasss.lanthorn.bench
 perf/bench.sh --apk app/build/outputs/apk/bench/app-arm64-v8a-bench.apk
 ```
 

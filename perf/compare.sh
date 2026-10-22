@@ -22,7 +22,7 @@ done
 [ -n "$OTHER" ] || { echo "--package <other app package> is required"; exit 2; }
 adb shell pm path "$OTHER" > /dev/null 2>&1 || { echo "$OTHER is not installed"; exit 2; }
 LABEL=${LABEL:-$OTHER}
-OURS=app.player.bench
+OURS=io.github.hrmasss.lanthorn.bench
 OUT=$(ls -t results/*.md 2>/dev/null | head -1)
 [ -n "$OUT" ] || { echo "run perf/bench.sh first: this adds to its results file"; exit 2; }
 MEDIA=/sdcard/Movies/PlayerBench

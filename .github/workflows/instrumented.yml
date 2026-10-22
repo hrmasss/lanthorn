@@ -3,7 +3,7 @@ name: Instrumented
 # Every module's androidTest on its own API 36 emulator, in parallel, on GitHub-hosted runners
 # (free and with KVM now that the repo is public). Builds stay on the self-hosted CI workflow.
 # Results per module: artifact `androidTest-<module>` (JUnit XML, HTML report, logcat, and the
-# files tests write under /sdcard/Android/data/app.player*/files, such as screenshots).
+# files tests write under /sdcard/Android/data/{io.github.hrmasss.lanthorn,app.player}*/files, such as screenshots).
 # Main runs all modules on every push; branches and PRs run only the modules they touched, plus the
 # app, and everything when shared code or the build changed (.github/scripts/instrumented-matrix.sh).
 
@@ -126,7 +126,7 @@ jobs:
             if [ "${{ matrix.module }}" = app ]; then rm -rf /tmp/others && cp -r app/build/outputs/androidTest-results/connected/debug /tmp/others || true; fi
             if [ "${{ matrix.module }}" = app ]; then ./gradlew ${{ matrix.task }} -Pandroid.testInstrumentationRunnerArguments.class=app.player.NoTrafficUiTest -Pandroid.testInstrumentationRunnerArguments.timing=lenient -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain || touch failed.marker; fi
             if [ -d /tmp/others ]; then mkdir -p app/build/outputs/androidTest-results/connected/debug/others && cp -r /tmp/others/. app/build/outputs/androidTest-results/connected/debug/others/; fi
-            mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
+            mkdir -p device-files && for d in $(adb shell 'ls -d /sdcard/Android/data/io.github.hrmasss.lanthorn* /sdcard/Android/data/app.player*' | tr -d '\r'); do adb pull "$d/files" "device-files/$(basename "$d")" || true; done
             adb logcat -d > logcat.txt || true
             # A test class JUnit cannot run (a @Before that returns a value, a bad constructor) is
             # dropped without a failure in the XML. Make that fail the job.
